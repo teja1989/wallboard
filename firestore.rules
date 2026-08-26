@@ -63,6 +63,13 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // The addresses a host is sending to. Server-only: a guest list of email addresses
+      // is exactly the thing that must not be readable by everyone holding the code, and
+      // the host reads it through an authorised API call.
+      match /invitees/{inviteeId} {
+        allow read, write: if false;
+      }
+
       // The live wall. Removed and quarantined posts stay invisible to members.
       match /posts/{postId} {
         allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();
@@ -83,6 +90,12 @@ service cloud.firestore {
 
     // Audit logs are read through the admin API so every read is itself accountable.
     match /auditLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    // Development outbox. Server-only in every environment — it holds rendered messages
+    // addressed to real people.
+    match /mailOutbox/{messageId} {
       allow read, write: if false;
     }
 

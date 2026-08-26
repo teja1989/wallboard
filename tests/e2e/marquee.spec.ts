@@ -71,14 +71,25 @@ test.describe('creating an event', () => {
     await expect(page.getByRole('button', { name: /send the invitation/i })).toBeDisabled();
   });
 
-  test('every theme is offered while billing is in preview', async ({ page }) => {
+  test('the design gallery is browsable and grouped by occasion', async ({ page }) => {
+    await page.goto('/templates');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /wedding/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /works for anything/i })).toBeVisible();
+    // Every card links somewhere someone can act on.
+    await expect(page.getByRole('link', { name: /make an invitation/i }).first()).toBeVisible();
+  });
+
+  test('every design is offered while billing is in preview', async ({ page }) => {
     // Billing is off, so nothing is gated — and the page says exactly that rather than
     // dangling a paywall the visitor will never actually meet.
     await signIn(page, uniqueEmail('host'));
     await page.goto('/create');
     await expect(page.getByRole('button', { name: 'Midnight' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Sunset' })).toBeEnabled();
-    await expect(page.getByText(/every theme is available while we are in preview/i)).toBeVisible();
+    await expect(
+      page.getByText(/every design is available while we are in preview/i),
+    ).toBeVisible();
   });
 });
 
@@ -307,6 +318,92 @@ test.describe('the invitation and RSVP', () => {
   });
 });
 
+test.describe('email invitations', () => {
+  test('a host builds a list, sends it, and does not send twice', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Email journey');
+    const guest = uniqueEmail('guest');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByLabel('Email addresses').fill(`Priya Sharma <${guest}>`);
+    await panel.getByRole('button', { name: /^add/i }).click();
+
+    await expect(panel.getByText('Priya Sharma')).toBeVisible();
+    await expect(panel.getByText('Not sent')).toBeVisible();
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await panel.getByRole('button', { name: /send to 1 unsent/i }).click();
+    await expect(panel.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
+
+    // The invitation goes once; that is what the nudge button is for.
+    await expect(panel.getByRole('button', { name: /send to 0 unsent/i })).toBeDisabled();
+  });
+
+  test('nothing that is not an address gets added', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Bad addresses');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByLabel('Email addresses').fill('please invite everyone');
+    await expect(panel.getByText(/no email addresses found/i)).toBeVisible();
+    await expect(panel.getByRole('button', { name: /^add/i })).toBeDisabled();
+  });
+});
+
+test.describe('the archive and deletion', () => {
+  test('the host downloads everything as a zip', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Archive journey');
+    await apiCall(page, '/api/posts', { eventId, body: 'One for the archive' });
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30_000 }),
+      panel.getByRole('link', { name: /download everything/i }).click(),
+    ]);
+
+    expect(download.suggestedFilename()).toMatch(/\.zip$/);
+  });
+
+  test('deleting needs the event name typed exactly', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Deletion journey');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByRole('button', { name: /delete this event permanently/i }).click();
+
+    // Guarded until the name matches — a mis-tap must not be able to do this.
+    await expect(panel.getByRole('button', { name: /delete it all/i })).toBeDisabled();
+    await panel.getByLabel(/type .* to confirm/i).fill('something else');
+    await expect(panel.getByRole('button', { name: /delete it all/i })).toBeDisabled();
+
+    await panel.getByLabel(/type .* to confirm/i).fill('Deletion journey');
+    await expect(panel.getByRole('button', { name: /delete it all/i })).toBeEnabled();
+    await panel.getByRole('button', { name: /delete it all/i }).click();
+
+    await page.waitForURL('/', { timeout: 20_000 });
+
+    // And it is genuinely gone, not merely hidden.
+    const after = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/events/${id}`, { credentials: 'same-origin' });
+      return response.status;
+    }, eventId);
+    expect(after).toBe(404);
+  });
+});
+
 test.describe('accessibility and theming', () => {
   test('every page renders in dark mode without console errors', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });
@@ -314,7 +411,7 @@ test.describe('accessibility and theming', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    for (const path of ['/', '/pricing', '/join', '/create']) {
+    for (const path of ['/', '/pricing', '/templates', '/join', '/create']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     }

@@ -23,6 +23,8 @@ env:
   JOIN_CODE_PEPPER: ci-pepper-value-not-a-real-secret-0123456789
   CLEANUP_TASK_SECRET: ci-cleanup-secret-not-a-real-secret-0123456789
   OWNER_EMAILS: owner@example.com
+  EMAIL_DRIVER: outbox
+  BILLING_DRIVER: mock
 
 jobs:
   static:

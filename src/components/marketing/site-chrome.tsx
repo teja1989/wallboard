@@ -18,6 +18,12 @@ export function SiteHeader() {
 
       <nav className="flex items-center gap-1 sm:gap-2">
         <Link
+          href="/templates"
+          className="rounded-[var(--radius-pill)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
+        >
+          Designs
+        </Link>
+        <Link
           href="/pricing"
           className="rounded-[var(--radius-pill)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
         >
@@ -50,6 +56,9 @@ export function SiteFooter() {
         </div>
 
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/templates" className="transition-colors hover:text-[var(--text-primary)]">
+            Designs
+          </Link>
           <Link href="/pricing" className="transition-colors hover:text-[var(--text-primary)]">
             Pricing
           </Link>

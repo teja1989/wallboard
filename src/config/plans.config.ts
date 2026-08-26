@@ -30,7 +30,7 @@ export interface Entitlements {
   /** Live events one host may own at once. */
   maxActiveEvents: number;
   /** Access to the premium invitation themes. */
-  premiumThemes: boolean;
+  premiumTemplates: boolean;
   /** Hide the "Made with Marquee" line on the invitation. */
   removeBranding: boolean;
   /** Let guests leave a private note with their RSVP. */
@@ -70,7 +70,7 @@ const freeEntitlements: Entitlements = {
   maxStorageBytesPerEvent: 500 * MB,
   maxEventLifetimeMs: 7 * DAY,
   maxActiveEvents: 2,
-  premiumThemes: false,
+  premiumTemplates: false,
   removeBranding: false,
   rsvpNotes: false,
   rsvpCustomQuestion: false,
@@ -85,7 +85,7 @@ const eventEntitlements: Entitlements = {
   maxStorageBytesPerEvent: 5 * 1024 * MB,
   maxEventLifetimeMs: 30 * DAY,
   maxActiveEvents: 5,
-  premiumThemes: true,
+  premiumTemplates: true,
   removeBranding: true,
   rsvpNotes: true,
   rsvpCustomQuestion: true,
@@ -100,7 +100,7 @@ const proEntitlements: Entitlements = {
   maxStorageBytesPerEvent: 20 * 1024 * MB,
   maxEventLifetimeMs: 90 * DAY,
   maxActiveEvents: 25,
-  premiumThemes: true,
+  premiumTemplates: true,
   removeBranding: true,
   rsvpNotes: true,
   rsvpCustomQuestion: true,

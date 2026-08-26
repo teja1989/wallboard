@@ -66,7 +66,7 @@ what is missing is the read APIs and the screens.
 **Done when:** an owner can find and remove any piece of content in under a minute, and every
 action they take is in the audit log.
 
-## Phase 4 — content safety
+## Phase 5 — content safety
 
 Behind `features.safetyScan`.
 
@@ -79,7 +79,7 @@ Behind `features.safetyScan`.
 **Done when:** a host never has to be the first line of defence against an image nobody
 should have to look at.
 
-## Phase 5 — ads and marketing
+## Phase 6 — ads and marketing
 
 Behind `features.ads` and `features.analytics`. Design detail in
 [ADS_MARKETING.md](./ADS_MARKETING.md).

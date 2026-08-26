@@ -13,7 +13,7 @@ Two skills carry the working detail — read them rather than re-deriving:
   authorization, entitlements, rules, sessions, codes, RSVPs, uploads, rate limits, or the
   CSP.
 
-## The five invariants
+## The six invariants
 
 1. **No client writes to Firestore.** Every mutation goes through a route handler that
    validates with Zod, authorizes with `can()`, checks entitlements, consumes a rate-limit
@@ -25,7 +25,10 @@ Two skills carry the working detail — read them rather than re-deriving:
    enforced server-side.
 4. **RSVP notes live in `rsvpNotes/`, never on the member document.** Firestore rules cannot
    restrict a field, and a note written for the host is not for the rest of the guest list.
-5. **Config is the single source of every tunable.** `src/config/*` — limits, plans,
+   The same applies to `invitees/` — a list of email addresses is not for the guest list.
+5. **Only a verified webhook grants a paid plan.** A checkout success redirect is a URL
+   anyone can visit.
+6. **Config is the single source of every tunable.** `src/config/*` — limits, plans,
    occasions, roles, flags, and every string a guest reads. A literal in a component or
    handler is a bug, because the client's check and the server's enforcement would then read
    different numbers.

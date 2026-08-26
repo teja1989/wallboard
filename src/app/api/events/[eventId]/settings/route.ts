@@ -26,7 +26,7 @@ export const PATCH = route(async (request, { params }: Params) => {
   const update: Record<string, unknown> = {};
   if (input.title !== undefined) update.title = input.title;
   if (input.description !== undefined) update.description = input.description;
-  if (input.themeId !== undefined) update.themeId = input.themeId;
+  if (input.templateId !== undefined) update.templateId = input.templateId;
   if (input.whoCanPost !== undefined) update['settings.whoCanPost'] = input.whoCanPost;
   if (input.allowedKinds !== undefined) update['settings.allowedKinds'] = input.allowedKinds;
 

@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     description: 'Drinks from seven, dinner at eight. Come hungry.',
     occasion: 'birthday',
     hostedBy: 'Priya & Sam',
-    themeId: 'sunset',
+    templateId: 'sunset',
     startsAt: Date.now() + 5 * DAY_MS,
     endsAt: null,
     location: {

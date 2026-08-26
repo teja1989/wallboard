@@ -3,7 +3,7 @@ import {
   eventCeilings,
   expiryPresets,
   isEnabled,
-  isPremiumTheme,
+  isPremiumTemplate,
   planById,
   plans,
   previewPlanId,
@@ -69,9 +69,9 @@ export function canUseExpiryPreset(planId: string, presetId: ExpiryPresetId): bo
   return allowedExpiryPresets(planId).some((preset) => preset.id === presetId);
 }
 
-export function canUseTheme(planId: string, themeId: string): boolean {
-  if (!isPremiumTheme(themeId)) return true;
-  return entitlementsFor(planId).premiumThemes;
+export function canUseTemplate(planId: string, templateId: string): boolean {
+  if (!isPremiumTemplate(templateId)) return true;
+  return entitlementsFor(planId).premiumTemplates;
 }
 
 /**

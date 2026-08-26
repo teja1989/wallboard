@@ -40,10 +40,12 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     // every chunk URL having to be enumerated here.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https: ${isDev ? "'unsafe-eval'" : ''}`,
     // Next injects its own <style> tags; there is no nonce hook for them yet.
-    `style-src 'self' 'unsafe-inline'`,
+    // fonts.googleapis.com is the one external stylesheet origin we allow: the invitation
+    // display faces are a real part of the product, not decoration.
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `img-src ${media} https://*.googleusercontent.com`,
     `media-src ${media}`,
-    `font-src 'self' data:`,
+    `font-src 'self' data: https://fonts.gstatic.com`,
     `connect-src ${connectSources(isDev).join(' ')}`,
     // Firebase Auth popups render in an iframe on the auth domain.
     `frame-src 'self' https://*.firebaseapp.com https://accounts.google.com`,

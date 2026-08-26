@@ -3,7 +3,7 @@ import { plans, previewPlanId } from '@/config';
 import {
   allowedExpiryPresets,
   canUseExpiryPreset,
-  canUseTheme,
+  canUseTemplate,
   cheapestPlanReaching,
   cheapestPlanWith,
   effectivePlanId,
@@ -46,7 +46,7 @@ describe('while billing is off', () => {
   });
 
   it('lets a free event use a premium theme', async () => {
-    await withBilling(false, () => expect(canUseTheme('free', 'midnight')).toBe(true));
+    await withBilling(false, () => expect(canUseTemplate('free', 'midnight')).toBe(true));
   });
 });
 
@@ -65,10 +65,10 @@ describe('once billing is on', () => {
 
   it('keeps premium themes behind the paywall', async () => {
     await withBilling(true, () => {
-      expect(canUseTheme('free', 'midnight')).toBe(false);
-      expect(canUseTheme('event', 'midnight')).toBe(true);
+      expect(canUseTemplate('free', 'midnight')).toBe(false);
+      expect(canUseTemplate('event', 'midnight')).toBe(true);
       // Free themes stay free on every plan.
-      expect(canUseTheme('free', 'sunset')).toBe(true);
+      expect(canUseTemplate('free', 'sunset')).toBe(true);
     });
   });
 
@@ -103,7 +103,7 @@ describe('entitlement ceilings', () => {
 
 describe('pointing at the right upgrade', () => {
   it('names the cheapest plan that unlocks a feature, not the dearest', () => {
-    expect(cheapestPlanWith('premiumThemes')).toBe('event');
+    expect(cheapestPlanWith('premiumTemplates')).toBe('event');
     expect(cheapestPlanWith('guestListExport')).toBe('event');
   });
 
@@ -118,7 +118,7 @@ describe('pointing at the right upgrade', () => {
   });
 
   it('builds a message that says both what was refused and what fixes it', () => {
-    const prompt = upgradeForFlag('premiumThemes', 'That theme is part of a paid plan.');
+    const prompt = upgradeForFlag('premiumTemplates', 'That theme is part of a paid plan.');
     expect(prompt.planId).toBe('event');
     expect(prompt.message).toContain('That theme is part of a paid plan.');
     expect(prompt.message).toContain(plans.event.label);

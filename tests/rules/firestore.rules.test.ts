@@ -75,6 +75,15 @@ beforeEach(async () => {
       note: 'Allergic to shellfish',
       answer: '',
     });
+    await setDoc(doc(db, 'events', EVENT_ID, 'invitees', 'abc123'), {
+      email: 'guest@example.com',
+      name: 'Guest',
+      status: 'sent',
+    });
+    await setDoc(doc(db, 'mailOutbox', 'msg-1'), {
+      to: 'guest@example.com',
+      subject: 'You are invited',
+    });
     await setDoc(doc(db, 'events', EVENT_ID, 'posts', 'post-visible'), {
       state: 'visible',
       body: 'hello',
@@ -147,6 +156,11 @@ describe('events', () => {
   it('refuses writes from an owner', async () => {
     // Even the app owner mutates through the audited API, never directly.
     await assertFails(setDoc(doc(staff('owner'), 'events', EVENT_ID), { title: 'Renamed' }));
+  });
+
+  it('refuses a self-granted plan upgrade on the event', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(setDoc(doc(host, 'events', EVENT_ID), { plan: 'pro' }, { merge: true }));
   });
 });
 
@@ -298,6 +312,49 @@ describe('RSVP answers on the guest list', () => {
   });
 });
 
+describe('the invitee list', () => {
+  it('is unreadable by guests', async () => {
+    // A list of everyone's email addresses is exactly what must not be readable by
+    // everyone holding the code.
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('is unreadable by the host who built it', async () => {
+    // They read it through an authorised API call, so the read is logged.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('is unreadable by staff', async () => {
+    await assertFails(getDoc(doc(staff('owner'), 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('cannot be enumerated', async () => {
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'invitees')));
+  });
+
+  it('cannot be written by anyone', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'forged'), {
+        email: 'someone@example.com',
+      }),
+    );
+  });
+});
+
+describe('the mail outbox', () => {
+  it('is unreadable by every client', async () => {
+    // It holds rendered messages addressed to real people, in every environment.
+    await assertFails(getDoc(doc(member(), 'mailOutbox', 'msg-1')));
+    await assertFails(getDoc(doc(staff('owner'), 'mailOutbox', 'msg-1')));
+    await assertFails(getDocs(collection(staff('admin'), 'mailOutbox')));
+  });
+
+  it('cannot be written to', async () => {
+    await assertFails(setDoc(doc(member(), 'mailOutbox', 'forged'), { to: 'a@b.com' }));
+  });
+});
+
 describe('users', () => {
   it('let a person read their own profile', async () => {
     await assertSucceeds(getDoc(doc(member(), 'users', 'member-uid')));
@@ -313,6 +370,18 @@ describe('users', () => {
 
   it('refuse self-service writes, so a role claim cannot be forged', async () => {
     await assertFails(setDoc(doc(member(), 'users', 'member-uid'), { role: 'owner' }));
+  });
+
+  it('refuse a self-granted paid plan', async () => {
+    // Billing state lives on the user document, so this is the write that would hand
+    // someone a Pro subscription for free.
+    await assertFails(
+      setDoc(
+        doc(member(), 'users', 'member-uid'),
+        { billing: { plan: 'pro', currentPeriodEnd: Date.now() + 1e10 } },
+        { merge: true },
+      ),
+    );
   });
 });
 

@@ -103,6 +103,41 @@ implemented as an entitlement is a permission somebody can buy.
 
 Every paid gate is enforced server-side. A disabled button is a courtesy, not a control.
 
+## Email
+
+An invitation product that sends mail is a spam relay unless it is built carefully, and a
+blocked sending domain means _nobody's_ invitations arrive — paying customers included. So:
+
+- **There is no endpoint that takes an address and a message.** A host adds addresses to
+  their own event and sends _that event's_ invitation. The body is rendered from the event;
+  no field in any request reaches a recipient's inbox as free text.
+- The address is the document id (hashed), so double-adding is impossible rather than
+  merely unlikely.
+- An unsubscribe is permanent and survives being re-added. Tokens are HMAC-derived from the
+  address and event, never stored — nothing extra to leak, and rotating the pepper
+  invalidates every outstanding link.
+- The invitation sends once; a reminder has a 20-hour cooldown and never reaches someone
+  who has already replied.
+- Per-account limits are tighter than the guest caps, so a burst is visible rather than
+  merely expensive.
+- The invitee list and the development outbox are both server-only in Firestore: a list of
+  everyone's email addresses is exactly what must not be readable by everyone holding the
+  code.
+
+## Payments
+
+- The **webhook is the only thing that grants anything.** A checkout success redirect is a
+  URL anyone can visit; only a verified webhook is proof money changed hands.
+- Stripe's signature scheme is verified directly, including the timestamp window — without
+  it, a captured signature could be replayed forever.
+- Every grant is idempotent, and an older subscription period never overwrites a newer one,
+  because webhooks are delivered at least once and occasionally out of order.
+- A per-event unlock only applies if the payer is that event's host.
+- Billing state lives on the user document, which clients cannot write — asserted in the
+  rules tests.
+- The mock gateway refuses to run when `NODE_ENV=production`, behind `BILLING_DRIVER`. A
+  checkout that takes no money must never be reachable in production.
+
 ## Rate limits
 
 Fixed-window counters, declared in `src/config/limits.config.ts`:
@@ -190,6 +225,10 @@ describes something someone could attempt with nothing but the Firebase SDK and 
 - writing a post document directly, or editing one to impersonate another author
 - creating your own membership document to join without a code
 - promoting yourself to `host`, or writing `role: 'owner'` onto your user document
+- reading the invitee list — as a guest, as the host who built it, as an owner
+- reading or writing the development mail outbox
+- granting yourself a paid plan by writing `billing` onto your own user document
+- granting an event a paid plan by writing `plan` onto it
 - reading or tampering with the audit log
 - reading rate-limit buckets to see how much budget is left
 

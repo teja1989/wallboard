@@ -2,7 +2,9 @@ import { z } from 'zod';
 import {
   POST_KINDS,
   contentLimits,
-  eventThemes,
+  defaultTemplateId,
+  emailConfig,
+  templates,
   expiryPresets,
   joinCodeConfig,
   mediaRules,
@@ -30,7 +32,7 @@ const cleanText = (max: number) =>
     .transform((s) => s.replace(INVISIBLE, '').trim())
     .pipe(z.string().max(max));
 
-const themeIds = eventThemes.map((t) => t.id) as [string, ...string[]];
+const templateIds = templates.map((t) => t.id) as [string, ...string[]];
 const presetIds = expiryPresets.map((p) => p.id) as [string, ...string[]];
 const occasionIds = occasions.map((o) => o.id) as [string, ...string[]];
 const rsvpChoiceIds = [...rsvpChoices] as [string, ...string[]];
@@ -103,7 +105,7 @@ export const createEventSchema = z
     description: cleanText(contentLimits.eventDescriptionMaxLength).default(''),
     occasion: z.enum(occasionIds),
     hostedBy: cleanText(contentLimits.hostedByMaxLength).default(''),
-    themeId: z.enum(themeIds).default(eventThemes[0].id),
+    templateId: z.enum(templateIds).default(defaultTemplateId),
     startsAt: eventTimestamp.default(null),
     endsAt: eventTimestamp.default(null),
     location: locationSchema,
@@ -127,7 +129,7 @@ export const updateEventSchema = z
     title: cleanText(contentLimits.eventTitleMaxLength).pipe(z.string().min(1)).optional(),
     description: cleanText(contentLimits.eventDescriptionMaxLength).optional(),
     hostedBy: cleanText(contentLimits.hostedByMaxLength).optional(),
-    themeId: z.enum(themeIds).optional(),
+    templateId: z.enum(templateIds).optional(),
     startsAt: eventTimestamp.optional(),
     endsAt: eventTimestamp.optional(),
     location: locationSchema.optional(),
@@ -233,6 +235,55 @@ export const rsvpSchema = z.object({
   displayName: cleanText(contentLimits.displayNameMaxLength).optional(),
 });
 export type RsvpInput = z.infer<typeof rsvpSchema>;
+
+/**
+ * Addresses a host is adding to their guest list.
+ *
+ * Deliberately narrow: this is the only way an address enters the system, and there is no
+ * endpoint anywhere that accepts a message body. A host adds people to *their* event and
+ * sends *that event's* invitation — which is what stops this being a spam relay.
+ */
+export const addInviteesSchema = z.object({
+  invitees: z
+    .array(
+      z.object({
+        email: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .max(254)
+          .pipe(z.string().email('That does not look like an email address.')),
+        name: cleanText(contentLimits.displayNameMaxLength).default(''),
+      }),
+    )
+    .min(1, 'Add at least one address.')
+    .max(emailConfig.maxInviteesPerRequest),
+});
+export type AddInviteesInput = z.infer<typeof addInviteesSchema>;
+
+export const sendInvitesSchema = z.object({
+  kind: z.enum(['invitation', 'reminder']).default('invitation'),
+});
+
+export const unsubscribeSchema = z.object({
+  eventId: eventIdSchema,
+  email: z.string().trim().toLowerCase().max(254).pipe(z.string().email()),
+  token: z.string().regex(/^[0-9a-f]{32}$/),
+});
+
+/** The host types the event's name to confirm. Compared case-insensitively server-side. */
+export const deleteEventSchema = z.object({
+  confirm: z
+    .string()
+    .min(1)
+    .max(contentLimits.eventTitleMaxLength + 10),
+});
+
+export const checkoutSchema = z.object({
+  planId: z.enum(['event', 'pro']),
+  /** Required for a per-event unlock; meaningless for a subscription. */
+  eventId: eventIdSchema.optional(),
+});
 
 export const sessionSchema = z.object({ idToken: z.string().min(20).max(8192) });
 

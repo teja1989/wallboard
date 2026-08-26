@@ -50,6 +50,23 @@ const serverEnvSchema = z.object({
   CLEANUP_TASK_SECRET: z.string().min(16).optional(),
   /** Emails bootstrapped to the OWNER role on first sign-in. */
   OWNER_EMAILS: csv,
+
+  /**
+   * Mail. Defaults to `outbox` so a half-configured deploy writes to a collection nobody
+   * reads rather than sending real invitations to real guests.
+   */
+  EMAIL_DRIVER: z.enum(['outbox', 'resend']).default('outbox'),
+  RESEND_API_KEY: z.string().optional(),
+
+  /**
+   * Payments. Defaults to `mock` so a deploy that forgets its keys cannot half-take real
+   * money — the mock checkout refuses to run outside development.
+   */
+  BILLING_DRIVER: z.enum(['mock', 'stripe']).default('mock'),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRICE_EVENT: z.string().optional(),
+  STRIPE_PRICE_PRO: z.string().optional(),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
@@ -101,6 +118,27 @@ export function serverEnv(): ServerEnv {
   }
   if (parsed.data.STORAGE_DRIVER === 'gcs' && !parsed.data.GCS_BUCKET) {
     throw new Error('STORAGE_DRIVER=gcs requires GCS_BUCKET to be set.');
+  }
+  if (parsed.data.EMAIL_DRIVER === 'resend' && !parsed.data.RESEND_API_KEY) {
+    throw new Error('EMAIL_DRIVER=resend requires RESEND_API_KEY to be set.');
+  }
+  if (parsed.data.BILLING_DRIVER === 'stripe') {
+    // Failing at boot beats failing at checkout, where the cost is a lost sale and a
+    // customer who thinks the product is broken.
+    const missing = (
+      [
+        ['STRIPE_SECRET_KEY', parsed.data.STRIPE_SECRET_KEY],
+        ['STRIPE_WEBHOOK_SECRET', parsed.data.STRIPE_WEBHOOK_SECRET],
+        ['STRIPE_PRICE_EVENT', parsed.data.STRIPE_PRICE_EVENT],
+        ['STRIPE_PRICE_PRO', parsed.data.STRIPE_PRICE_PRO],
+      ] as const
+    )
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+
+    if (missing.length > 0) {
+      throw new Error(`BILLING_DRIVER=stripe requires: ${missing.join(', ')}`);
+    }
   }
   serverEnvCache = parsed.data;
   return serverEnvCache;

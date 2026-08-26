@@ -3,6 +3,7 @@ import { eventAuthzContext } from '@/lib/authz/event-context';
 import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
 import { requireEvent } from '@/lib/services/events';
+import { sendRsvpConfirmation } from '@/lib/services/invites';
 import { submitRsvp } from '@/lib/services/rsvp';
 import { ApiError, limitByUser, ok, parseBody, requireActor, route } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
@@ -39,6 +40,14 @@ export const POST = route(async (request, { params }: Params) => {
 
   const input = await parseBody(request, rsvpSchema);
   const outcome = await submitRsvp(actor, event, input);
+
+  // A confirmation is a courtesy, so it must never be able to fail the reply that earned
+  // it. Only for a yes, and only when we have an address to send it to.
+  if (outcome.status === 'yes' && actor.email) {
+    await sendRsvpConfirmation(event, actor.email, input.displayName || actor.displayName).catch(
+      (error: unknown) => console.error('[rsvp] confirmation email failed', error),
+    );
+  }
 
   await recordAudit(
     actor,

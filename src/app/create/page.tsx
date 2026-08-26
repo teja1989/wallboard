@@ -9,7 +9,7 @@ import {
   contentLimits,
   defaultExpiryPresetId,
   defaultOccasionId,
-  eventThemes,
+  templates,
   expiryPresets,
   occasionById,
   occasions,
@@ -18,9 +18,10 @@ import {
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { Button } from '@/components/ui/button';
+import { TemplatePicker } from '@/components/event/template-picker';
 import { TextAreaField, TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
-import { canUseExpiryPreset, canUseTheme } from '@/lib/billing/entitlements';
+import { canUseExpiryPreset, canUseTemplate } from '@/lib/billing/entitlements';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { formatJoinCode } from '@/lib/codes-format';
 import { cn, fromDateTimeLocalValue } from '@/lib/utils';
@@ -57,8 +58,10 @@ export default function CreateEventPage() {
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [dressCode, setDressCode] = useState('');
-  const [themeId, setThemeId] = useState<string>(occasionById(defaultOccasionId).defaultThemeId);
-  const [themeTouched, setThemeTouched] = useState(false);
+  const [templateId, setTemplateId] = useState<string>(
+    occasionById(defaultOccasionId).defaultTemplateId,
+  );
+  const [templateTouched, setTemplateTouched] = useState(false);
   const [expiryPresetId, setExpiryPresetId] = useState<string>(defaultExpiryPresetId);
   const [allowedKinds, setAllowedKinds] = useState<PostKind[]>([...POST_KINDS]);
   const [allowPlusOnes, setAllowPlusOnes] = useState(true);
@@ -72,7 +75,7 @@ export default function CreateEventPage() {
   // While billing is off nothing is actually locked, so the copy below adapts rather than
   // promising a paywall the visitor will not meet.
   const planId = 'free';
-  const lockedThemeCount = eventThemes.filter((theme) => !canUseTheme(planId, theme.id)).length;
+  const lockedTemplateCount = templates.filter((t) => !canUseTemplate(planId, t.id)).length;
 
   if (!loading && (!actor || isAnonymous)) {
     return (
@@ -86,7 +89,7 @@ export default function CreateEventPage() {
   function chooseOccasion(id: string) {
     setOccasionId(id);
     // Only follow the occasion's theme until the host expresses their own preference.
-    if (!themeTouched) setThemeId(occasionById(id).defaultThemeId);
+    if (!templateTouched) setTemplateId(occasionById(id).defaultTemplateId);
   }
 
   function toggleKind(kind: PostKind) {
@@ -107,7 +110,7 @@ export default function CreateEventPage() {
           description,
           occasion: occasionId,
           hostedBy,
-          themeId,
+          templateId,
           startsAt: fromDateTimeLocalValue(startsAt),
           endsAt: null,
           location:
@@ -264,49 +267,25 @@ export default function CreateEventPage() {
         )}
 
         <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            Invitation theme
+          <legend className="mb-3 block text-sm font-medium text-[var(--text-secondary)]">
+            Pick a design
           </legend>
-          <div className="flex flex-wrap gap-2.5">
-            {eventThemes.map((theme) => {
-              const locked = !canUseTheme(planId, theme.id);
-              return (
-                <button
-                  key={theme.id}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => {
-                    setThemeId(theme.id);
-                    setThemeTouched(true);
-                  }}
-                  aria-pressed={themeId === theme.id}
-                  aria-label={locked ? `${theme.label} — part of a paid plan` : theme.label}
-                  title={locked ? `${theme.label} — part of a paid plan` : theme.label}
-                  className={cn(
-                    'relative size-11 rounded-full transition-all duration-200',
-                    themeId === theme.id
-                      ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--surface-page)]'
-                      : 'ring-1 ring-[var(--border-subtle)]',
-                    locked ? 'cursor-not-allowed opacity-45' : 'hover:scale-105',
-                  )}
-                  style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}
-                >
-                  {locked && (
-                    <Lock
-                      className="absolute inset-0 m-auto size-3.5 text-[var(--text-inverse)]"
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {lockedThemeCount > 0
-              ? `${lockedThemeCount} more themes come with a paid plan. `
-              : 'Every theme is available while we are in preview. '}
-            <Link href="/pricing" className="underline underline-offset-2">
-              See what is included
+          <TemplatePicker
+            occasionId={occasionId}
+            value={templateId}
+            planId={planId}
+            canUse={(id) => canUseTemplate(planId, id)}
+            onChange={(id) => {
+              setTemplateId(id);
+              setTemplateTouched(true);
+            }}
+          />
+          <p className="mt-3 text-sm text-[var(--text-muted)]">
+            {lockedTemplateCount > 0
+              ? `${lockedTemplateCount} more designs come with a paid plan. `
+              : 'Every design is available while we are in preview. '}
+            <Link href="/templates" className="underline underline-offset-2">
+              Browse them all
             </Link>
             .
           </p>

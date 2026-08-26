@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence } from 'framer-motion';
 import { Clock, Loader2, Settings2, Sparkles, Users } from 'lucide-react';
-import { brand, occasionById, themeById } from '@/config';
+import { brand, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { GuestList } from '@/components/event/guest-list';
@@ -121,7 +121,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   }
 
   const { event, permissions, rsvp } = detail;
-  const theme = themeById(event.themeId);
+  const theme = templateById(event.templateId);
   const occasion = occasionById(event.occasion);
   const isLive = event.status === 'live';
   const active = section ?? 'invite';
@@ -131,7 +131,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 opacity-45 blur-3xl"
-        style={{ background: `linear-gradient(120deg, ${theme.from}, ${theme.to})` }}
+        style={{
+          background: `linear-gradient(120deg, ${theme.palette.from}, ${theme.palette.to})`,
+        }}
       />
 
       <main className="mx-auto w-full max-w-3xl px-4 pt-6 pb-24 sm:px-6">
@@ -292,6 +294,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
       <Lightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
       <HostPanel
         eventId={eventId}
+        title={event.title}
+        plan={event.plan}
         open={hostPanelOpen}
         onClose={() => setHostPanelOpen(false)}
         onChanged={loadEvent}

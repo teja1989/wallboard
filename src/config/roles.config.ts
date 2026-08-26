@@ -44,6 +44,9 @@ export const PERMISSIONS = [
   'rsvp:respond',
   'rsvp:viewAll',
   'rsvp:export',
+  // Sending
+  'invite:manage',
+  'invite:send',
   // Membership
   'member:list',
   'member:mute',
@@ -101,6 +104,11 @@ export const eventRolePermissions: Record<EventRole, readonly Permission[]> = {
   moderator: ['post:deleteAny', 'member:mute', 'rsvp:viewAll'],
   host: [
     'rsvp:export',
+    'invite:manage',
+    'invite:send',
+    // Sending
+    'invite:manage',
+    'invite:send',
     'event:update',
     'event:end',
     'event:extend',

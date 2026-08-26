@@ -2,6 +2,9 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, Eye, RefreshCw, Timer, X } from 'lucide-react';
+import { DangerSection } from '@/components/event/danger-section';
+import { InvitePanel } from '@/components/event/invite-panel';
+import { UpgradeSection } from '@/components/event/upgrade-section';
 import { expiryPresets, motion as motionTokens } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -10,6 +13,10 @@ import { formatJoinCode } from '@/lib/codes-format';
 
 interface HostPanelProps {
   eventId: string;
+  /** Needed for the typed delete confirmation. */
+  title: string;
+  /** The plan the event currently runs on, so the panel knows whether to offer an upgrade. */
+  plan: string;
   open: boolean;
   onClose: () => void;
   onChanged: () => void;
@@ -20,7 +27,7 @@ interface HostPanelProps {
  * here, which is what makes each read auditable and keeps it out of any response a
  * non-host could receive.
  */
-export function HostPanel({ eventId, open, onClose, onChanged }: HostPanelProps) {
+export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: HostPanelProps) {
   const { notify } = useToast();
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
@@ -161,6 +168,10 @@ export function HostPanel({ eventId, open, onClose, onChanged }: HostPanelProps)
             </section>
 
             <section className="mb-6">
+              <InvitePanel eventId={eventId} onSent={onChanged} />
+            </section>
+
+            <section className="mb-6">
               <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-[var(--text-secondary)]">
                 <Timer className="size-4" aria-hidden />
                 Add time
@@ -183,7 +194,9 @@ export function HostPanel({ eventId, open, onClose, onChanged }: HostPanelProps)
               </p>
             </section>
 
-            <section>
+            <UpgradeSection eventId={eventId} plan={plan} />
+
+            <section className="mb-6">
               <Button
                 variant="danger"
                 className="w-full"
@@ -197,6 +210,8 @@ export function HostPanel({ eventId, open, onClose, onChanged }: HostPanelProps)
                 reversible for a while by adding time.
               </p>
             </section>
+
+            <DangerSection eventId={eventId} title={title} plan={plan} />
           </motion.aside>
         </>
       )}

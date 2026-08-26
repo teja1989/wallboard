@@ -162,7 +162,7 @@ async function main() {
       occasion: 'party',
       hostedBy: 'The smoke test',
       expiryPresetId: '24h',
-      themeId: 'sunset',
+      templateId: 'sunset',
       startsAt: Date.now() + 3 * 24 * 60 * 60 * 1000,
       location: { name: 'The Rooftop', address: '14 Bridge Street', url: null },
       rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
@@ -444,6 +444,118 @@ async function main() {
   });
   check('the new code works', freshJoin.status === 200);
 
+  // --- email invitations ---------------------------------------------------
+  const addInvites = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: {
+      invitees: [
+        { email: `guest1-${stamp}@example.com`, name: 'Guest One' },
+        { email: `guest2-${stamp}@example.com`, name: 'Guest Two' },
+      ],
+    },
+  });
+  check('the host adds addresses', addInvites.status === 200, JSON.stringify(addInvites.payload));
+  check('both were added', addInvites.payload?.data?.added === 2);
+
+  const readd = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ email: `guest1-${stamp}@example.com`, name: 'Guest One' }] },
+  });
+  check('re-adding the same address is a no-op', readd.payload?.data?.duplicates === 1);
+
+  const badAddress = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ email: 'not-an-address' }] },
+  });
+  check('a malformed address is rejected', badAddress.status === 400);
+
+  const memberAdds = await call(member.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ email: `sneaky-${stamp}@example.com` }] },
+  });
+  check('a member cannot add to the invite list', memberAdds.status === 403);
+
+  const memberReadsList = await call(member.session, `/api/events/${eventId}/invites`);
+  check('a member cannot read the invite list', memberReadsList.status === 403);
+
+  const sendInvites = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation' },
+  });
+  check(
+    'the host sends the invitation',
+    sendInvites.status === 200,
+    JSON.stringify(sendInvites.payload),
+  );
+  check(
+    'both were sent',
+    sendInvites.payload?.data?.sent === 2,
+    JSON.stringify(sendInvites.payload),
+  );
+
+  const resend = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation' },
+  });
+  check('the invitation is not sent twice', resend.payload?.data?.sent === 0);
+
+  const memberSends = await call(member.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation' },
+  });
+  check('a member cannot send', memberSends.status === 403);
+
+  const badUnsub = await call(guest.session, '/api/unsubscribe', {
+    method: 'POST',
+    body: { eventId, email: `guest1-${stamp}@example.com`, token: 'f'.repeat(32) },
+  });
+  check('a forged unsubscribe token is refused', badUnsub.status === 403);
+
+  // --- billing --------------------------------------------------------------
+  // Billing is off by default, so checkout must refuse rather than silently succeed.
+  const checkout = await call(host.session, '/api/billing/checkout', {
+    method: 'POST',
+    body: { planId: 'event', eventId },
+  });
+  check('checkout is closed while billing is in preview', checkout.status === 403);
+
+  const badWebhook = await fetch(`${BASE}/api/billing/webhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nothing: true }),
+  });
+  check('a webhook with no event type is accepted but does nothing', badWebhook.status === 200);
+
+  // --- archive and deletion -------------------------------------------------
+  const memberArchive = await call(member.session, `/api/events/${eventId}/archive`);
+  check('a member cannot download the archive', memberArchive.status === 403);
+
+  const archive = await fetch(`${BASE}/api/events/${eventId}/archive`, {
+    headers: { Cookie: cookieHeader(host.session) },
+  });
+  check('the host downloads the archive', archive.status === 200, String(archive.status));
+  check(
+    'the archive is a zip',
+    archive.headers.get('content-type') === 'application/zip',
+    archive.headers.get('content-type') ?? 'none',
+  );
+  const archiveBytes = Buffer.from(await archive.arrayBuffer());
+  check('the archive has content', archiveBytes.length > 200, `${archiveBytes.length} bytes`);
+  // Local file header magic — proves this is a real zip, not an error page.
+  check('the archive is a valid zip', archiveBytes.subarray(0, 2).toString() === 'PK');
+
+  const wrongConfirm = await call(host.session, `/api/events/${eventId}/delete`, {
+    method: 'POST',
+    body: { confirm: 'something else' },
+  });
+  check('deletion needs the exact event name', wrongConfirm.status === 400);
+
+  const memberDeletes = await call(member.session, `/api/events/${eventId}/delete`, {
+    method: 'POST',
+    body: { confirm: 'Smoke test party' },
+  });
+  check('a member cannot delete the event', memberDeletes.status === 403);
+
   // --- ending the event ----------------------------------------------------
   const memberEnd = await call(member.session, `/api/events/${eventId}/end`, { method: 'POST' });
   check('a member cannot end the event', memberEnd.status === 403);
@@ -469,6 +581,26 @@ async function main() {
   check('nosniff is set', headResponse.headers.get('x-content-type-options') === 'nosniff');
   check('referrer policy is set', !!headResponse.headers.get('referrer-policy'));
   check('the framework version is not advertised', !headResponse.headers.get('x-powered-by'));
+
+  // --- deletion, last, because it destroys everything above -----------------
+  const deleted = await call(host.session, `/api/events/${eventId}/delete`, {
+    method: 'POST',
+    body: { confirm: 'smoke TEST party' },
+  });
+  check(
+    'the host deletes the event, case-insensitively',
+    deleted.status === 200,
+    JSON.stringify(deleted.payload),
+  );
+
+  const afterDelete = await call(host.session, `/api/events/${eventId}`);
+  check('the event is gone', afterDelete.status === 404);
+
+  const codeAfterDelete = await call(outsider.session, '/api/events/join', {
+    method: 'POST',
+    body: { code: rotated.payload.data.code },
+  });
+  check('the join code stops working immediately', codeAfterDelete.status === 404);
 
   // --- sign out ------------------------------------------------------------
   await call(member.session, '/api/session', { method: 'DELETE' });

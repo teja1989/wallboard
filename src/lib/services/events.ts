@@ -3,18 +3,18 @@ import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import {
   absoluteMaxEventLifetimeMs,
   collections,
-  defaultEventThemeId,
+  defaultTemplateId,
   docIds,
   expiryPresets,
   isEnabled,
   occasionById,
   serverConfig,
-  type EventThemeId,
+  type TemplateId,
   type ExpiryPresetId,
   type OccasionId,
   type PlanId,
 } from '@/config';
-import { canUseExpiryPreset, canUseTheme, entitlementsFor } from '@/lib/billing/entitlements';
+import { canUseExpiryPreset, canUseTemplate, entitlementsFor } from '@/lib/billing/entitlements';
 import { generateJoinCode, hashJoinCode } from '@/lib/codes';
 import { db } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/server/api';
@@ -39,8 +39,11 @@ export function expiryMsFor(presetId: string): number {
  * Today every event starts on the host's own plan. When per-event unlocks go live this is
  * where a purchased upgrade gets attached, so the rest of the system needs no change.
  */
-export function planForNewEvent(_actor: Actor): PlanId {
-  return 'free';
+export async function planForNewEvent(actor: Actor): Promise<PlanId> {
+  // A Pro subscriber's events start on Pro; everyone else starts free and upgrades the one
+  // event they care about.
+  const { accountPlan } = await import('@/lib/services/billing');
+  return accountPlan(actor.uid);
 }
 
 /**
@@ -53,13 +56,13 @@ export function planForNewEvent(_actor: Actor): PlanId {
 function assertPlanAllows(
   planId: PlanId,
   choices: {
-    themeId?: string;
+    templateId?: string;
     expiryPresetId?: string;
     askNote?: boolean;
     question?: string | null;
   },
 ): void {
-  if (choices.themeId && !canUseTheme(planId, choices.themeId)) {
+  if (choices.templateId && !canUseTemplate(planId, choices.templateId)) {
     throw new ApiError('forbidden', 'That invitation theme is part of a paid plan.');
   }
   if (
@@ -129,7 +132,7 @@ export function toPreview(event: EventDoc): EventPreview {
   return {
     id: event.id,
     title: event.title,
-    themeId: event.themeId,
+    templateId: event.templateId,
     occasion: event.occasion,
     status: effectiveStatus(event),
     expiresAt: event.expiresAt,
@@ -194,10 +197,10 @@ export function assertWhoCanPostAllowed(whoCanPost: 'members' | 'anyone'): void 
 export async function createEvent(actor: Actor, input: CreateEventInput): Promise<CreatedEvent> {
   assertWhoCanPostAllowed(input.whoCanPost);
 
-  const plan = planForNewEvent(actor);
+  const plan = await planForNewEvent(actor);
   const entitlements = entitlementsFor(plan);
   assertPlanAllows(plan, {
-    themeId: input.themeId,
+    templateId: input.templateId,
     expiryPresetId: input.expiryPresetId,
     askNote: input.rsvp.askNote,
     question: input.rsvp.question,
@@ -223,7 +226,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     hostUid: actor.uid,
     hostName: actor.displayName,
     hostedBy: input.hostedBy || actor.displayName,
-    themeId: (input.themeId as EventThemeId) ?? occasion.defaultThemeId ?? defaultEventThemeId,
+    templateId: (input.templateId as TemplateId) ?? occasion.defaultTemplateId ?? defaultTemplateId,
     status: 'live',
     startsAt: input.startsAt,
     endsAt: input.endsAt,

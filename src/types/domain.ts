@@ -1,6 +1,6 @@
 import type {
   EventRole,
-  EventThemeId,
+  TemplateId,
   OccasionId,
   PlanId,
   PlatformRole,
@@ -9,7 +9,7 @@ import type {
 } from '@/config';
 
 // Re-exported so consumers can import domain, role and plan types from one place.
-export type { EventRole, EventThemeId, OccasionId, PlanId, PlatformRole, PostKind, RsvpStatus };
+export type { EventRole, TemplateId, OccasionId, PlanId, PlatformRole, PostKind, RsvpStatus };
 
 /**
  * Wire-shaped domain types. Timestamps are epoch milliseconds so the same object
@@ -93,7 +93,7 @@ export interface EventDoc {
   hostName: string;
   /** Who the invitation is from, e.g. "Priya & Sam". Falls back to the host's name. */
   hostedBy: string;
-  themeId: EventThemeId;
+  templateId: TemplateId;
   status: EventStatus;
   /** When the event itself happens — distinct from when the wall expires. */
   startsAt: number | null;
@@ -116,7 +116,7 @@ export interface EventDoc {
 /** What a visitor is allowed to see about an event before joining. */
 export type EventPreview = Pick<
   EventDoc,
-  'id' | 'title' | 'themeId' | 'occasion' | 'status' | 'expiresAt' | 'startsAt'
+  'id' | 'title' | 'templateId' | 'occasion' | 'status' | 'expiresAt' | 'startsAt'
 > & {
   hostedBy: string;
   memberCount: number;
@@ -173,6 +173,22 @@ export interface UserDoc {
   lastSeenAt: number;
   suspendedAt: number | null;
   suspendedReason: string | null;
+}
+
+/** Where an invited address currently stands. */
+export type InviteeStatus = 'pending' | 'sent' | 'failed' | 'unsubscribed';
+
+export interface InviteeDoc {
+  /** A hash of the address — the address itself is the identity, so it is the id. */
+  id: string;
+  email: string;
+  name: string;
+  status: InviteeStatus;
+  addedAt: number;
+  lastSentAt: number | null;
+  sendCount: number;
+  lastError: string | null;
+  unsubscribedAt?: number;
 }
 
 export interface AuditLogDoc {

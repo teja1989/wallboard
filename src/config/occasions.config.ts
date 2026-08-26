@@ -1,4 +1,4 @@
-import type { EventThemeId } from './branding.config';
+import type { TemplateId } from './templates.config';
 
 /**
  * Occasions.
@@ -14,7 +14,7 @@ export interface Occasion {
   label: string;
   /** Emoji used as the invitation's mark. Kept small and warm rather than decorative. */
   glyph: string;
-  defaultThemeId: EventThemeId;
+  defaultTemplateId: TemplateId;
   /** Placeholder in the title field — an example, not an instruction. */
   titlePlaceholder: string;
   /** Verb used on the host's primary button, e.g. "Send the invitation". */
@@ -36,7 +36,7 @@ export const occasions: readonly Occasion[] = [
     id: 'birthday',
     label: 'Birthday',
     glyph: '🎂',
-    defaultThemeId: 'sunset',
+    defaultTemplateId: 'sunset',
     titlePlaceholder: "Priya's 30th",
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Can you make it?',
@@ -49,7 +49,7 @@ export const occasions: readonly Occasion[] = [
     id: 'wedding',
     label: 'Wedding',
     glyph: '💍',
-    defaultThemeId: 'champagne',
+    defaultTemplateId: 'champagne',
     titlePlaceholder: 'Priya & Sam',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Will you be joining us?',
@@ -62,7 +62,7 @@ export const occasions: readonly Occasion[] = [
     id: 'party',
     label: 'Party',
     glyph: '🎉',
-    defaultThemeId: 'aurora',
+    defaultTemplateId: 'aurora',
     titlePlaceholder: 'Rooftop summer party',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Coming?',
@@ -75,7 +75,7 @@ export const occasions: readonly Occasion[] = [
     id: 'dinner',
     label: 'Dinner',
     glyph: '🍽️',
-    defaultThemeId: 'linen',
+    defaultTemplateId: 'linen',
     titlePlaceholder: 'Supper at ours',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Can you join us?',
@@ -88,7 +88,7 @@ export const occasions: readonly Occasion[] = [
     id: 'baby',
     label: 'Baby shower',
     glyph: '🍼',
-    defaultThemeId: 'blossom',
+    defaultTemplateId: 'blossom',
     titlePlaceholder: 'A shower for Ada',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Can you make it?',
@@ -101,7 +101,7 @@ export const occasions: readonly Occasion[] = [
     id: 'graduation',
     label: 'Graduation',
     glyph: '🎓',
-    defaultThemeId: 'lagoon',
+    defaultTemplateId: 'lagoon',
     titlePlaceholder: 'Sam graduates',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Can you come?',
@@ -114,7 +114,7 @@ export const occasions: readonly Occasion[] = [
     id: 'reunion',
     label: 'Reunion',
     glyph: '🫂',
-    defaultThemeId: 'meadow',
+    defaultTemplateId: 'meadow',
     titlePlaceholder: 'The 2015 lot, ten years on',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Are you in?',
@@ -127,7 +127,7 @@ export const occasions: readonly Occasion[] = [
     id: 'work',
     label: 'Work',
     glyph: '💼',
-    defaultThemeId: 'midnight',
+    defaultTemplateId: 'midnight',
     titlePlaceholder: 'Q4 offsite',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Will you attend?',
@@ -140,7 +140,7 @@ export const occasions: readonly Occasion[] = [
     id: 'memorial',
     label: 'Memorial',
     glyph: '🕊️',
-    defaultThemeId: 'linen',
+    defaultTemplateId: 'linen',
     titlePlaceholder: 'Remembering Ada',
     inviteVerb: 'Share the details',
     rsvpPrompt: 'Will you be attending?',
@@ -153,7 +153,7 @@ export const occasions: readonly Occasion[] = [
     id: 'other',
     label: 'Something else',
     glyph: '✨',
-    defaultThemeId: 'sunset',
+    defaultTemplateId: 'sunset',
     titlePlaceholder: 'What are we calling it?',
     inviteVerb: 'Send the invitation',
     rsvpPrompt: 'Can you make it?',

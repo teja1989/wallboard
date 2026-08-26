@@ -31,6 +31,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" data-nonce={nonce} suppressHydrationWarning>
+      <head>
+        {/*
+          The invitation display faces. Loaded as a plain stylesheet rather than through
+          next/font because the face is chosen per invitation at runtime, so there is no
+          build-time set to optimise — and every stack in TYPE_FACES ends in a real
+          fallback, so an invitation still looks composed if this never arrives.
+        */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href={
+            'https://fonts.googleapis.com/css2' +
+            '?family=Cormorant+Garamond:wght@500;600;700' +
+            '&family=Fraunces:opsz,wght@9..144,500;9..144,600' +
+            '&family=Space+Grotesk:wght@500;600;700' +
+            '&family=Inter:wght@400;500;600' +
+            '&display=swap'
+          }
+        />
+      </head>
       <body>
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>

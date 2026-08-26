@@ -35,6 +35,17 @@ export function serverConfig() {
       bucket: env.GCS_BUCKET ?? clientEnv.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     },
     joinCodePepper: env.JOIN_CODE_PEPPER,
+    email: {
+      driver: env.EMAIL_DRIVER,
+    },
+    resendApiKey: env.RESEND_API_KEY,
+    billing: {
+      driver: env.BILLING_DRIVER,
+    },
+    stripe: {
+      secretKey: env.STRIPE_SECRET_KEY,
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    },
     cleanupSecret: env.CLEANUP_TASK_SECRET,
     ownerEmails: env.OWNER_EMAILS,
     serviceAccountJson: env.FIREBASE_SERVICE_ACCOUNT_JSON,
@@ -53,6 +64,9 @@ export const collections = {
   posts: 'posts',
   private: 'private',
   rsvpNotes: 'rsvpNotes',
+  invitees: 'invitees',
+  // Development only: where the outbox driver puts mail instead of sending it.
+  mailOutbox: 'mailOutbox',
 } as const;
 
 /** Fixed document ids. */

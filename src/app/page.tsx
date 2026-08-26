@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { brand, eventThemes, occasions, plans } from '@/config';
+import { brand, templates, occasions, plans } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 
@@ -153,13 +153,13 @@ export default function LandingPage() {
 
               {/* Theme swatches, standing in for the invitation designs. */}
               <div className="grid grid-cols-5 gap-3">
-                {eventThemes.map((theme) => (
+                {templates.map((theme) => (
                   <div key={theme.id} className="space-y-2">
                     <div
                       aria-hidden
                       className="aspect-[3/4] w-full rounded-2xl shadow-[var(--shadow-soft)]"
                       style={{
-                        background: `linear-gradient(150deg, ${theme.from}, ${theme.to})`,
+                        background: `linear-gradient(150deg, ${theme.palette.from}, ${theme.palette.to})`,
                       }}
                     />
                     <p className="truncate text-center text-xs text-[var(--text-muted)]">

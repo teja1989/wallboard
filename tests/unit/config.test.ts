@@ -3,7 +3,7 @@ import {
   PERMISSIONS,
   absoluteMaxEventLifetimeMs,
   eventRolePermissions,
-  eventThemes,
+  templates,
   expiryPresets,
   mediaRules,
   occasions,
@@ -133,9 +133,9 @@ describe('occasions', () => {
     const ids = occasions.map((o) => o.id);
     expect(new Set(ids).size).toBe(ids.length);
 
-    const themeIds = new Set(eventThemes.map((t) => t.id));
+    const themeIds = new Set(templates.map((t) => t.id));
     for (const occasion of occasions) {
-      expect(themeIds.has(occasion.defaultThemeId), occasion.id).toBe(true);
+      expect(themeIds.has(occasion.defaultTemplateId), occasion.id).toBe(true);
     }
   });
 
@@ -157,15 +157,15 @@ describe('occasions', () => {
 
 describe('themes', () => {
   it('offer a usable free set rather than a deliberately poor one', () => {
-    expect(eventThemes.filter((t) => !t.premium).length).toBeGreaterThanOrEqual(3);
+    expect(templates.filter((t) => !t.premium).length).toBeGreaterThanOrEqual(3);
   });
 
   it('have something behind the paywall worth paying for', () => {
-    expect(eventThemes.filter((t) => t.premium).length).toBeGreaterThan(0);
+    expect(templates.filter((t) => t.premium).length).toBeGreaterThan(0);
   });
 
   it('have unique ids', () => {
-    const ids = eventThemes.map((t) => t.id);
+    const ids = templates.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
