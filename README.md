@@ -91,6 +91,7 @@ missing. The reasoning behind the numbers is in [docs/PRICING.md](docs/PRICING.m
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md)   | how it fits together, and what was left out          |
 | [SECURITY.md](docs/SECURITY.md)           | the guardrails and what each one stops               |
 | [DATA_MODEL.md](docs/DATA_MODEL.md)       | collections, fields, indexes, TTLs                   |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)       | GCP, Terraform, and the push-to-deploy pipeline      |
 | [PRICING.md](docs/PRICING.md)             | the plans, the unit economics, turning billing on    |
 | [BRAND.md](docs/BRAND.md)                 | the name, the voice, the rules the copy follows      |
 | [SETUP.md](docs/SETUP.md)                 | local setup and the GCP deployment path              |
@@ -98,14 +99,18 @@ missing. The reasoning behind the numbers is in [docs/PRICING.md](docs/PRICING.m
 | [ADS_MARKETING.md](docs/ADS_MARKETING.md) | the ad plan, written before building it              |
 | [CONTRIBUTING.md](CONTRIBUTING.md)        | conventions and the config-first rule                |
 
-`.claude/skills/` holds two working skills: `marquee-dev` for running and changing the app,
-`marquee-security` for the pre-merge review checklist.
+`.claude/skills/` holds three working skills: `marquee-dev` for running and changing the
+app, `marquee-security` for the pre-merge review checklist, and `marquee-deploy` for the
+infrastructure.
 
 ## Status
 
-v1 is complete and tested — invitations, RSVPs, the guest list, the live wall, expiry, and
-the plan gates. Verified against the emulators: **114 unit tests**, **39 Firestore rules
-tests**, **66 API smoke assertions**, **20 Playwright journeys**.
+v1 is complete and tested — invitations, RSVPs, the guest list, the live wall, expiry, email
+invitations, Stripe, the archive, and the plan gates. Verified against the emulators:
+**146 unit tests**, **48 Firestore rules tests**, **95 API smoke assertions**,
+**25 Playwright journeys**.
 
-Before a public launch: email delivery, Stripe, archive download, and Terraform for the real
-GCP project. See [ROADMAP.md](docs/ROADMAP.md).
+Deployment is described in Terraform and runs from a GitHub push — see
+[DEPLOYMENT.md](docs/DEPLOYMENT.md). Email and payments ship switched off behind their
+`outbox` and `mock` drivers, so turning either on is a variable change rather than a
+migration. Next up in [ROADMAP.md](docs/ROADMAP.md): the admin console, content safety, ads.

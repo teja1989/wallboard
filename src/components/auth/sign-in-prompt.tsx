@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Mail } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
+import { appConfig } from '@/config';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -24,7 +25,10 @@ export function SignInPrompt({ title, body, compact = false }: SignInPromptProps
   const { upgradeWithGoogle, sendEmailLink } = useAuth();
   const { notify } = useToast();
   const [email, setEmail] = useState('');
-  const [showEmail, setShowEmail] = useState(false);
+  // With no OAuth client configured for the project there is no Google button, so the
+  // email form is the only way in and opens expanded rather than behind a second tap.
+  const googleAvailable = appConfig.auth.googleSignIn;
+  const [showEmail, setShowEmail] = useState(!googleAvailable);
   const [busy, setBusy] = useState<'google' | 'email' | null>(null);
 
   async function handleGoogle() {
@@ -58,9 +62,11 @@ export function SignInPrompt({ title, body, compact = false }: SignInPromptProps
       {body && <p className="mt-2 text-[var(--text-secondary)]">{body}</p>}
 
       <div className="mt-6 space-y-3">
-        <Button size="lg" className="w-full" loading={busy === 'google'} onClick={handleGoogle}>
-          Continue with Google
-        </Button>
+        {googleAvailable && (
+          <Button size="lg" className="w-full" loading={busy === 'google'} onClick={handleGoogle}>
+            Continue with Google
+          </Button>
+        )}
 
         {showEmail ? (
           <form onSubmit={handleEmail} className="space-y-3 text-left">
@@ -73,7 +79,13 @@ export function SignInPrompt({ title, body, compact = false }: SignInPromptProps
               autoComplete="email"
               required
             />
-            <Button type="submit" variant="soft" className="w-full" loading={busy === 'email'}>
+            <Button
+              type="submit"
+              size={googleAvailable ? 'md' : 'lg'}
+              variant={googleAvailable ? 'soft' : 'primary'}
+              className="w-full"
+              loading={busy === 'email'}
+            >
               Send me a link
             </Button>
           </form>

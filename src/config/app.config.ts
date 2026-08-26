@@ -22,6 +22,10 @@ export const appConfig = {
     storagePort: clientEnv.NEXT_PUBLIC_EMULATOR_STORAGE_PORT,
   },
   session: sessionConfig,
+  auth: {
+    /** Off until an OAuth client exists for the project. See docs/DEPLOYMENT.md. */
+    googleSignIn: clientEnv.NEXT_PUBLIC_GOOGLE_SIGN_IN,
+  },
 } as const;
 
 /** Server-only slice. Throws in the browser via serverEnv(). */

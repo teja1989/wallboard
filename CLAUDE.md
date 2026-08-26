@@ -4,7 +4,7 @@ Invitations, RSVPs and a live guest wall. Next.js 16 (App Router) on Cloud Run, 
 Cloud Storage, Firebase Auth. Runs entirely against the Firebase emulators with no GCP
 account.
 
-Two skills carry the working detail — read them rather than re-deriving:
+Three skills carry the working detail — read them rather than re-deriving:
 
 - **`.claude/skills/marquee-dev/`** — running, seeding, testing; where each kind of change
   goes; the traps (`NODE_ENV`, `server-only` in CLI scripts, `node:crypto` in client code,
@@ -12,6 +12,8 @@ Two skills carry the working detail — read them rather than re-deriving:
 - **`.claude/skills/marquee-security/`** — the pre-merge checklist for anything touching
   authorization, entitlements, rules, sessions, codes, RSVPs, uploads, rate limits, or the
   CSP.
+- **`.claude/skills/marquee-deploy/`** — Terraform, the Dockerfile, the deploy workflow, and
+  the traps in each (the site-URL cycle, build-time `NEXT_PUBLIC_*`, self-signing IAM).
 
 ## The six invariants
 
@@ -48,6 +50,6 @@ npm run test:e2e      # Playwright through the real UI
 
 ## Docs
 
-`docs/ARCHITECTURE.md` · `docs/SECURITY.md` · `docs/DATA_MODEL.md` · `docs/PRICING.md` ·
-`docs/BRAND.md` · `docs/SETUP.md` · `docs/ROADMAP.md` · `docs/ADS_MARKETING.md` ·
-`CONTRIBUTING.md`
+`docs/ARCHITECTURE.md` · `docs/SECURITY.md` · `docs/DATA_MODEL.md` · `docs/DEPLOYMENT.md` ·
+`docs/PRICING.md` · `docs/BRAND.md` · `docs/SETUP.md` · `docs/ROADMAP.md` ·
+`docs/ADS_MARKETING.md` · `CONTRIBUTING.md`

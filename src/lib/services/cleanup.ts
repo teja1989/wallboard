@@ -19,6 +19,23 @@ import type { EventDoc } from '@/types/domain';
 
 const SWEEP_BATCH_SIZE = 50;
 
+/**
+ * Everything hanging off an event document.
+ *
+ * A Firestore TTL policy deletes the document it is set on and *nothing underneath it*, so
+ * when the event doc lapses its subcollections become unreachable orphans that live
+ * forever. For `rsvpNotes` and `invitees` that is a privacy problem rather than a billing
+ * one: a note a guest wrote for the host, and a list of the addresses the host invited,
+ * would outlive the event they belong to. The sweep is what actually keeps the promise.
+ */
+const EVENT_SUBCOLLECTIONS = [
+  collections.members,
+  collections.posts,
+  collections.private,
+  collections.rsvpNotes,
+  collections.invitees,
+] as const;
+
 export interface CleanupSummary {
   eventsSwept: number;
   objectsDeleted: number;
@@ -62,10 +79,19 @@ export async function runCleanup(): Promise<CleanupSummary> {
     // Everything the event ever stored lives under one prefix, so a single call is enough.
     objectsDeleted += await storage().deletePrefix(storagePaths.eventPrefix(event.id));
 
-    await db().collection(collections.events).doc(event.id).update({
+    const reference = db().collection(collections.events).doc(event.id);
+    for (const name of EVENT_SUBCOLLECTIONS) {
+      await db().recursiveDelete(reference.collection(name));
+    }
+
+    // The event document itself survives the sweep, hollowed out. Someone following an old
+    // link within the grace window should read "this has ended" rather than a 404, and the
+    // TTL policy on `expiresAtTtl` removes the shell shortly after.
+    await reference.update({
       status: 'expired',
       sweptAt: Date.now(),
       storageBytes: 0,
+      postCount: 0,
     });
 
     await recordAudit(

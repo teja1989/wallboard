@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars for a local plan. CI passes these as -var flags
+# instead, so this file is a convenience and is never committed with real values.
+
+project_id   = "quantum-pulsar"
+region       = "us-central1"
+owner_emails = "you@example.com"
+
+# Leave empty until a custom domain is mapped; the run.app URL is used instead.
+site_url = ""
+
+# Needs an OAuth client and a consent screen first. See docs/DEPLOYMENT.md.
+google_sign_in = false
+
+# Phase two. `outbox` writes mail to Firestore; `mock` never touches real money.
+email_driver   = "outbox"
+billing_driver = "mock"
+
+# Optional: a budget alert needs the billing account the project is linked to.
+# Find it with: gcloud billing projects describe quantum-pulsar
+# billing_account     = "000000-AAAAAA-BBBBBB"
+# budget_amount_usd   = 25
+# budget_alert_emails = ["you@example.com"]

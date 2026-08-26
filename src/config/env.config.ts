@@ -34,6 +34,13 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_EMULATOR_FIRESTORE_PORT: z.coerce.number().int().default(8080),
   NEXT_PUBLIC_EMULATOR_STORAGE_PORT: z.coerce.number().int().default(9199),
   NEXT_PUBLIC_SITE_URL: z.string().url().default('http://localhost:3000'),
+  /**
+   * Whether to offer the Google button. Configuring Google sign-in needs an OAuth client
+   * and a consent screen, which is console work no deploy pipeline can do for you — so a
+   * fresh project turns this off and offers the email link alone, rather than showing a
+   * button that fails with `auth/operation-not-allowed` on the first click.
+   */
+  NEXT_PUBLIC_GOOGLE_SIGN_IN: booleanish.default(true),
 });
 
 const serverEnvSchema = z.object({
@@ -92,6 +99,7 @@ const rawClientEnv = {
   NEXT_PUBLIC_EMULATOR_FIRESTORE_PORT: process.env.NEXT_PUBLIC_EMULATOR_FIRESTORE_PORT,
   NEXT_PUBLIC_EMULATOR_STORAGE_PORT: process.env.NEXT_PUBLIC_EMULATOR_STORAGE_PORT,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_GOOGLE_SIGN_IN: process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN,
 };
 
 const clientParsed = clientEnvSchema.safeParse(rawClientEnv);
