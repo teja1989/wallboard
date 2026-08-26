@@ -104,7 +104,15 @@ false` — nobody reaches it from a browser, host and owner included.
 | `state`                                     | `visible` \| `removed` \| `quarantined` |                              |
 | `createdAt`, `expiresAt`                    | number                                  | inherits the event's expiry  |
 
-`MediaAsset`: `{ kind, objectPath, posterPath, mimeType, bytes, durationSeconds, width, height }`.
+`MediaAsset`: `{ kind, objectPath, previewPath, displayPath, mimeType, bytes, durationSeconds,
+width, height }`.
+
+`objectPath` is the original, kept untouched for the archive. `previewPath` (640px) and
+`displayPath` (1800px) are WebP copies the browser encodes before upload; the wall renders
+them through a `srcset` and only the lightbox reaches for the display size. Either may be
+null — an encode can fail, or the browser can lack canvas WebP — in which case the wall falls
+back to the original. That costs egress but shows the right picture, which is the correct
+trade in that direction.
 
 Deletion is a soft delete: `state` becomes `removed`, `body` and `media` are cleared, and the
 bytes are destroyed immediately. The document survives so moderation stays reviewable and the

@@ -47,6 +47,45 @@ export const mediaRules: Record<MediaKind, MediaRule> = {
   },
 };
 
+/**
+ * Display derivatives.
+ *
+ * Egress is the largest line on the bill and the only one we can fix in code: a 6 MB phone
+ * photo viewed by eighty guests is half a gigabyte of transfer from one picture. Serving a
+ * resized copy instead cuts media egress by roughly 95%.
+ *
+ * Generated in the browser at upload time rather than on the server. Ingress is free, so
+ * uploading three files costs nothing, and it keeps a native image library — and its CPU,
+ * its memory spikes and its latency — out of the request path entirely. The server still
+ * validates every byte that lands, exactly as it does for the original.
+ *
+ * The original is kept untouched and served only in the archive, so "at the quality they
+ * were uploaded" stays true.
+ */
+export const imageVariants = {
+  /** For the wall grid. Small enough that a whole screen of them costs less than one photo. */
+  preview: { maxEdge: 640, quality: 0.68, maxBytes: 250 * 1024 },
+  /** For the lightbox, and the large candidate in the wall's srcset. */
+  display: { maxEdge: 1800, quality: 0.78, maxBytes: 1_500_000 },
+} as const;
+
+export type ImageVariantId = keyof typeof imageVariants;
+export const IMAGE_VARIANT_IDS = ['preview', 'display'] as const;
+
+/**
+ * Signed read URLs are cached and reused within this window.
+ *
+ * Not a micro-optimisation: a V4 signature changes on every mint, so a freshly signed URL
+ * is a fresh cache key and the browser re-downloads an image it already has. Reusing the
+ * same URL for everyone inside the window is what makes browser caching work at all.
+ */
+export const mediaUrlCache = {
+  /** How long a minted URL is reused. Comfortably inside its own expiry. */
+  reuseMs: 45 * 60 * 1000,
+  /** Bounded so one busy event cannot grow the process memory without limit. */
+  maxEntries: 5000,
+} as const;
+
 export const contentLimits = {
   eventTitleMaxLength: 80,
   eventDescriptionMaxLength: 280,
@@ -148,8 +187,14 @@ export const sessionConfig = {
   cookieName: '__Host-mq_session',
   /** Firebase session cookies max out at 14 days; we stay well under. */
   maxAgeMs: 5 * DAY,
-  /** How long a minted media read URL stays valid. */
-  mediaUrlTtlSeconds: 15 * 60,
+  /**
+   * How long a minted media read URL stays valid.
+   *
+   * An hour rather than fifteen minutes, so a URL survives long enough to be worth caching
+   * — see `mediaUrlCache`. Still short enough that a link pasted elsewhere stops working
+   * well before anyone finds it useful.
+   */
+  mediaUrlTtlSeconds: 60 * 60,
   /** How long an upload target stays valid. */
   uploadUrlTtlSeconds: 15 * 60,
   /** Pending uploads older than this are swept even if never finalized. */

@@ -1,4 +1,5 @@
 'use client';
+import type { ImageVariantId } from '@/config';
 import { api } from '@/lib/client/api-client';
 import type { ProbedMedia } from '@/lib/client/media-probe';
 import type { PostDoc } from '@/types/domain';
@@ -12,17 +13,23 @@ import type { PostDoc } from '@/types/domain';
  * broken.
  */
 
-interface UploadTargetResponse {
-  uploadId: string;
+interface UploadTarget {
   url: string;
   method: 'PUT' | 'POST';
   headers: Record<string, string>;
+}
+
+interface UploadTargetResponse {
+  uploadId: string;
+  original: UploadTarget;
+  /** Present only for kinds that have derivatives. */
+  variants: Partial<Record<ImageVariantId, UploadTarget>>;
   expiresAt: number;
 }
 
 function putBytes(
-  target: UploadTargetResponse,
-  file: File,
+  target: UploadTarget,
+  file: Blob,
   onProgress: (fraction: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -62,11 +69,11 @@ export async function submitPost(
     durationSeconds: number | null;
     width: number | null;
     height: number | null;
-    posterDataUrl: string | null;
+    variants: ImageVariantId[];
   } | null = null;
 
   if (submission.media) {
-    const { file, kind, durationSeconds, width, height, posterDataUrl } = submission.media;
+    const { file, kind, durationSeconds, width, height, variants } = submission.media;
 
     const target = await api.post<UploadTargetResponse>('/api/posts/upload-target', {
       eventId: submission.eventId,
@@ -74,10 +81,35 @@ export async function submitPost(
       mimeType: file.type,
       bytes: file.size,
       durationSeconds,
+      variants: Object.keys(variants),
     });
 
-    await putBytes(target, file, onProgress);
-    upload = { uploadId: target.uploadId, kind, durationSeconds, width, height, posterDataUrl };
+    // The original dominates the transfer, so it owns the progress bar; the derivatives
+    // together are a percent or two of it and go up afterwards.
+    await putBytes(target.original, file, onProgress);
+
+    const uploaded: ImageVariantId[] = [];
+    for (const id of Object.keys(variants) as ImageVariantId[]) {
+      const blob = variants[id];
+      const variantTarget = target.variants[id];
+      if (!blob || !variantTarget) continue;
+
+      try {
+        await putBytes(variantTarget, blob, () => undefined);
+        uploaded.push(id);
+      } catch {
+        // A derivative that fails to upload costs egress later, not the post now.
+      }
+    }
+
+    upload = {
+      uploadId: target.uploadId,
+      kind,
+      durationSeconds,
+      width,
+      height,
+      variants: uploaded,
+    };
   }
 
   // Finalize. The server verifies the object that actually landed before creating the post.

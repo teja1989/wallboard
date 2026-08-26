@@ -182,8 +182,15 @@ async function resolveRole(input: EnsureUserInput): Promise<PlatformRole> {
   return input.claimedRole;
 }
 
-/** The actor's role inside one event, or null when they are not a member. */
-export async function eventRoleFor(eventId: string, uid: string): Promise<EventRole | null> {
+/**
+ * The actor's membership document, or null when they are not a member.
+ *
+ * Handlers that need more than the role — the event detail route wants the viewer's own
+ * RSVP — should call this and read both off one snapshot. Reading the role and then
+ * re-reading the same document for a second field is a Firestore read nobody is paying
+ * for on purpose.
+ */
+export async function eventMembershipFor(eventId: string, uid: string): Promise<MemberDoc | null> {
   const snapshot = await db()
     .collection(collections.events)
     .doc(eventId)
@@ -191,7 +198,12 @@ export async function eventRoleFor(eventId: string, uid: string): Promise<EventR
     .doc(uid)
     .get();
   if (!snapshot.exists) return null;
-  return (snapshot.data() as MemberDoc).role;
+  return snapshot.data() as MemberDoc;
+}
+
+/** The actor's role inside one event, or null when they are not a member. */
+export async function eventRoleFor(eventId: string, uid: string): Promise<EventRole | null> {
+  return (await eventMembershipFor(eventId, uid))?.role ?? null;
 }
 
 /** Marks a member as active without contending on the member document. */

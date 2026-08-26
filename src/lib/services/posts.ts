@@ -4,15 +4,18 @@ import { FieldValue } from 'firebase-admin/firestore';
 import {
   collections,
   contentLimits,
+  imageVariants,
   mediaRules,
   sessionConfig,
   storagePaths,
+  type ImageVariantId,
   type MediaKind,
 } from '@/config';
 import { db } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/server/api';
 import { entitlementsFor } from '@/lib/billing/entitlements';
 import { extensionForMime, storage } from '@/lib/storage';
+import { signedUrl } from '@/lib/storage/signed-url-cache';
 import { eventRef } from '@/lib/services/events';
 import type { Actor, EventDoc, MediaAsset, PostDoc, ResolvedMedia } from '@/types/domain';
 import type { CreatePostInput, UploadTargetInput } from '@/lib/validation/schemas';
@@ -29,11 +32,17 @@ import type { CreatePostInput, UploadTargetInput } from '@/lib/validation/schema
  * caught here, the pending object is deleted, and no post is created.
  */
 
-export interface PreparedUpload {
-  uploadId: string;
+export interface PreparedTarget {
   url: string;
   method: 'PUT' | 'POST';
   headers: Record<string, string>;
+}
+
+export interface PreparedUpload {
+  uploadId: string;
+  original: PreparedTarget;
+  /** One per derivative the browser said it could produce. */
+  variants: Partial<Record<ImageVariantId, PreparedTarget>>;
   expiresAt: number;
 }
 
@@ -53,22 +62,77 @@ export async function prepareUpload(
   }
 
   const uploadId = randomUUID();
-  const objectPath = storagePaths.pending(event.id, uploadId, extensionForMime(input.mimeType));
-
-  const target = await storage().createUploadTarget({
-    objectPath,
+  const original = await storage().createUploadTarget({
+    objectPath: storagePaths.pending(event.id, uploadId, extensionForMime(input.mimeType)),
     contentType: input.mimeType,
     maxBytes: mediaRules[input.kind].maxBytes,
     ttlSeconds: sessionConfig.uploadUrlTtlSeconds,
   });
 
+  // One target per derivative the browser says it has. Asking for a target it never uses
+  // costs nothing: the pending object simply never appears, and the sweep ignores it.
+  const variants: Partial<Record<ImageVariantId, PreparedTarget>> = {};
+  for (const id of input.variants) {
+    const target = await storage().createUploadTarget({
+      objectPath: storagePaths.pendingVariant(event.id, uploadId, id),
+      contentType: 'image/webp',
+      maxBytes: imageVariants[id].maxBytes,
+      ttlSeconds: sessionConfig.uploadUrlTtlSeconds,
+    });
+    variants[id] = { url: target.url, method: target.method, headers: target.headers };
+  }
+
   return {
     uploadId,
-    url: target.url,
-    method: target.method,
-    headers: target.headers,
-    expiresAt: target.expiresAt,
+    original: { url: original.url, method: original.method, headers: original.headers },
+    variants,
+    expiresAt: original.expiresAt,
   };
+}
+
+/**
+ * Promotes the derivatives that actually landed.
+ *
+ * Each is re-checked against its own cap and content type before being wired up, exactly
+ * like the original — a browser can claim it uploaded a 40 KB preview and have uploaded
+ * something else entirely. Anything that fails is dropped rather than fatal: the wall then
+ * falls back to the original, which costs egress but shows the right picture.
+ */
+async function promoteVariants(
+  eventId: string,
+  postId: string,
+  uploadId: string,
+  claimed: readonly ImageVariantId[],
+): Promise<Partial<Record<ImageVariantId, string>>> {
+  const promoted: Partial<Record<ImageVariantId, string>> = {};
+
+  for (const id of claimed) {
+    const pendingPath = storagePaths.pendingVariant(eventId, uploadId, id);
+    try {
+      const stat = await storage().stat(pendingPath);
+      if (!stat) continue;
+
+      const contentType = stat.contentType.split(';')[0]?.trim().toLowerCase();
+      if (contentType !== 'image/webp') continue;
+      if (stat.bytes <= 0 || stat.bytes > imageVariants[id].maxBytes) continue;
+
+      const finalPath = storagePaths.variant(eventId, postId, id);
+      await storage().copy(pendingPath, finalPath);
+      promoted[id] = finalPath;
+    } catch (error) {
+      console.error(`[posts] could not promote the ${id} variant`, error);
+    } finally {
+      await storage()
+        .delete([pendingPath])
+        .catch(() => undefined);
+    }
+  }
+
+  if (claimed.length > 0 && Object.keys(promoted).length === 0) {
+    // Worth noticing: it means every viewer of this post downloads the full original.
+    console.warn(`[posts] no derivatives survived for ${postId}; serving the original`);
+  }
+  return promoted;
 }
 
 /** Finds the pending object for an upload id, whatever extension it was stored under. */
@@ -102,12 +166,6 @@ function assertMediaWithinLimits(kind: MediaKind, bytes: number, contentType: st
   if (bytes > rule.maxBytes) {
     throw new ApiError('bad_request', `That ${kind} is larger than the limit.`);
   }
-}
-
-function decodePosterDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } | null {
-  const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(dataUrl);
-  if (!match?.[1] || !match[2]) return null;
-  return { buffer: Buffer.from(match[2], 'base64'), contentType: match[1] };
 }
 
 export async function createPost(
@@ -148,20 +206,14 @@ export async function createPost(
       );
       await storage().copy(pending.objectPath, finalPath);
 
-      let posterPath: string | null = null;
-      if (input.upload.posterDataUrl && kind !== 'image') {
-        const poster = decodePosterDataUrl(input.upload.posterDataUrl);
-        if (poster) {
-          posterPath = storagePaths.poster(event.id, postRef.id);
-          await storage().put(posterPath, poster.buffer, poster.contentType);
-        }
-      }
+      const promoted = await promoteVariants(event.id, postRef.id, uploadId, input.upload.variants);
 
       uploadedBytes = pending.bytes;
       media.push({
         kind,
         objectPath: finalPath,
-        posterPath,
+        previewPath: promoted.preview ?? null,
+        displayPath: promoted.display ?? null,
         mimeType: pending.contentType,
         bytes: pending.bytes,
         durationSeconds: input.upload.durationSeconds,
@@ -213,10 +265,11 @@ export async function createPost(
  * asked for it to go.
  */
 export async function removePost(eventId: string, post: PostDoc): Promise<void> {
-  const paths = post.media.flatMap((asset) =>
-    [asset.objectPath, asset.posterPath].filter((p): p is string => !!p),
-  );
-  if (paths.length) await storage().delete(paths);
+  // Deleting the whole prefix rather than the listed paths, so a derivative that was
+  // written but never recorded cannot be left behind paying rent forever.
+  if (post.media.length > 0) {
+    await storage().deletePrefix(storagePaths.postPrefix(eventId, post.id));
+  }
 
   const freedBytes = post.media.reduce((sum, asset) => sum + asset.bytes, 0);
   await db().runTransaction(async (transaction) => {
@@ -239,15 +292,24 @@ export async function getPost(eventId: string, postId: string): Promise<PostDoc 
   return { ...(snapshot.data() as Omit<PostDoc, 'id'>), id: snapshot.id };
 }
 
-/** Attaches short-lived read URLs. Media URLs are minted per request, never stored. */
+/**
+ * Attaches read URLs. Never stored on the document — they expire, which is what makes
+ * removing someone from an event actually remove their access.
+ *
+ * `url` stays the original because the archive and any download want it. Everything the
+ * wall and the lightbox render comes from `previewUrl` and `displayUrl`, which is where
+ * the egress saving lives.
+ */
 export async function resolveMedia(assets: MediaAsset[]): Promise<ResolvedMedia[]> {
   const ttl = sessionConfig.mediaUrlTtlSeconds;
   const expiresAt = Date.now() + ttl * 1000;
+
   return Promise.all(
     assets.map(async (asset) => ({
       ...asset,
-      url: await storage().createReadUrl(asset.objectPath, ttl),
-      posterUrl: asset.posterPath ? await storage().createReadUrl(asset.posterPath, ttl) : null,
+      url: await signedUrl(asset.objectPath, ttl),
+      previewUrl: asset.previewPath ? await signedUrl(asset.previewPath, ttl) : null,
+      displayUrl: asset.displayPath ? await signedUrl(asset.displayPath, ttl) : null,
       urlExpiresAt: expiresAt,
     })),
   );

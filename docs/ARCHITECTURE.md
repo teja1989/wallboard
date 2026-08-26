@@ -74,9 +74,53 @@ Step 2 is why the client's declared byte count does not matter. A client that li
 against the object in the bucket, the pending upload is deleted, and no post is created.
 
 Reading works the same way in reverse: post documents hold object _paths_, never URLs.
-Playable URLs are minted per request at `GET /api/media/[eventId]`, only for members, and
-they expire. A link pasted elsewhere stops working, and removing someone from an event
-actually removes their access to the media.
+Playable URLs are minted at `POST /api/media/[eventId]`, only for members, and they expire.
+A link pasted elsewhere stops working, and removing someone from an event actually removes
+their access to the media.
+
+The mint is a **batch** for the whole wall, not one request per post. The obvious per-post
+shape re-read each post document to find its paths, which cost three Firestore reads per
+post — ninety to open a wall of thirty photos, before a single pixel arrived. The client
+already holds those post documents from its live listener, so it already knows the paths;
+re-reading them told us nothing. What matters is that the paths are _authorised_, and the
+prefix is the authorisation: everything under `events/{id}/posts/` belongs to that event,
+and a member of that event may already see all of it. One batch costs two reads for any
+number of posts.
+
+## Media is resized before it is uploaded
+
+Egress is the largest line on the bill for an app whose whole purpose is photos, and a wall
+that serves 4 MB phone originals into a 400px card is paying roughly forty times over for
+pixels nobody sees.
+
+So the browser encodes two WebP copies on a canvas before uploading — `preview` at 640px and
+`display` at 1800px on the longest edge, both bounded by `imageVariants` in
+`limits.config.ts` — and uploads them alongside the original to their own signed targets. The
+server re-`stat`s each one at finalize exactly as it does the original: wrong content type or
+over its cap and the derivative is dropped, never fatal.
+
+| Copy      | Where it is served                     |
+| --------- | -------------------------------------- |
+| `preview` | the wall card, via `srcset`            |
+| `display` | the lightbox                           |
+| original  | the archive download, and nothing else |
+
+Doing it client-side is what keeps this cheap: no transcoding service, no Cloud Function, no
+second write path. The cost is that a browser can fail to produce a derivative, so both paths
+are nullable and the wall falls back to the original — more expensive, but never a hole where
+a photo should be.
+
+Three smaller things fall out of the same concern:
+
+- **Video and audio never auto-download.** A card renders the poster with a play button and
+  mounts `<video>` only on first press; audio is `preload="none"`. Ten videos on a wall used
+  to mean ten metadata fetches nobody asked for.
+- **Signed URLs are memoised** (`lib/storage/signed-url-cache.ts`). A V4 signature differs on
+  every mint, so an unmemoised URL is a fresh cache key to the browser and re-downloads bytes
+  it already has. Reusing the URL within a window is what makes browser caching work at all.
+- **Firestore keeps a persistent local cache** in the browser, so a guest checking back on a
+  wall five times during a party resumes their listener instead of re-reading every post
+  five times.
 
 ## Plans and entitlements
 

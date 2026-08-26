@@ -197,8 +197,10 @@ use. Bounds come from `src/config/*`, so client and server cannot drift apart.
 Text fields strip control, zero-width and bidi-override characters — the ones that render
 invisibly or reverse the display order of what follows.
 
-The `posterDataUrl` field accepts only `data:image/(jpeg|png|webp);base64,…`, which is what
-stops a `javascript:` URL being stored and later rendered.
+Media URL requests carry object **paths**, not URLs, and each is matched against the exact
+shape the storage layer produces — `events/{eventId}/posts/{postId}/{file}`, no nesting and
+no `..`. The route then checks the prefix against the event the caller is a member of, which
+is what stops a member of one event signing a URL for another event's bytes.
 
 ## Audit log
 

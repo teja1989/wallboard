@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   POST_KINDS,
+  IMAGE_VARIANT_IDS,
   contentLimits,
   defaultTemplateId,
   emailConfig,
@@ -167,6 +168,8 @@ export const uploadTargetSchema = z
       .max(24 * 60 * 60)
       .nullable()
       .default(null),
+    /** Which resized copies the browser managed to produce. */
+    variants: z.array(z.enum(IMAGE_VARIANT_IDS)).default([]),
   })
   .superRefine((v, ctx) => {
     const rule = mediaRules[v.kind];
@@ -209,13 +212,11 @@ export const createPostSchema = z
         durationSeconds: z.number().nonnegative().nullable().default(null),
         width: z.number().int().positive().max(20000).nullable().default(null),
         height: z.number().int().positive().max(20000).nullable().default(null),
-        /** Optional client-rendered poster frame, as a data URL. */
-        posterDataUrl: z
-          .string()
-          .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
-          .max(2_000_000)
-          .nullable()
-          .default(null),
+        /**
+         * Which derivatives were uploaded. A claim, not a fact — finalize checks each one
+         * actually landed and is within its cap before wiring it up.
+         */
+        variants: z.array(z.enum(IMAGE_VARIANT_IDS)).default([]),
       })
       .nullable()
       .default(null),
@@ -277,6 +278,29 @@ export const deleteEventSchema = z.object({
     .string()
     .min(1)
     .max(contentLimits.eventTitleMaxLength + 10),
+});
+
+/**
+ * Object paths the wall wants URLs for.
+ *
+ * Bounded so one request cannot ask us to sign an unbounded list, and shaped so nothing
+ * exotic reaches the signer. The prefix check that actually authorises these lives in the
+ * route, because only it knows which event is being asked about.
+ */
+export const mediaUrlsSchema = z.object({
+  paths: z
+    .array(
+      z
+        .string()
+        .max(300)
+        // Exactly the shape `storagePaths.post` and `storagePaths.variant` produce: one
+        // post id, then one file name. No nesting, and no `..` — object names are literal
+        // in GCS, but the emulator adapter puts them on a real filesystem.
+        .regex(/^events\/[A-Za-z0-9_-]+\/posts\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/)
+        .refine((path) => !path.includes('..'), 'That is not a media path.'),
+    )
+    .min(1)
+    .max(contentLimits.wallPageSize * 3),
 });
 
 export const checkoutSchema = z.object({

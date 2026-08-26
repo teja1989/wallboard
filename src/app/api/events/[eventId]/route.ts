@@ -1,8 +1,6 @@
 import { can } from '@/lib/authz/policy';
 import { eventAuthzContext } from '@/lib/authz/event-context';
-import { eventRoleFor } from '@/lib/authz/session';
-import { collections } from '@/config';
-import { db } from '@/lib/firebase/admin';
+import { eventMembershipFor } from '@/lib/authz/session';
 import { effectiveStatus, requireEvent } from '@/lib/services/events';
 import { ApiError, ok, requireActor, route } from '@/lib/server/api';
 import { eventIdSchema } from '@/lib/validation/schemas';
@@ -22,31 +20,24 @@ export const GET = route(async (_request, { params }: Params) => {
   const id = eventIdSchema.parse(eventId);
 
   const event = await requireEvent(id);
-  const eventRole = await eventRoleFor(id, actor.uid);
+
+  // One read of the membership document serves both the authorization decision and the
+  // viewer's own reply, which the invitation needs to open in the right state. Reading the
+  // role and then re-reading the same document for its `rsvp` field doubled the cost of
+  // the most-requested route in the app.
+  const membership = await eventMembershipFor(id, actor.uid);
+  const eventRole = membership?.role ?? null;
 
   if (!can('event:view', eventAuthzContext(actor, event, eventRole))) {
     throw new ApiError('not_found', 'That event does not exist.');
   }
 
-  // The viewer's own reply, so the invitation can open in the right state without a
-  // second round trip.
-  const memberSnapshot = await db()
-    .collection(collections.events)
-    .doc(id)
-    .collection(collections.members)
-    .doc(actor.uid)
-    .get();
-
-  const memberRsvp = memberSnapshot.exists
-    ? (memberSnapshot.get('rsvp') as { status?: string; partySize?: number } | undefined)
-    : undefined;
-
   return ok({
     event: { ...event, status: effectiveStatus(event) },
     role: eventRole,
     rsvp: {
-      status: memberRsvp?.status ?? 'pending',
-      partySize: memberRsvp?.partySize ?? 1,
+      status: membership?.rsvp?.status ?? 'pending',
+      partySize: membership?.rsvp?.partySize ?? 1,
     },
     permissions: {
       canPost:

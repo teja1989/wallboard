@@ -33,10 +33,17 @@ const URL_REFRESH_MARGIN_MS = 60_000;
 
 export function useWall(eventId: string, enabled: boolean) {
   const [posts, setPosts] = useState<PostDoc[]>([]);
-  const [mediaByPost, setMediaByPost] = useState<Record<string, ResolvedMedia[]>>({});
+  /** Keyed by object path rather than post, so a path shared across renders is fetched once. */
+  const [urls, setUrls] = useState<Record<string, { url: string; expiresAt: number }>>({});
   const [settled, setSettled] = useState(false);
   const [listenerError, setListenerError] = useState<string | null>(null);
   const inFlight = useRef(new Set<string>());
+  /**
+   * Paths the server declined to sign. Without this the effect would ask again the moment
+   * the response landed, and keep asking — the response changes `urls`, which re-runs the
+   * effect, which finds the path still missing. A refusal is a permanent answer.
+   */
+  const refused = useRef(new Set<string>());
 
   // Built during render rather than inside the effect so the effect body does nothing but
   // subscribe — all state changes then originate from listener callbacks.
@@ -72,34 +79,87 @@ export function useWall(eventId: string, enabled: boolean) {
     return unsubscribe;
   }, [wallQuery]);
 
-  // Mint media URLs for any post that needs them, one request per post, never twice at once.
+  /**
+   * Mints URLs for everything on screen in one request.
+   *
+   * One call per wall rather than one per post. The earlier shape cost three Firestore
+   * reads for every photo — ninety reads to open a wall of thirty — because each request
+   * re-read the post it was already being told about.
+   */
   useEffect(() => {
     const now = Date.now();
-    const needing = posts.filter((post) => {
-      if (post.media.length === 0) return false;
-      if (inFlight.current.has(post.id)) return false;
-      const existing = mediaByPost[post.id];
-      if (!existing) return true;
-      return (existing[0]?.urlExpiresAt ?? 0) - now < URL_REFRESH_MARGIN_MS;
-    });
+    const wanted = new Set<string>();
 
-    for (const post of needing) {
-      inFlight.current.add(post.id);
-      api
-        .get<{ media: ResolvedMedia[] }>(`/api/media/${eventId}?postId=${post.id}`)
-        .then((result) => setMediaByPost((current) => ({ ...current, [post.id]: result.media })))
-        .catch(() => undefined)
-        .finally(() => inFlight.current.delete(post.id));
+    for (const post of posts) {
+      for (const asset of post.media) {
+        for (const path of [asset.objectPath, asset.previewPath, asset.displayPath]) {
+          if (!path) continue;
+          const known = urls[path];
+          if (known && known.expiresAt - now > URL_REFRESH_MARGIN_MS) continue;
+          if (inFlight.current.has(path) || refused.current.has(path)) continue;
+          wanted.add(path);
+        }
+      }
     }
-  }, [posts, mediaByPost, eventId]);
+
+    if (wanted.size === 0) return;
+    const batch = [...wanted];
+    for (const path of batch) inFlight.current.add(path);
+
+    void (async () => {
+      try {
+        const result = await api.post<{ urls: Record<string, string>; expiresAt: number }>(
+          `/api/media/${eventId}`,
+          { paths: batch },
+        );
+        for (const path of batch) {
+          if (!(path in result.urls)) refused.current.add(path);
+        }
+
+        setUrls((current) => {
+          const entries = Object.entries(result.urls);
+          if (entries.length === 0) return current;
+          const next = { ...current };
+          for (const [path, url] of entries) {
+            next[path] = { url, expiresAt: result.expiresAt };
+          }
+          return next;
+        });
+      } catch {
+        // Leaves the placeholders in place; the next snapshot retries.
+      } finally {
+        for (const path of batch) inFlight.current.delete(path);
+      }
+    })();
+  }, [posts, urls, eventId]);
 
   const wallPosts = useMemo<WallPost[]>(
     () =>
-      posts.map((post) => ({
-        ...post,
-        resolvedMedia: post.media.length === 0 ? [] : (mediaByPost[post.id] ?? null),
-      })),
-    [posts, mediaByPost],
+      posts.map((post) => {
+        if (post.media.length === 0) return { ...post, resolvedMedia: [] };
+
+        // A post is renderable once its *original* has a URL; the derivatives fill in as
+        // they arrive, and the img falls back to whatever exists.
+        const resolved = post.media.map((asset) => {
+          const original = urls[asset.objectPath];
+          if (!original) return null;
+          return {
+            ...asset,
+            url: original.url,
+            previewUrl: asset.previewPath ? (urls[asset.previewPath]?.url ?? null) : null,
+            displayUrl: asset.displayPath ? (urls[asset.displayPath]?.url ?? null) : null,
+            urlExpiresAt: original.expiresAt,
+          } satisfies ResolvedMedia;
+        });
+
+        return {
+          ...post,
+          resolvedMedia: resolved.every((asset) => asset !== null)
+            ? (resolved as ResolvedMedia[])
+            : null,
+        };
+      }),
+    [posts, urls],
   );
 
   return { posts: wallPosts, loading: enabled && !settled, error: listenerError };

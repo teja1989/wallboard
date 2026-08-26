@@ -45,7 +45,9 @@ export function Lightbox({ media, onClose }: LightboxProps) {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
             transition={motionTokens.spring}
-            src={media.url}
+            // The display copy, not the original: at 1800px on the longest edge it fills
+            // any screen, and it is a fraction of the size.
+            src={media.displayUrl ?? media.url}
             alt=""
             onClick={(event) => event.stopPropagation()}
             className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"

@@ -107,6 +107,9 @@ const PNG_BYTES = Buffer.from(
   'base64',
 );
 
+/** A 1x1 WebP, standing in for the resized copies a browser would encode. */
+const WEBP_BYTES = Buffer.from('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==', 'base64');
+
 async function uploadThroughTarget(target, bytes) {
   const response = await fetch(target.url, {
     method: target.method,
@@ -337,11 +340,24 @@ async function main() {
   // --- media upload --------------------------------------------------------
   const target = await call(member.session, '/api/posts/upload-target', {
     method: 'POST',
-    body: { eventId, kind: 'image', mimeType: 'image/png', bytes: PNG_BYTES.length },
+    body: {
+      eventId,
+      kind: 'image',
+      mimeType: 'image/png',
+      bytes: PNG_BYTES.length,
+      variants: ['preview', 'display'],
+    },
   });
   check('member gets an upload target', target.status === 200, JSON.stringify(target.payload));
+  check(
+    'the target includes one slot per resized copy',
+    Boolean(target.payload?.data?.variants?.preview && target.payload?.data?.variants?.display),
+    JSON.stringify(target.payload),
+  );
 
-  await uploadThroughTarget(target.payload.data, PNG_BYTES);
+  await uploadThroughTarget(target.payload.data.original, PNG_BYTES);
+  await uploadThroughTarget(target.payload.data.variants.preview, WEBP_BYTES);
+  await uploadThroughTarget(target.payload.data.variants.display, WEBP_BYTES);
 
   const mediaPost = await call(member.session, '/api/posts', {
     method: 'POST',
@@ -353,6 +369,7 @@ async function main() {
         kind: 'image',
         width: 1,
         height: 1,
+        variants: ['preview', 'display'],
       },
     },
   });
@@ -362,7 +379,46 @@ async function main() {
     JSON.stringify(mediaPost.payload),
   );
   const postId = mediaPost.payload?.data?.post?.id;
+  const asset = mediaPost.payload?.data?.post?.media?.[0];
   check('the post carries one media asset', mediaPost.payload?.data?.post?.media?.length === 1);
+  check(
+    'the resized copies are promoted alongside the original',
+    Boolean(asset?.previewPath && asset?.displayPath),
+    JSON.stringify(asset),
+  );
+
+  // A derivative that never lands must not break the post — the wall falls back to the
+  // original rather than showing a hole.
+  const partialTarget = await call(member.session, '/api/posts/upload-target', {
+    method: 'POST',
+    body: {
+      eventId,
+      kind: 'image',
+      mimeType: 'image/png',
+      bytes: PNG_BYTES.length,
+      variants: ['preview', 'display'],
+    },
+  });
+  await uploadThroughTarget(partialTarget.payload.data.original, PNG_BYTES);
+  await uploadThroughTarget(partialTarget.payload.data.variants.preview, WEBP_BYTES);
+  const partialPost = await call(member.session, '/api/posts', {
+    method: 'POST',
+    body: {
+      eventId,
+      body: 'Half resized',
+      upload: {
+        uploadId: partialTarget.payload.data.uploadId,
+        kind: 'image',
+        variants: ['preview', 'display'],
+      },
+    },
+  });
+  const partialAsset = partialPost.payload?.data?.post?.media?.[0];
+  check(
+    'a missing derivative leaves the post intact',
+    partialPost.status === 200 && !!partialAsset?.previewPath && partialAsset?.displayPath === null,
+    JSON.stringify(partialPost.payload),
+  );
 
   const oversized = await call(member.session, '/api/posts/upload-target', {
     method: 'POST',
@@ -382,7 +438,7 @@ async function main() {
     method: 'POST',
     body: { eventId, kind: 'audio', mimeType: 'audio/mpeg', bytes: 1024 },
   });
-  await uploadThroughTarget(honestTarget.payload.data, PNG_BYTES);
+  await uploadThroughTarget(honestTarget.payload.data.original, PNG_BYTES);
   const mismatched = await call(member.session, '/api/posts', {
     method: 'POST',
     body: {
@@ -394,14 +450,42 @@ async function main() {
   check('finalize refuses an upload claimed as the wrong kind', mismatched.status === 400);
 
   // --- media URLs ----------------------------------------------------------
-  const media = await call(member.session, `/api/media/${eventId}?postId=${postId}`);
+  // One batch for the whole wall. The paths come from the client's own listener, and the
+  // route authorises them by prefix rather than re-reading every post.
+  const wallPaths = [asset.objectPath, asset.previewPath, asset.displayPath];
+  const media = await call(member.session, `/api/media/${eventId}`, {
+    method: 'POST',
+    body: { paths: wallPaths },
+  });
   check('a member gets media URLs', media.status === 200, JSON.stringify(media.payload));
   check(
-    'media URLs are time-bound',
-    (media.payload?.data?.media?.[0]?.urlExpiresAt ?? 0) > Date.now(),
+    'every requested path is signed in one round trip',
+    wallPaths.every((path) => typeof media.payload?.data?.urls?.[path] === 'string'),
+    JSON.stringify(media.payload),
+  );
+  check('media URLs are time-bound', (media.payload?.data?.expiresAt ?? 0) > Date.now());
+
+  // The prefix is the access control, so a path belonging to another event must not sign.
+  const foreign = await call(member.session, `/api/media/${eventId}`, {
+    method: 'POST',
+    body: { paths: ['events/someotherevent01/posts/somepost123/original.png'] },
+  });
+  check(
+    'a path from another event is refused a URL',
+    foreign.status === 200 && Object.keys(foreign.payload?.data?.urls ?? {}).length === 0,
+    JSON.stringify(foreign.payload),
   );
 
-  const outsiderMedia = await call(outsider.session, `/api/media/${eventId}?postId=${postId}`);
+  const traversal = await call(member.session, `/api/media/${eventId}`, {
+    method: 'POST',
+    body: { paths: [`events/${eventId}/posts/../private/joinCode`] },
+  });
+  check('a traversal path is rejected outright', traversal.status === 400);
+
+  const outsiderMedia = await call(outsider.session, `/api/media/${eventId}`, {
+    method: 'POST',
+    body: { paths: wallPaths },
+  });
   check('a non-member gets no media URLs', outsiderMedia.status === 404);
 
   // --- moderation ----------------------------------------------------------

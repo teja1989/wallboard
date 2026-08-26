@@ -21,8 +21,17 @@ export type PostState = 'visible' | 'removed' | 'quarantined';
 
 export interface MediaAsset {
   kind: Exclude<PostKind, 'text'>;
+  /** The file as uploaded. Served only in the archive — see `previewPath`. */
   objectPath: string;
-  posterPath: string | null;
+  /**
+   * Resized copies. Null when the browser could not produce them, in which case the
+   * original is shown instead: correct, but expensive in egress.
+   *
+   * For video these are frames from the clip, which is what the wall shows until someone
+   * presses play.
+   */
+  previewPath: string | null;
+  displayPath: string | null;
   mimeType: string;
   bytes: number;
   durationSeconds: number | null;
@@ -33,7 +42,8 @@ export interface MediaAsset {
 /** MediaAsset with short-lived signed URLs attached, as sent to the browser. */
 export interface ResolvedMedia extends MediaAsset {
   url: string;
-  posterUrl: string | null;
+  previewUrl: string | null;
+  displayUrl: string | null;
   urlExpiresAt: number;
 }
 

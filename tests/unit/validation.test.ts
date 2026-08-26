@@ -4,6 +4,7 @@ import {
   createEventSchema,
   createPostSchema,
   joinCodeSchema,
+  mediaUrlsSchema,
   rsvpSchema,
   uploadTargetSchema,
 } from '@/lib/validation/schemas';
@@ -192,18 +193,27 @@ describe('createPostSchema', () => {
     ).toBe(true);
   });
 
-  it('rejects a poster that is not an image data URL', () => {
+  it('rejects a variant id it does not know', () => {
     expect(
       createPostSchema.safeParse({
         eventId: EVENT_ID,
         body: '',
         upload: {
           uploadId: 'abcdefghij1234',
-          kind: 'video',
-          posterDataUrl: 'javascript:alert(1)',
+          kind: 'image',
+          variants: ['preview', 'enormous'],
         },
       }).success,
     ).toBe(false);
+  });
+
+  it('defaults to claiming no variants', () => {
+    const parsed = createPostSchema.parse({
+      eventId: EVENT_ID,
+      body: '',
+      upload: { uploadId: 'abcdefghij1234', kind: 'image' },
+    });
+    expect(parsed.upload?.variants).toEqual([]);
   });
 
   it('rejects a body beyond the configured limit', () => {
@@ -213,5 +223,30 @@ describe('createPostSchema', () => {
         body: 'x'.repeat(contentLimits.postBodyMaxLength + 1),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('mediaUrlsSchema', () => {
+  const path = `events/${EVENT_ID}/posts/post123abcd/display.webp`;
+
+  it('accepts the paths the storage layer actually produces', () => {
+    expect(mediaUrlsSchema.safeParse({ paths: [path] }).success).toBe(true);
+  });
+
+  it('rejects traversal and anything outside the posts shape', () => {
+    for (const bad of [
+      `events/${EVENT_ID}/posts/../private/joinCode`,
+      `events/${EVENT_ID}/pending/abc.jpg`,
+      `events/${EVENT_ID}/posts/post123abcd/nested/deep.webp`,
+      'https://example.com/evil.webp',
+    ]) {
+      expect(mediaUrlsSchema.safeParse({ paths: [bad] }).success).toBe(false);
+    }
+  });
+
+  it('refuses an unbounded batch', () => {
+    const many = Array.from({ length: contentLimits.wallPageSize * 3 + 1 }, () => path);
+    expect(mediaUrlsSchema.safeParse({ paths: many }).success).toBe(false);
+    expect(mediaUrlsSchema.safeParse({ paths: [] }).success).toBe(false);
   });
 });

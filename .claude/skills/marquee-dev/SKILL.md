@@ -118,6 +118,29 @@ memorial never inherits celebratory copy. Add all of it, not just the label.
 4. `MediaBlock` in `src/components/wall/post-card.tsx` — how to play it
 5. `tests/unit/config.test.ts` already asserts no two kinds claim the same MIME type
 
+### Touching anything that costs money
+
+Egress and Firestore reads are the two lines that grow with usage, and both have already
+been worked over. Before adding a media path or a fetch, check you are not undoing it:
+
+- **Render the derivative, never the original.** `preview` (640px) on a card, `display`
+  (1800px) in the lightbox; the original exists for the archive. `srcSetFor()` in
+  `post-card.tsx` is how a card picks. Sizes live in `imageVariants` in `limits.config.ts`.
+- **Both derivative paths are nullable.** A browser can fail to encode one. Every consumer
+  falls back to `media.url`, and none of them may assume a derivative exists.
+- **Mint media URLs in one batch.** `POST /api/media/[eventId]` takes the paths the client
+  already holds from its listener and authorises them by prefix. Do not add a route that
+  re-reads posts to find paths the client just gave you.
+- **Do not add a Firestore read a listener already covers.** The wall's post documents are
+  live in the browser; anything derived from them belongs in a `useMemo`, not a fetch.
+- **One document, one read.** If a handler needs two fields off `members/{uid}`, call
+  `eventMembershipFor()` once — `eventRoleFor()` is a thin wrapper over it.
+- **Never auto-download video or audio.** Poster plus a play button; `<video>` mounts on
+  press. `preload="none"` on audio.
+- **Sign through `signedUrl()`**, not `storage().createReadUrl()`, for anything a browser
+  fetches repeatedly. A fresh V4 signature is a fresh cache key, so an unmemoised URL
+  re-downloads bytes the browser already has.
+
 ### Adding a config value
 
 Put it in the right `*.config.ts`, export it, and import it on **both** sides. The whole
@@ -146,6 +169,12 @@ to change one of them.
 - **Firestore singletons belong on `globalThis`.** Module scope resets on hot reload while
   the Firebase app does not, and `settings()` throws on a second call. See
   `src/lib/firebase/admin.ts`.
+- **`initializeFirestore` must run before the first `getFirestore`.** The browser cache is
+  configured in `src/lib/firebase/client.ts`; call `clientDb()` rather than reaching for
+  `getFirestore` yourself, or the cache silently does not apply.
+- **Canvas encoding is best-effort.** `toBlob` can return null, WebP support is not
+  universal, and a huge image can exceed the variant's byte cap. `media-probe.ts` returns
+  whatever succeeded and the upload claims only that.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.

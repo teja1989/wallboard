@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Trash2 } from 'lucide-react';
-import { motion as motionTokens } from '@/config';
+import { Loader2, Play, Trash2 } from 'lucide-react';
+import { imageVariants, motion as motionTokens } from '@/config';
 import { Avatar } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
 import type { WallPost } from '@/lib/client/use-wall';
-import { cn, formatRelativeTime } from '@/lib/utils';
+import { cn, formatDuration, formatRelativeTime } from '@/lib/utils';
 import type { ResolvedMedia } from '@/types/domain';
 
 interface PostCardProps {
@@ -129,10 +129,19 @@ function MediaBlock({
         className="block w-full cursor-zoom-in"
         aria-label="View full size"
       >
-        {/* Signed, short-lived URLs on an arbitrary host: next/image cannot optimise these. */}
+        {/*
+          Signed, short-lived URLs on an arbitrary host: next/image cannot optimise these,
+          which is exactly why the resizing happens at upload time instead.
+
+          srcset lets the browser pick between the small copy and the large one by its own
+          slot width and pixel density, so a phone does not pull a 1800px image to fill a
+          390px column — and neither does a retina laptop pull the 6 MB original.
+        */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={media.url}
+          src={media.previewUrl ?? media.displayUrl ?? media.url}
+          srcSet={srcSetFor(media)}
+          sizes="(min-width: 640px) 45vw, 92vw"
           alt=""
           loading="lazy"
           decoding="async"
@@ -144,12 +153,49 @@ function MediaBlock({
     );
   }
 
-  if (media.kind === 'video') {
+  if (media.kind === 'video') return <VideoBlock media={media} />;
+
+  return (
+    <div className="px-4 pb-1">
+      {/*
+        preload="none": with "metadata", every video on the wall fetches its header the
+        moment the page loads, so a wall of twenty clips costs twenty requests nobody asked
+        for.
+      */}
+      <audio src={media.url} controls preload="none" className="w-full" />
+    </div>
+  );
+}
+
+/**
+ * Candidates for the browser to choose between. Falls back to whatever exists — an older
+ * post with no derivatives still renders, it just costs more to serve.
+ */
+function srcSetFor(media: ResolvedMedia): string | undefined {
+  const candidates: string[] = [];
+  if (media.previewUrl) candidates.push(`${media.previewUrl} ${imageVariants.preview.maxEdge}w`);
+  if (media.displayUrl) candidates.push(`${media.displayUrl} ${imageVariants.display.maxEdge}w`);
+  return candidates.length > 1 ? candidates.join(', ') : undefined;
+}
+
+/**
+ * A video shows its poster until someone actually wants to watch it.
+ *
+ * The poster is a resized frame — tens of kilobytes — where the clip itself is tens of
+ * megabytes. Mounting the <video> only on the first press means a guest scrolling past
+ * fifteen clips downloads fifteen thumbnails rather than fifteen video headers.
+ */
+function VideoBlock({ media }: { media: ResolvedMedia }) {
+  const [playing, setPlaying] = useState(false);
+  const poster = media.previewUrl ?? media.displayUrl;
+
+  if (playing || !poster) {
     return (
       <video
         src={media.url}
-        poster={media.posterUrl ?? undefined}
+        poster={media.displayUrl ?? undefined}
         controls
+        autoPlay={playing}
         preload="metadata"
         playsInline
         className="w-full bg-black"
@@ -158,8 +204,30 @@ function MediaBlock({
   }
 
   return (
-    <div className="px-4 pb-1">
-      <audio src={media.url} controls preload="metadata" className="w-full" />
-    </div>
+    <button
+      type="button"
+      onClick={() => setPlaying(true)}
+      className="relative block w-full"
+      aria-label="Play video"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={poster}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="w-full bg-black object-cover"
+      />
+      <span aria-hidden className="absolute inset-0 flex items-center justify-center">
+        <span className="inline-flex size-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm">
+          <Play className="size-6 translate-x-0.5 text-white" />
+        </span>
+      </span>
+      {media.durationSeconds !== null && (
+        <span className="absolute right-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs text-white tabular-nums">
+          {formatDuration(media.durationSeconds)}
+        </span>
+      )}
+    </button>
   );
 }

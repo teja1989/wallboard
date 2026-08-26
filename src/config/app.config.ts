@@ -78,8 +78,15 @@ export const docIds = {
 export const storagePaths = {
   pending: (eventId: string, uploadId: string, ext: string) =>
     `events/${eventId}/pending/${uploadId}${ext}`,
+  /** A derivative, staged alongside the original it came from. */
+  pendingVariant: (eventId: string, uploadId: string, variant: string) =>
+    `events/${eventId}/pending/${uploadId}.${variant}.webp`,
   post: (eventId: string, postId: string, ext: string) =>
     `events/${eventId}/posts/${postId}/original${ext}`,
-  poster: (eventId: string, postId: string) => `events/${eventId}/posts/${postId}/poster.jpg`,
+  /** Resized copies. These are what the wall and the lightbox actually load. */
+  variant: (eventId: string, postId: string, variant: string) =>
+    `events/${eventId}/posts/${postId}/${variant}.webp`,
   eventPrefix: (eventId: string) => `events/${eventId}/`,
+  /** Everything a post owns, for prefix deletion. */
+  postPrefix: (eventId: string, postId: string) => `events/${eventId}/posts/${postId}/`,
 } as const;

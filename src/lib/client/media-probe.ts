@@ -1,5 +1,5 @@
 'use client';
-import { mediaRules, type MediaKind } from '@/config';
+import { imageVariants, mediaRules, type ImageVariantId, type MediaKind } from '@/config';
 
 /**
  * Client-side inspection of a chosen file: duration, dimensions, and a poster frame.
@@ -15,7 +15,17 @@ export interface ProbedMedia {
   durationSeconds: number | null;
   width: number | null;
   height: number | null;
-  posterDataUrl: string | null;
+  /**
+   * Resized copies, generated here rather than on the server.
+   *
+   * Ingress is free, so uploading these alongside the original costs nothing, and it keeps
+   * a native image library out of the request path — no CPU, no memory spikes, no added
+   * latency on the post. The server validates each one before it is used.
+   *
+   * Empty when the browser could not produce them; the server then falls back to the
+   * original, which is correct but expensive, and is logged as such.
+   */
+  variants: Partial<Record<ImageVariantId, Blob>>;
   previewUrl: string;
 }
 
@@ -40,13 +50,73 @@ export function validationError(file: File, kind: MediaKind): string | null {
   return null;
 }
 
-function loadImage(url: string): Promise<{ width: number; height: number }> {
+function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onload = () => resolve(image);
     image.onerror = () => reject(new Error('Could not read that image.'));
     image.src = url;
   });
+}
+
+/**
+ * Draws a source down to fit inside `maxEdge` and encodes it as WebP.
+ *
+ * Never upscales: a 400px photo resized "up" to 1800 is a bigger file that looks worse.
+ * Returns null rather than throwing, because a browser that cannot encode WebP should cost
+ * a host some egress, not cost a guest their photo.
+ */
+async function encodeVariant(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  variant: ImageVariantId,
+): Promise<Blob | null> {
+  const { maxEdge, quality, maxBytes } = imageVariants[variant];
+  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
+
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    // Without this the browser uses a cheap nearest-neighbour path and the result looks
+    // visibly worse than the original at the same size.
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(source, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/webp', quality),
+    );
+
+    if (!blob) return null;
+    // A "smaller" copy that is larger than the cap is not worth uploading or serving.
+    if (blob.size > maxBytes) return null;
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+/** Both derivatives from one decoded source. */
+async function buildVariants(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+): Promise<Partial<Record<ImageVariantId, Blob>>> {
+  const variants: Partial<Record<ImageVariantId, Blob>> = {};
+
+  for (const id of ['preview', 'display'] as const) {
+    const blob = await encodeVariant(source, width, height, id);
+    if (blob) variants[id] = blob;
+  }
+  return variants;
 }
 
 /** Seeks a little way in — frame zero is often black. */
@@ -54,7 +124,7 @@ function captureVideoPoster(url: string): Promise<{
   durationSeconds: number;
   width: number;
   height: number;
-  posterDataUrl: string | null;
+  frame: HTMLVideoElement | null;
 }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
@@ -69,20 +139,13 @@ function captureVideoPoster(url: string): Promise<{
     };
 
     video.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const context = canvas.getContext('2d');
-      let posterDataUrl: string | null = null;
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        posterDataUrl = canvas.toDataURL('image/jpeg', 0.72);
-      }
+      // The element itself is a valid CanvasImageSource at this point, so the frame can be
+      // resized straight from it without an intermediate full-size encode.
       resolve({
         durationSeconds: video.duration,
         width: video.videoWidth,
         height: video.videoHeight,
-        posterDataUrl,
+        frame: video,
       });
     };
 
@@ -112,8 +175,16 @@ export async function probeFile(file: File): Promise<ProbedMedia> {
   const base = { kind, file, previewUrl } as const;
 
   if (kind === 'image') {
-    const { width, height } = await loadImage(previewUrl);
-    return { ...base, durationSeconds: null, width, height, posterDataUrl: null };
+    const image = await loadImage(previewUrl);
+    const width = image.naturalWidth;
+    const height = image.naturalHeight;
+    return {
+      ...base,
+      durationSeconds: null,
+      width,
+      height,
+      variants: await buildVariants(image, width, height),
+    };
   }
 
   if (kind === 'video') {
@@ -124,13 +195,15 @@ export async function probeFile(file: File): Promise<ProbedMedia> {
       durationSeconds: probed.durationSeconds,
       width: probed.width,
       height: probed.height,
-      posterDataUrl: probed.posterDataUrl,
+      // A poster is the only thing the wall shows for a video until someone presses play,
+      // so it goes through exactly the same resizing as a photo.
+      variants: probed.frame ? await buildVariants(probed.frame, probed.width, probed.height) : {},
     };
   }
 
   const durationSeconds = await readAudioDuration(previewUrl);
   assertDuration(kind, durationSeconds);
-  return { ...base, durationSeconds, width: null, height: null, posterDataUrl: null };
+  return { ...base, durationSeconds, width: null, height: null, variants: {} };
 }
 
 function assertDuration(kind: MediaKind, seconds: number): void {
