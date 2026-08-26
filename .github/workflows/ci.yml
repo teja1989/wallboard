@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Emulator placeholders. No real credentials are involved anywhere in CI.
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_PUBLIC_USE_EMULATORS: 'true'
+  NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: wallboard-dev.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: wallboard-dev
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: wallboard-dev.appspot.com
+  NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000'
+  NEXT_PUBLIC_EMULATOR_HOST: 127.0.0.1
+  STORAGE_DRIVER: emulator
+  JOIN_CODE_PEPPER: ci-pepper-value-not-a-real-secret-0123456789
+  CLEANUP_TASK_SECRET: ci-cleanup-secret-not-a-real-secret-0123456789
+  OWNER_EMAILS: owner@example.com
+
+jobs:
+  static:
+    name: Types, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      # A moderate advisory in a transitive dependency should not silently accumulate.
+      - run: npm audit --audit-level=moderate
+
+  rules:
+    name: Firestore rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The Firestore emulator is a Java process.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:rules
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+
+      - name: Start emulators
+        run: |
+          npx firebase emulators:start --project wallboard-dev \
+            --only auth,firestore,storage > /tmp/emulators.log 2>&1 &
+          npx wait-on -t 120000 http-get://127.0.0.1:8080 http-get://127.0.0.1:9099
+
+      - name: Start the app
+        run: |
+          npm start > /tmp/app.log 2>&1 &
+          npx wait-on -t 120000 http-get://127.0.0.1:3000
+
+      # Two passes over the same running stack: the API contract, then the real UI.
+      - run: npm run smoke
+      - run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Server logs on failure
+        if: failure()
+        run: |
+          echo '--- app ---'; tail -100 /tmp/app.log
+          echo '--- emulators ---'; tail -100 /tmp/emulators.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

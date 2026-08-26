@@ -1,0 +1,90 @@
+rules_version = '2';
+
+// Deny-by-default. Clients may READ what they are entitled to see; clients may never
+// WRITE. Every mutation goes through a Next.js route handler using the Admin SDK, which
+// validates, authorises, rate-limits and audit-logs. The Admin SDK bypasses these rules,
+// so they exist purely to bound what a browser holding an ID token can reach.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function platformRole() {
+      return signedIn() && request.auth.token.role is string ? request.auth.token.role : 'user';
+    }
+
+    function isStaff() {
+      return platformRole() in ['support', 'admin', 'owner'];
+    }
+
+    function isMemberOf(eventId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/events/$(eventId)/members/$(uid()));
+    }
+
+    // ---- users -------------------------------------------------------------
+    // A user reads only their own profile. Staff read any profile.
+    match /users/{userId} {
+      allow read: if signedIn() && (userId == uid() || isStaff());
+      allow write: if false;
+    }
+
+    // ---- events ------------------------------------------------------------
+    match /events/{eventId} {
+      // Members see the event. Staff see any event. Non-members get nothing here —
+      // the pre-join preview is served by the API, not by a direct read.
+      allow read: if isMemberOf(eventId) || isStaff();
+      allow write: if false;
+
+      // Join codes are server-only. Even the host reads theirs through the API so the
+      // read is rate-limited and audit-logged.
+      match /private/{docId} {
+        allow read, write: if false;
+      }
+
+      // Members can see who else is here.
+      match /members/{memberId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      // The live wall. Removed and quarantined posts stay invisible to members.
+      match /posts/{postId} {
+        allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();
+        allow write: if false;
+      }
+    }
+
+    // ---- server-only collections ------------------------------------------
+    // Code lookup table: readable only by the server, or the hash space becomes a
+    // brute-forceable index of every live event.
+    match /joinCodes/{codeHash} {
+      allow read, write: if false;
+    }
+
+    match /rateLimits/{bucket} {
+      allow read, write: if false;
+    }
+
+    // Audit logs are read through the admin API so every read is itself accountable.
+    match /auditLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /config/{docId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // Anything not matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

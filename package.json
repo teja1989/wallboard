@@ -1,0 +1,72 @@
+{
+  "name": "wallboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:watch": "vitest --project unit",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project wallboard-dev \"vitest run --project rules\"",
+    "test:e2e": "playwright test",
+    "emulators": "firebase emulators:start --project wallboard-dev --import ./.emulator-data --export-on-exit ./.emulator-data",
+    "seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts",
+    "grant": "NODE_OPTIONS=--conditions=react-server tsx scripts/grant-role.ts",
+    "cleanup": "NODE_OPTIONS=--conditions=react-server tsx scripts/run-cleanup.ts",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^8.0.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "framer-motion": "^13.1.1",
+    "lucide-react": "^1.34.0",
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.3.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitest/coverage-v8": "^4.1.11",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
+    "firebase-tools": "^15.28.1",
+    "postcss": "^8.5.26",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11",
+    "wait-on": "^9.1.0"
+  },
+  "overrides": {
+    "gaxios": "^7.1.4",
+    "uuid": "^11.1.1",
+    "retry-request": "^8.0.0",
+    "teeny-request": "^10.1.0",
+    "@opentelemetry/core": "^2.8.0"
+  }
+}

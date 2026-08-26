@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// The bucket is private end to end. Browsers never read or write objects directly with
+// their Firebase identity: uploads use a server-issued signed PUT URL (or, under the
+// emulator, a server-issued upload target), and reads use a short-lived signed GET URL.
+// Denying everything here means a leaked ID token cannot touch stored media.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
