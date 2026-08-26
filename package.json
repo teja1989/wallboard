@@ -1,5 +1,5 @@
 {
-  "name": "wallboard",
+  "name": "marquee",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,9 +16,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project wallboard-dev \"vitest run --project rules\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project marquee-dev \"vitest run --project rules\"",
     "test:e2e": "playwright test",
-    "emulators": "firebase emulators:start --project wallboard-dev --import ./.emulator-data --export-on-exit ./.emulator-data",
+    "emulators": "firebase emulators:start --project marquee-dev --import ./.emulator-data --export-on-exit ./.emulator-data",
     "seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts",
     "grant": "NODE_OPTIONS=--conditions=react-server tsx scripts/grant-role.ts",
     "cleanup": "NODE_OPTIONS=--conditions=react-server tsx scripts/run-cleanup.ts",

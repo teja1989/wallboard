@@ -1,6 +1,6 @@
 # Roadmap
 
-## Shipped — v1: the wallboard
+## Shipped — v1: the marquee
 
 Everything needed to create an event, share a code, and post to a live wall that expires.
 
@@ -18,7 +18,34 @@ matrix, rate limiting — shipped **inside** v1 deliberately. An audit log that 
 admin console ships has no history to show, and retrofitting call sites is how gaps get left
 behind.
 
-## Phase 2 — owner and admin console
+## Phase 2 — the gaps that block a launch
+
+Ordered by what actually stops revenue.
+
+### Email delivery
+
+The biggest hole against Evite. Today an invitation is shared as a link or a code; there is
+no "type twenty addresses and send". Needs a transactional provider, an address list per
+event, delivery and open tracking, and a reminder for guests who have not replied. The
+reminder is the part hosts will actually love.
+
+### Payments
+
+The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,
+Stripe Billing for the subscription, a webhook that stamps `events/{id}.plan`, and an
+upgrade screen inside an existing event. See [PRICING.md](./PRICING.md).
+
+### Archive download
+
+Do not turn billing on without it. It is the answer to "what happens to my photos", which is
+the question that decides whether someone trusts us with the event at all.
+
+### Real GCP provisioning
+
+Terraform for bucket, IAM, CORS, lifecycle, Cloud Run, Scheduler and Secret Manager. Manual
+steps are in [SETUP.md](./SETUP.md) today.
+
+## Phase 3 — owner and admin console
 
 `/admin`, gated on `admin:accessConsole`, behind `features.adminConsole`.
 
@@ -39,7 +66,7 @@ what is missing is the read APIs and the screens.
 **Done when:** an owner can find and remove any piece of content in under a minute, and every
 action they take is in the audit log.
 
-## Phase 3 — content safety
+## Phase 4 — content safety
 
 Behind `features.safetyScan`.
 
@@ -52,7 +79,7 @@ Behind `features.safetyScan`.
 **Done when:** a host never has to be the first line of defence against an image nobody
 should have to look at.
 
-## Phase 4 — ads and marketing
+## Phase 5 — ads and marketing
 
 Behind `features.ads` and `features.analytics`. Design detail in
 [ADS_MARKETING.md](./ADS_MARKETING.md).
@@ -67,10 +94,6 @@ heterogeneous list. Only activation is deferred.
 
 ## Deferred, with reasons
 
-**Real GCP provisioning.** Terraform for bucket, IAM, CORS, lifecycle, Cloud Run, Scheduler
-and Secret Manager. Deferred because v1 targets the emulators; the manual steps are in
-[SETUP.md](./SETUP.md). This is the first thing to do before any public launch.
-
 **Video transcoding.** Cloud Transcoder normalising to H.264/AAC with an HLS ladder. Deferred
 because it adds a worker service, async "processing" states in the UI, and real per-minute
 cost — for a v1 where a 60-second cap already keeps files playable. `features.transcoding`
@@ -80,6 +103,10 @@ reserves the seam; enabling it will not change the storage layout or the post sc
 would improve camera access and background upload, and is not worth it until usage says so.
 
 ## Ideas not yet committed
+
+- Save-the-date, sent before the details are settled — the schema already allows a null date
+- Co-hosts, so a wedding is not owned by one person's account
+- Seating and meal choices, which is where the wedding market starts paying real money
 
 - Presentation mode for projecting a wall on a venue screen (`features.presentationMode` is
   already true; the route does not exist yet)

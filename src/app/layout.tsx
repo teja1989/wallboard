@@ -7,7 +7,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: { default: brand.name, template: `%s · ${brand.name}` },
-  description: brand.description,
+  description: brand.promise,
   applicationName: brand.name,
   // Ephemeral, code-gated content has no business in a search index.
   robots: { index: false, follow: false },

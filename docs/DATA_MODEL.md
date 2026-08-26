@@ -8,7 +8,8 @@ without a Firestore `Timestamp` reaching the browser. Documents that expire carr
 users/{uid}
 events/{eventId}
   private/joinCode          ← server-only
-  members/{uid}
+  members/{uid}             ← guest list, incl. the public half of each RSVP
+  rsvpNotes/{uid}           ← server-only, the private half
   posts/{postId}
 joinCodes/{codeHash}        ← server-only
 rateLimits/{bucketKey}      ← server-only
@@ -78,6 +79,19 @@ restrict a single field. `allow read, write: if false` — no client reaches it,
 
 The document id is the uid, which makes "is this person a member?" a single `exists()` in the
 rules. Anonymous visitors join as `viewer`; identified ones as `member`.
+
+## `events/{eventId}/rsvpNotes/{uid}`
+
+| Field                | Type                                       |
+| -------------------- | ------------------------------------------ |
+| `uid`, `displayName` |                                            |
+| `note`               | the guest's private message to the host    |
+| `answer`             | their answer to the host's custom question |
+| `updatedAt`          | number                                     |
+
+A separate subcollection purely because Firestore rules cannot restrict a single field, and
+a note addressed to the host is not for the rest of the guest list. `allow read, write: if
+false` — nobody reaches it from a browser, host and owner included.
 
 ## `events/{eventId}/posts/{postId}`
 

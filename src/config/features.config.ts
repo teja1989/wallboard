@@ -7,6 +7,12 @@
  */
 
 export interface FeatureFlags {
+  /**
+   * Charging real money. While this is off, every event runs on `previewPlanId` and the
+   * pricing page presents itself as a preview — see src/lib/billing/entitlements.ts.
+   * Turning it on activates the plan gates with no other code change.
+   */
+  billing: boolean;
   /** Phase 2 — owner/admin console at /admin. */
   adminConsole: boolean;
   /** Phase 3 — Cloud Vision SafeSearch on uploaded media. */
@@ -25,6 +31,7 @@ export interface FeatureFlags {
 }
 
 export const defaultFeatureFlags: FeatureFlags = {
+  billing: false,
   adminConsole: false,
   safetyScan: false,
   contentReporting: false,

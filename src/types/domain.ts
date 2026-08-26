@@ -1,7 +1,15 @@
-import type { EventRole, EventThemeId, PlatformRole, PostKind } from '@/config';
+import type {
+  EventRole,
+  EventThemeId,
+  OccasionId,
+  PlanId,
+  PlatformRole,
+  PostKind,
+  RsvpStatus,
+} from '@/config';
 
-// Re-exported so consumers can import domain and role types from one place.
-export type { EventRole, EventThemeId, PlatformRole, PostKind };
+// Re-exported so consumers can import domain, role and plan types from one place.
+export type { EventRole, EventThemeId, OccasionId, PlanId, PlatformRole, PostKind, RsvpStatus };
 
 /**
  * Wire-shaped domain types. Timestamps are epoch milliseconds so the same object
@@ -37,15 +45,66 @@ export interface EventSettings {
   moderated: boolean;
 }
 
+/** Where the event happens. All optional — plenty of invitations are "ours, 8pm". */
+export interface EventLocation {
+  name: string;
+  address: string;
+  /** A maps link the host pasted. Validated to http(s) before it is stored. */
+  url: string | null;
+}
+
+export interface RsvpSettings {
+  /** A save-the-date or a memorial notice may not want replies at all. */
+  enabled: boolean;
+  /** After this, the invitation shows as closed. Null means no deadline. */
+  deadline: number | null;
+  allowPlusOnes: boolean;
+  /** Total people one reply may cover, including the guest themselves. */
+  maxPartySize: number;
+  /** Collect a private note with the reply. A paid entitlement. */
+  askNote: boolean;
+  /** One extra question, e.g. "any dietary requirements?". A paid entitlement. */
+  question: string | null;
+}
+
+export interface RsvpResponse {
+  status: RsvpStatus;
+  /** Including the guest. 1 means just them. */
+  partySize: number;
+  respondedAt: number | null;
+}
+
+/** Aggregate counts shown to the host. Maintained transactionally on the event. */
+export interface RsvpTally {
+  yes: number;
+  no: number;
+  maybe: number;
+  pending: number;
+  /** Sum of party sizes across every "yes" — the number that matters for catering. */
+  attending: number;
+}
+
 export interface EventDoc {
   id: string;
   title: string;
   description: string;
+  occasion: OccasionId;
   hostUid: string;
   hostName: string;
+  /** Who the invitation is from, e.g. "Priya & Sam". Falls back to the host's name. */
+  hostedBy: string;
   themeId: EventThemeId;
   status: EventStatus;
+  /** When the event itself happens — distinct from when the wall expires. */
+  startsAt: number | null;
+  endsAt: number | null;
+  location: EventLocation | null;
+  dressCode: string;
+  rsvp: RsvpSettings;
+  rsvpTally: RsvpTally;
   settings: EventSettings;
+  /** The plan this event runs on. Resolved through effectivePlanId() before use. */
+  plan: PlanId;
   createdAt: number;
   expiresAt: number;
   endedAt: number | null;
@@ -55,8 +114,11 @@ export interface EventDoc {
 }
 
 /** What a visitor is allowed to see about an event before joining. */
-export type EventPreview = Pick<EventDoc, 'id' | 'title' | 'themeId' | 'status' | 'expiresAt'> & {
-  hostName: string;
+export type EventPreview = Pick<
+  EventDoc,
+  'id' | 'title' | 'themeId' | 'occasion' | 'status' | 'expiresAt' | 'startsAt'
+> & {
+  hostedBy: string;
   memberCount: number;
 };
 
@@ -68,6 +130,22 @@ export interface MemberDoc {
   joinedAt: number;
   mutedAt: number | null;
   isAnonymous: boolean;
+  /** The guest's reply. Everyone who redeems a code starts at `pending`. */
+  rsvp: RsvpResponse;
+}
+
+/**
+ * The private half of a reply: the note and the custom answer.
+ *
+ * Kept in its own subcollection because Firestore rules cannot restrict a single field,
+ * and a note addressed to the host should not be readable by every other guest.
+ */
+export interface RsvpNoteDoc {
+  uid: string;
+  displayName: string;
+  note: string;
+  answer: string;
+  updatedAt: number;
 }
 
 export interface PostDoc {

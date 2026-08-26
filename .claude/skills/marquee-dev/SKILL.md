@@ -1,12 +1,13 @@
 ---
-name: wallboard-dev
-description: Run, seed, and test the Wallboard app locally against the Firebase emulators. Use when starting work on this repo, when a change needs verifying end to end, when the emulators or dev server misbehave, or when adding a config value, an API route, or a media kind.
+name: marquee-dev
+description: Run, seed, and test the Marquee app locally against the Firebase emulators. Use when starting work on this repo, when a change needs verifying end to end, when the emulators or dev server misbehave, or when adding a config value, an API route, an occasion, a plan entitlement, or a media kind.
 ---
 
-# Working on Wallboard
+# Working on Marquee
 
-Ephemeral group event walls. Next.js 16 on Cloud Run, Firestore, Cloud Storage, Firebase
-Auth. Everything runs locally against the emulators with **no GCP account**.
+Invitations, RSVPs and a live guest wall. Next.js 16 on Cloud Run, Firestore, Cloud
+Storage, Firebase Auth. Everything runs locally against the emulators with **no GCP
+account**.
 
 ## Booting it
 
@@ -86,6 +87,29 @@ export const POST = route(async (request) => {
 `route()` maps every thrown error to a response, so an unmapped exception cannot leak a
 stack trace. Never `try/catch` around the whole handler.
 
+### Adding something to a paid plan
+
+Two axes, kept apart on purpose. **Permissions** (`can()`) answer _who you are_;
+**entitlements** (`entitlementsFor()`) answer _what you have paid for_. Never make one do
+the other's job — a paywall implemented as a permission is a paywall an admin accidentally
+bypasses.
+
+1. Add the field to `Entitlements` in `plans.config.ts` and set it on all three plans.
+2. Gate the server path with `entitlementsFor(event.plan)`.
+3. Gate the UI with the same call, and _show_ the locked thing rather than hiding it.
+4. `tests/unit/config.test.ts` already asserts no plan loses an entitlement as price rises.
+
+While `features.billing` is off, `effectivePlanId()` returns `previewPlanId` for every
+event, so nothing is actually gated. That is deliberate — see the note in
+`entitlements.ts` — but it means **your gate will not appear to work in development**
+unless you stub `isEnabled`, the way `tests/unit/entitlements.test.ts` does.
+
+### Adding an occasion
+
+`occasions.config.ts` carries the wording as well as the defaults: RSVP prompt, wall
+prompt, title placeholder, whether to ask for a dress code. The `somber` flag exists so a
+memorial never inherits celebratory copy. Add all of it, not just the label.
+
 ### Adding a media kind
 
 1. `mediaRules` in `limits.config.ts` — MIME allowlist, size, duration
@@ -116,7 +140,15 @@ to change one of them.
 - **Opening the app on an unexpected origin gives 403 on `/_next/static/*`.** Add it to
   `allowedDevOrigins` in `next.config.ts`.
 - **A one-time code is one-time.** Effects that consume one need a `useRef` guard, or Strict
-  Mode's double invocation burns it. This already bit `/auth/finish` once.
+  Mode's double invocation burns it. This already bit `/auth/finish` once — and note the
+  guard must not be combined with a cancellation flag, or the first run's success is
+  discarded on unmount and the visitor is stranded.
+- **Firestore singletons belong on `globalThis`.** Module scope resets on hot reload while
+  the Firebase app does not, and `settings()` throws on a second call. See
+  `src/lib/firebase/admin.ts`.
+- **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
+  cannot restrict a single field, so a note addressed to the host would otherwise be
+  readable by every other guest.
 
 ## Conventions
 
@@ -124,4 +156,7 @@ to change one of them.
 - Comments explain _why_, not what. If a line needs a comment to say what it does, rename
   something instead.
 - Error messages are sentences a guest at a party could understand, not error codes.
-- New behaviour comes with a test. Permissions get a test that asserts the refusal too.
+- New behaviour comes with a test. Permissions get a test that asserts the refusal too, and
+  entitlements get one for both the gated and the ungated case.
+- Copy is product. A string a guest reads belongs in `branding.config.ts` or
+  `occasions.config.ts`, not inline in a component.

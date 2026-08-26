@@ -52,6 +52,7 @@ export const collections = {
   members: 'members',
   posts: 'posts',
   private: 'private',
+  rsvpNotes: 'rsvpNotes',
 } as const;
 
 /** Fixed document ids. */

@@ -6,6 +6,8 @@ import {
   expiryPresets,
   joinCodeConfig,
   mediaRules,
+  occasions,
+  rsvpChoices,
   type MediaKind,
 } from '@/config';
 
@@ -13,9 +15,6 @@ import {
  * Request schemas. Every route handler parses its input through one of these — there is no
  * other way into the write path. Bounds come from config so client and server cannot drift.
  */
-
-const themeIds = eventThemes.map((t) => t.id) as [string, ...string[]];
-const presetIds = expiryPresets.map((p) => p.id) as [string, ...string[]];
 
 /**
  * Strips control, zero-width and bidi-override characters that render invisibly or break
@@ -31,6 +30,59 @@ const cleanText = (max: number) =>
     .transform((s) => s.replace(INVISIBLE, '').trim())
     .pipe(z.string().max(max));
 
+const themeIds = eventThemes.map((t) => t.id) as [string, ...string[]];
+const presetIds = expiryPresets.map((p) => p.id) as [string, ...string[]];
+const occasionIds = occasions.map((o) => o.id) as [string, ...string[]];
+const rsvpChoiceIds = [...rsvpChoices] as [string, ...string[]];
+
+/**
+ * An event happens at a point in time, and the invitation is worthless if that time is
+ * wrong. Bounded to a sane window so a typo cannot store a date in the year 30000.
+ */
+const eventTimestamp = z
+  .number()
+  .int()
+  .min(Date.UTC(2000, 0, 1))
+  .max(Date.UTC(2100, 0, 1))
+  .nullable();
+
+/** A maps link the host pasted. http(s) only — anything else is a redirect waiting to happen. */
+const externalUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => {
+    if (value === '') return true;
+    try {
+      return ['http:', 'https:'].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, 'That does not look like a web address.')
+  .transform((value) => (value === '' ? null : value))
+  .nullable();
+
+const locationSchema = z
+  .object({
+    name: cleanText(contentLimits.locationNameMaxLength).default(''),
+    address: cleanText(contentLimits.locationAddressMaxLength).default(''),
+    url: externalUrl.default(null),
+  })
+  .nullable()
+  .default(null);
+
+const rsvpSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  deadline: eventTimestamp.default(null),
+  allowPlusOnes: z.boolean().default(true),
+  maxPartySize: z.number().int().min(1).max(contentLimits.maxPartySize).default(2),
+  askNote: z.boolean().default(false),
+  question: cleanText(contentLimits.rsvpQuestionMaxLength)
+    .transform((value) => (value === '' ? null : value))
+    .nullable()
+    .default(null),
+});
+
 export const joinCodeSchema = z
   .string()
   .transform((s) => s.replace(/[\s-]/g, '').toUpperCase())
@@ -45,24 +97,42 @@ export const eventIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,40}$/);
 export const postIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,40}$/);
 export const uidSchema = z.string().min(1).max(128);
 
-export const createEventSchema = z.object({
-  title: cleanText(contentLimits.eventTitleMaxLength).pipe(z.string().min(1, 'Give it a name.')),
-  description: cleanText(contentLimits.eventDescriptionMaxLength).default(''),
-  themeId: z.enum(themeIds).default(eventThemes[0].id),
-  expiryPresetId: z.enum(presetIds),
-  whoCanPost: z.enum(['members', 'anyone']).default('members'),
-  allowedKinds: z
-    .array(z.enum(POST_KINDS))
-    .min(1)
-    .default([...POST_KINDS]),
-});
+export const createEventSchema = z
+  .object({
+    title: cleanText(contentLimits.eventTitleMaxLength).pipe(z.string().min(1, 'Give it a name.')),
+    description: cleanText(contentLimits.eventDescriptionMaxLength).default(''),
+    occasion: z.enum(occasionIds),
+    hostedBy: cleanText(contentLimits.hostedByMaxLength).default(''),
+    themeId: z.enum(themeIds).default(eventThemes[0].id),
+    startsAt: eventTimestamp.default(null),
+    endsAt: eventTimestamp.default(null),
+    location: locationSchema,
+    dressCode: cleanText(contentLimits.dressCodeMaxLength).default(''),
+    rsvp: rsvpSettingsSchema.prefault({}),
+    expiryPresetId: z.enum(presetIds),
+    whoCanPost: z.enum(['members', 'anyone']).default('members'),
+    allowedKinds: z
+      .array(z.enum(POST_KINDS))
+      .min(1)
+      .default([...POST_KINDS]),
+  })
+  .refine((v) => v.startsAt === null || v.endsAt === null || v.endsAt >= v.startsAt, {
+    path: ['endsAt'],
+    message: 'The end time is before the start time.',
+  });
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
 export const updateEventSchema = z
   .object({
     title: cleanText(contentLimits.eventTitleMaxLength).pipe(z.string().min(1)).optional(),
     description: cleanText(contentLimits.eventDescriptionMaxLength).optional(),
+    hostedBy: cleanText(contentLimits.hostedByMaxLength).optional(),
     themeId: z.enum(themeIds).optional(),
+    startsAt: eventTimestamp.optional(),
+    endsAt: eventTimestamp.optional(),
+    location: locationSchema.optional(),
+    dressCode: cleanText(contentLimits.dressCodeMaxLength).optional(),
+    rsvp: rsvpSettingsSchema.partial().optional(),
     whoCanPost: z.enum(['members', 'anyone']).optional(),
     allowedKinds: z.array(z.enum(POST_KINDS)).min(1).optional(),
   })
@@ -150,6 +220,19 @@ export const createPostSchema = z
   })
   .refine((v) => v.body.length > 0 || v.upload !== null, 'Write something or add a file.');
 export type CreatePostInput = z.infer<typeof createPostSchema>;
+
+/**
+ * A guest's reply. `partySize` is validated again on the server against the host's own
+ * `maxPartySize`, because this schema cannot know which event it is for.
+ */
+export const rsvpSchema = z.object({
+  status: z.enum(rsvpChoiceIds),
+  partySize: z.number().int().min(1).max(contentLimits.maxPartySize).default(1),
+  note: cleanText(contentLimits.rsvpNoteMaxLength).default(''),
+  answer: cleanText(contentLimits.rsvpAnswerMaxLength).default(''),
+  displayName: cleanText(contentLimits.displayNameMaxLength).optional(),
+});
+export type RsvpInput = z.infer<typeof rsvpSchema>;
 
 export const sessionSchema = z.object({ idToken: z.string().min(20).max(8192) });
 

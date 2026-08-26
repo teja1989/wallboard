@@ -17,6 +17,8 @@ const DEMO_POSTS = [
   'Best night in ages. Same time next year?',
 ];
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 async function main(): Promise<void> {
   const { appConfig } = await import('../src/config/app.config');
 
@@ -28,6 +30,7 @@ async function main(): Promise<void> {
 
   const { auth } = await import('../src/lib/firebase/admin');
   const { createEvent, joinEvent } = await import('../src/lib/services/events');
+  const { submitRsvp } = await import('../src/lib/services/rsvp');
   const { createPost } = await import('../src/lib/services/posts');
   const { formatJoinCode } = await import('../src/lib/codes-format');
 
@@ -38,15 +41,43 @@ async function main(): Promise<void> {
   ]);
 
   const { event, joinCode } = await createEvent(host, {
-    title: 'Rooftop birthday',
-    description: 'Post your photos from tonight here.',
+    title: "Priya's 30th",
+    description: 'Drinks from seven, dinner at eight. Come hungry.',
+    occasion: 'birthday',
+    hostedBy: 'Priya & Sam',
     themeId: 'sunset',
-    expiryPresetId: '24h',
+    startsAt: Date.now() + 5 * DAY_MS,
+    endsAt: null,
+    location: {
+      name: 'The Rooftop',
+      address: '14 Bridge Street',
+      url: null,
+    },
+    dressCode: '',
+    rsvp: {
+      enabled: true,
+      deadline: Date.now() + 3 * DAY_MS,
+      allowPlusOnes: true,
+      maxPartySize: 2,
+      askNote: false,
+      question: null,
+    },
+    expiryPresetId: '7d',
     whoCanPost: 'members',
     allowedKinds: ['text', 'image', 'video', 'audio'],
   });
 
+  // A guest list with a mix of answers, so the tally has something to show.
   for (const guest of guests) await joinEvent(guest, event);
+  const answers = ['yes', 'maybe'] as const;
+  for (const [index, guest] of guests.entries()) {
+    await submitRsvp(guest, event, {
+      status: answers[index % answers.length]!,
+      partySize: index === 0 ? 2 : 1,
+      note: '',
+      answer: '',
+    });
+  }
 
   const authors = [host, ...guests];
   for (const [index, body] of DEMO_POSTS.entries()) {
@@ -55,9 +86,9 @@ async function main(): Promise<void> {
   }
 
   console.log('Seeded a demo event.');
-  console.log(`  wall:  http://localhost:3000/e/${event.id}`);
-  console.log(`  code:  ${formatJoinCode(joinCode)}`);
-  console.log(`  host:  ${host.email}`);
+  console.log(`  invitation:  http://localhost:3000/e/${event.id}`);
+  console.log(`  code:        ${formatJoinCode(joinCode)}`);
+  console.log(`  host:        ${host.email}`);
   console.log('\nSign in as the host with the email-link option to get host controls.');
 
   /** Creates the account if it does not exist, and returns it shaped as an Actor. */

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   PERMISSIONS,
+  absoluteMaxEventLifetimeMs,
   eventRolePermissions,
+  eventThemes,
   expiryPresets,
-  maxEventLifetimeMs,
   mediaRules,
+  occasions,
+  planOrder,
+  plans,
   platformOnlyPermissions,
   platformRolePermissions,
   rateLimits,
@@ -48,7 +52,7 @@ describe('expiry presets', () => {
 
   it('never exceed the hard lifetime cap', () => {
     for (const preset of expiryPresets) {
-      expect(preset.ms, preset.id).toBeLessThanOrEqual(maxEventLifetimeMs);
+      expect(preset.ms, preset.id).toBeLessThanOrEqual(absoluteMaxEventLifetimeMs);
     }
   });
 
@@ -70,6 +74,99 @@ describe('rate limits', () => {
     // The per-IP join limit is the only thing standing between an attacker and the code
     // space, so a change that loosens it should fail here and be argued for explicitly.
     expect(rateLimits.joinAttemptPerIp.limit).toBeLessThanOrEqual(20);
+  });
+});
+
+describe('plans', () => {
+  it('are ordered by what they include, cheapest first', () => {
+    const guests = planOrder.map((id) => plans[id].entitlements.maxGuests);
+    expect([...guests].sort((a, b) => a - b)).toEqual(guests);
+  });
+
+  it('never take an entitlement away as you pay more', () => {
+    // A paid plan that silently loses a feature is the kind of thing nobody notices until
+    // a customer does.
+    for (let i = 1; i < planOrder.length; i += 1) {
+      const lower = plans[planOrder[i - 1]!].entitlements;
+      const higher = plans[planOrder[i]!].entitlements;
+
+      for (const key of Object.keys(lower) as (keyof typeof lower)[]) {
+        const before = lower[key];
+        const after = higher[key];
+        if (typeof before === 'boolean') {
+          expect(before && !after, `${planOrder[i]} lost ${key}`).toBe(false);
+        } else {
+          expect(after, `${planOrder[i]} reduced ${key}`).toBeGreaterThanOrEqual(before);
+        }
+      }
+    }
+  });
+
+  it('give the free tier something genuinely usable', () => {
+    // If free is useless, nobody gets far enough to want the paid tier.
+    const free = plans.free.entitlements;
+    expect(free.maxGuests).toBeGreaterThanOrEqual(10);
+    expect(free.maxPostsPerEvent).toBeGreaterThanOrEqual(50);
+    expect(free.maxEventLifetimeMs).toBeGreaterThan(0);
+  });
+
+  it('mark exactly one plan as featured', () => {
+    expect(planOrder.filter((id) => plans[id].featured)).toHaveLength(1);
+  });
+
+  it('price the paid plans and only the paid plans', () => {
+    expect(plans.free.price).toBeNull();
+    expect(plans.event.price).toBeGreaterThan(0);
+    expect(plans.pro.price).toBeGreaterThan(0);
+  });
+
+  it('keep every plan inside the longest expiry preset the UI offers', () => {
+    const longest = Math.max(...expiryPresets.map((p) => p.ms));
+    for (const id of planOrder) {
+      expect(plans[id].entitlements.maxEventLifetimeMs, id).toBeLessThanOrEqual(longest);
+    }
+  });
+});
+
+describe('occasions', () => {
+  it('have unique ids and point at real themes', () => {
+    const ids = occasions.map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const themeIds = new Set(eventThemes.map((t) => t.id));
+    for (const occasion of occasions) {
+      expect(themeIds.has(occasion.defaultThemeId), occasion.id).toBe(true);
+    }
+  });
+
+  it('give every occasion its own wording', () => {
+    for (const occasion of occasions) {
+      expect(occasion.rsvpPrompt.length, occasion.id).toBeGreaterThan(0);
+      expect(occasion.wallPrompt.length, occasion.id).toBeGreaterThan(0);
+      expect(occasion.titlePlaceholder.length, occasion.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('keep celebratory language away from the somber ones', () => {
+    const memorial = occasions.find((o) => o.id === 'memorial');
+    expect(memorial?.somber).toBe(true);
+    expect(memorial?.inviteVerb.toLowerCase()).not.toContain('celebrate');
+    expect(memorial?.plusOnesByDefault).toBe(false);
+  });
+});
+
+describe('themes', () => {
+  it('offer a usable free set rather than a deliberately poor one', () => {
+    expect(eventThemes.filter((t) => !t.premium).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('have something behind the paywall worth paying for', () => {
+    expect(eventThemes.filter((t) => t.premium).length).toBeGreaterThan(0);
+  });
+
+  it('have unique ids', () => {
+    const ids = eventThemes.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

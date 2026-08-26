@@ -1,17 +1,20 @@
 import 'server-only';
 import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import {
+  absoluteMaxEventLifetimeMs,
   collections,
   defaultEventThemeId,
   docIds,
-  eventLimits,
   expiryPresets,
   isEnabled,
-  maxEventLifetimeMs,
+  occasionById,
   serverConfig,
   type EventThemeId,
   type ExpiryPresetId,
+  type OccasionId,
+  type PlanId,
 } from '@/config';
+import { canUseExpiryPreset, canUseTheme, entitlementsFor } from '@/lib/billing/entitlements';
 import { generateJoinCode, hashJoinCode } from '@/lib/codes';
 import { db } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/server/api';
@@ -27,7 +30,51 @@ import type { CreateEventInput } from '@/lib/validation/schemas';
 export function expiryMsFor(presetId: string): number {
   const preset = expiryPresets.find((p) => p.id === presetId);
   if (!preset) throw new ApiError('bad_request', 'Unknown expiry option.');
-  return Math.min(preset.ms, maxEventLifetimeMs);
+  return Math.min(preset.ms, absoluteMaxEventLifetimeMs);
+}
+
+/**
+ * Which plan a new event runs on.
+ *
+ * Today every event starts on the host's own plan. When per-event unlocks go live this is
+ * where a purchased upgrade gets attached, so the rest of the system needs no change.
+ */
+export function planForNewEvent(_actor: Actor): PlanId {
+  return 'free';
+}
+
+/**
+ * Refuses a paid choice on an unpaid plan.
+ *
+ * Checked here rather than in the schema because the schema does not know whose event it
+ * is. Messages name the specific thing that was refused — a host who picked a premium
+ * theme should be told that, not handed a generic upgrade wall.
+ */
+function assertPlanAllows(
+  planId: PlanId,
+  choices: {
+    themeId?: string;
+    expiryPresetId?: string;
+    askNote?: boolean;
+    question?: string | null;
+  },
+): void {
+  if (choices.themeId && !canUseTheme(planId, choices.themeId)) {
+    throw new ApiError('forbidden', 'That invitation theme is part of a paid plan.');
+  }
+  if (
+    choices.expiryPresetId &&
+    !canUseExpiryPreset(planId, choices.expiryPresetId as ExpiryPresetId)
+  ) {
+    throw new ApiError('forbidden', 'Keeping the wall live that long is part of a paid plan.');
+  }
+  const entitlements = entitlementsFor(planId);
+  if (choices.askNote && !entitlements.rsvpNotes) {
+    throw new ApiError('forbidden', 'Collecting notes with an RSVP is part of a paid plan.');
+  }
+  if (choices.question && !entitlements.rsvpCustomQuestion) {
+    throw new ApiError('forbidden', 'Custom RSVP questions are part of a paid plan.');
+  }
 }
 
 /** Status derived from the clock, so a lapsed event reads as expired without a sweep. */
@@ -83,10 +130,26 @@ export function toPreview(event: EventDoc): EventPreview {
     id: event.id,
     title: event.title,
     themeId: event.themeId,
+    occasion: event.occasion,
     status: effectiveStatus(event),
     expiresAt: event.expiresAt,
-    hostName: event.hostName,
+    startsAt: event.startsAt,
+    hostedBy: event.hostedBy,
     memberCount: event.memberCount,
+  };
+}
+
+/** A member document for someone who has just arrived and not yet replied. */
+function newMember(actor: Actor, role: MemberDoc['role'], displayName?: string): MemberDoc {
+  return {
+    uid: actor.uid,
+    displayName: displayName || actor.displayName,
+    photoUrl: actor.photoUrl,
+    role,
+    joinedAt: Date.now(),
+    mutedAt: null,
+    isAnonymous: actor.isAnonymous,
+    rsvp: { status: 'pending', partySize: 1, respondedAt: null },
   };
 }
 
@@ -130,30 +193,59 @@ export function assertWhoCanPostAllowed(whoCanPost: 'members' | 'anyone'): void 
 
 export async function createEvent(actor: Actor, input: CreateEventInput): Promise<CreatedEvent> {
   assertWhoCanPostAllowed(input.whoCanPost);
+
+  const plan = planForNewEvent(actor);
+  const entitlements = entitlementsFor(plan);
+  assertPlanAllows(plan, {
+    themeId: input.themeId,
+    expiryPresetId: input.expiryPresetId,
+    askNote: input.rsvp.askNote,
+    question: input.rsvp.question,
+  });
+
   const activeCount = await countActiveEventsForHost(actor.uid);
-  if (activeCount >= eventLimits.maxActiveEventsPerHost) {
+  if (activeCount >= entitlements.maxActiveEvents) {
     throw new ApiError(
       'conflict',
-      `You already have ${eventLimits.maxActiveEventsPerHost} live events. End one first.`,
+      `You already have ${entitlements.maxActiveEvents} live events. End one first, or move to a plan that allows more.`,
     );
   }
 
   const now = Date.now();
   const expiresAt = now + expiryMsFor(input.expiryPresetId);
   const reference = db().collection(collections.events).doc();
+  const occasion = occasionById(input.occasion);
 
   const document: Omit<EventDoc, 'id'> = {
     title: input.title,
     description: input.description,
+    occasion: input.occasion as OccasionId,
     hostUid: actor.uid,
     hostName: actor.displayName,
-    themeId: (input.themeId as EventThemeId) ?? defaultEventThemeId,
+    hostedBy: input.hostedBy || actor.displayName,
+    themeId: (input.themeId as EventThemeId) ?? occasion.defaultThemeId ?? defaultEventThemeId,
     status: 'live',
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    location:
+      input.location && (input.location.name || input.location.address) ? input.location : null,
+    dressCode: input.dressCode,
+    rsvp: {
+      enabled: input.rsvp.enabled,
+      deadline: input.rsvp.deadline,
+      allowPlusOnes: input.rsvp.allowPlusOnes,
+      maxPartySize: input.rsvp.allowPlusOnes ? input.rsvp.maxPartySize : 1,
+      askNote: input.rsvp.askNote,
+      question: input.rsvp.question,
+    },
+    // The host counts as going: they are, after all, hosting.
+    rsvpTally: { yes: 1, no: 0, maybe: 0, pending: 0, attending: 1 },
     settings: {
       whoCanPost: input.whoCanPost,
       allowedKinds: input.allowedKinds,
       moderated: false,
     },
+    plan,
     createdAt: now,
     expiresAt,
     endedAt: null,
@@ -172,13 +264,8 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
       rotatedAt: null,
     });
     const hostMember: MemberDoc = {
-      uid: actor.uid,
-      displayName: actor.displayName,
-      photoUrl: actor.photoUrl,
-      role: 'host',
-      joinedAt: now,
-      mutedAt: null,
-      isAnonymous: actor.isAnonymous,
+      ...newMember(actor, 'host'),
+      rsvp: { status: 'yes', partySize: 1, respondedAt: now },
     };
     transaction.set(reference.collection(collections.members).doc(actor.uid), hostMember);
     return code;
@@ -233,8 +320,8 @@ export async function joinEvent(
 
     const eventSnapshot = await transaction.get(eventRef(event.id));
     const memberCount = Number(eventSnapshot.get('memberCount') ?? 0);
-    if (memberCount >= eventLimits.maxMembersPerEvent) {
-      throw new ApiError('conflict', 'This event is full.');
+    if (memberCount >= entitlementsFor(event.plan).maxGuests) {
+      throw new ApiError('conflict', 'This guest list is full.');
     }
 
     // A signed-in visitor becomes a member and can post; an anonymous one can only watch,
@@ -243,17 +330,11 @@ export async function joinEvent(
       event.settings.whoCanPost === 'anyone' && isEnabled('allowAnonymousPosting');
     const role: MemberDoc['role'] = actor.isAnonymous && !anonymousMayPost ? 'viewer' : 'member';
 
-    const member: MemberDoc = {
-      uid: actor.uid,
-      displayName: displayName || actor.displayName,
-      photoUrl: actor.photoUrl,
-      role,
-      joinedAt: Date.now(),
-      mutedAt: null,
-      isAnonymous: actor.isAnonymous,
-    };
-    transaction.set(memberRef, member);
-    transaction.update(eventRef(event.id), { memberCount: FieldValue.increment(1) });
+    transaction.set(memberRef, newMember(actor, role, displayName));
+    transaction.update(eventRef(event.id), {
+      memberCount: FieldValue.increment(1),
+      'rsvpTally.pending': FieldValue.increment(1),
+    });
     return { event, role, alreadyMember: false };
   });
 }

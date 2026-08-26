@@ -120,6 +120,7 @@ const READ_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   'event:view',
   'post:view',
   'member:list',
+  'rsvp:viewAll',
   'admin:accessConsole',
   'admin:listAllEvents',
   'admin:listAllUsers',
@@ -139,6 +140,9 @@ const ANONYMOUS_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   'event:view',
   'post:view',
   'member:list',
+  // Someone who was handed the code was invited. Making them create an account before
+  // they can say "yes, I'll be there" would lose replies for no security benefit.
+  'rsvp:respond',
 ]);
 
 /** What `anonymousPostingAllowed` adds, and nothing more. Never includes moderation. */

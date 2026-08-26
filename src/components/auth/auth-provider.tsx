@@ -55,7 +55,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const EMAIL_LINK_STORAGE_KEY = 'wallboard:pending-email';
+const EMAIL_LINK_STORAGE_KEY = 'marquee:pending-email';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

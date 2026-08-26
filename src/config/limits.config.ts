@@ -52,34 +52,54 @@ export const contentLimits = {
   eventDescriptionMaxLength: 280,
   postBodyMaxLength: 1000,
   displayNameMaxLength: 40,
+  /** Private note a guest can leave with their RSVP. */
+  rsvpNoteMaxLength: 300,
+  /** The host's own custom RSVP question. */
+  rsvpQuestionMaxLength: 120,
+  rsvpAnswerMaxLength: 200,
+  locationNameMaxLength: 120,
+  locationAddressMaxLength: 240,
+  dressCodeMaxLength: 60,
+  hostedByMaxLength: 80,
+  /** Guests one RSVP may bring, before the host's own plus-one setting narrows it. */
+  maxPartySize: 10,
   /** Attachments per post. One keeps the wall layout predictable; raise with care. */
   mediaPerPost: 1,
   /** Posts fetched per page on the wall. */
   wallPageSize: 30,
 } as const;
 
-export const eventLimits = {
-  /** Live events a single host may own at once. */
-  maxActiveEventsPerHost: 10,
-  maxMembersPerEvent: 500,
-  maxPostsPerEvent: 2000,
-  /** Total attachment bytes an event may hold before uploads are refused. */
-  maxStorageBytesPerEvent: 5 * 1024 * MB,
+/**
+ * Absolute ceilings, independent of plan.
+ *
+ * Per-plan caps live in `plans.config.ts` and are always the binding constraint in
+ * practice; these exist so that a misconfigured plan, or a future one, still cannot ask
+ * the system for something it cannot serve.
+ */
+export const eventCeilings = {
+  maxActiveEventsPerHost: 50,
+  maxMembersPerEvent: 1000,
+  maxPostsPerEvent: 10_000,
+  maxStorageBytesPerEvent: 50 * 1024 * MB,
 } as const;
 
-/** Expiry presets a host can pick when creating an event. */
+/**
+ * How long the wall stays live after the event. Which of these a host can actually pick
+ * depends on their plan's `maxEventLifetimeMs` — the longer windows are a paid entitlement,
+ * because storage is the real cost in this product.
+ */
 export const expiryPresets = [
-  { id: '1h', label: '1 hour', ms: HOUR },
-  { id: '6h', label: '6 hours', ms: 6 * HOUR },
   { id: '24h', label: '24 hours', ms: DAY },
   { id: '3d', label: '3 days', ms: 3 * DAY },
   { id: '7d', label: '7 days', ms: 7 * DAY },
   { id: '30d', label: '30 days', ms: 30 * DAY },
+  { id: '90d', label: '90 days', ms: 90 * DAY },
 ] as const;
 
 export type ExpiryPresetId = (typeof expiryPresets)[number]['id'];
-export const defaultExpiryPresetId: ExpiryPresetId = '24h';
-export const maxEventLifetimeMs = 30 * DAY;
+export const defaultExpiryPresetId: ExpiryPresetId = '7d';
+/** Nothing may outlive this, whatever the plan says. */
+export const absoluteMaxEventLifetimeMs = 90 * DAY;
 
 /**
  * Grace window between an event expiring and its bytes being swept, so a host who
@@ -109,6 +129,7 @@ export const rateLimits = {
   joinAttemptPerIp: { limit: 10, windowMs: 10 * MINUTE },
   joinAttemptPerUser: { limit: 20, windowMs: HOUR },
   createEventPerUser: { limit: 5, windowMs: HOUR },
+  rsvpPerUser: { limit: 30, windowMs: HOUR },
   createPostPerUser: { limit: 30, windowMs: 10 * MINUTE },
   uploadTargetPerUser: { limit: 40, windowMs: 10 * MINUTE },
   sessionPerIp: { limit: 60, windowMs: 10 * MINUTE },
@@ -118,7 +139,7 @@ export const rateLimits = {
 export type RateLimitName = keyof typeof rateLimits;
 
 export const sessionConfig = {
-  cookieName: '__Host-wb_session',
+  cookieName: '__Host-mq_session',
   /** Firebase session cookies max out at 14 days; we stay well under. */
   maxAgeMs: 5 * DAY,
   /** How long a minted media read URL stays valid. */

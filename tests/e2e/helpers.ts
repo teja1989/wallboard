@@ -13,7 +13,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
  */
 
 const EMULATOR = 'http://127.0.0.1:9099';
-const PROJECT = 'wallboard-dev';
+const PROJECT = 'marquee-dev';
 const API_KEY = 'demo-api-key';
 
 interface OobCode {
@@ -123,7 +123,11 @@ export async function createEvent(page: Page, title: string): Promise<CreatedEve
     data: { event: { id: string }; joinCode: string };
   }>(page, '/api/events/create', {
     title,
+    occasion: 'party',
+    hostedBy: 'The test suite',
     expiryPresetId: '24h',
+    startsAt: Date.now() + 3 * 24 * 60 * 60 * 1000,
+    rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
     allowedKinds: ['text', 'image', 'video', 'audio'],
   });
   if (status !== 200) throw new Error(`Event creation failed: ${JSON.stringify(payload)}`);

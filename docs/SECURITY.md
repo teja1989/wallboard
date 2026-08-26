@@ -35,7 +35,11 @@ carefully as the grants.
 
 ### Anonymous visitors
 
-A code-only visitor gets `event:view`, `post:view`, `member:list`, and nothing else. A host
+A code-only visitor gets `event:view`, `post:view`, `member:list`, `rsvp:respond`, and
+nothing else. Replying is included deliberately: someone handed the code was invited, and
+making them create an account before they can say "yes, I'll be there" loses replies for no
+security benefit. Posting to the wall still needs an account — that is where attribution
+starts to matter. A host
 may open posting to anyone holding the code, but that path is gated twice: the event setting
 _and_ the `allowAnonymousPosting` platform flag, which is off by default. Even then it grants
 only `post:create` and `post:deleteOwn` — never moderation.
@@ -73,6 +77,31 @@ The code is the credential for viewing an event, so it is treated as one.
 
 Guessing is bounded by the per-IP rate limit, not by the code space alone. `config.test.ts`
 asserts that limit stays tight, so loosening it fails a test and has to be argued for.
+
+## RSVP privacy
+
+The most easily-leaked data in the product is a note a guest wrote for the host.
+
+- The **answer and headcount** live on the member document and are readable by every member.
+- The **note and custom answer** live in `events/{id}/rsvpNotes/{uid}`, which is
+  `allow read, write: if false` — unreadable by the guest who wrote it, the host, and an
+  owner alike. Hosts read them through an API call that is authorised and logged.
+- The API decides whether to include notes from the **caller's permissions**, never from a
+  request parameter, and does not fetch them at all when the answer is no — so an ordinary
+  guest's response has no field to leak.
+- Party size is re-checked against the host's own `maxPartySize`, because the schema cannot
+  know which event a reply is for.
+- Tally deltas are computed from the stored member document, never from a client-supplied
+  previous value, so replaying a request cannot inflate the headcount.
+
+## Entitlements are not permissions
+
+`can()` answers _who you are_. `entitlementsFor()` answers _what was paid for_. They are
+separate systems and neither may stand in for the other — a paywall implemented as a
+permission is a paywall an administrator accidentally bypasses, and a permission
+implemented as an entitlement is a permission somebody can buy.
+
+Every paid gate is enforced server-side. A disabled button is a courtesy, not a control.
 
 ## Rate limits
 
@@ -153,6 +182,9 @@ describes something someone could attempt with nothing but the Firebase SDK and 
 
 - reading another event's posts while holding a valid membership in one
 - reading a post that was moderated away
+- reading a private RSVP note — as another guest, as its author, as the host, as an owner
+- enumerating the `rsvpNotes` collection
+- writing your own RSVP directly, or answering on someone else's behalf
 - reading the join code — as the host, or as an owner
 - enumerating `joinCodes` to harvest live events
 - writing a post document directly, or editing one to impersonate another author

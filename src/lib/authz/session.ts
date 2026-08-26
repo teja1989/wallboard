@@ -91,9 +91,25 @@ function readRoleClaim(claim: unknown): PlatformRole {
   return typeof claim === 'string' && claim in platformRoleRank ? (claim as PlatformRole) : 'user';
 }
 
-/** Fallback display name so anonymous visitors are still addressable on the wall. */
-function fallbackDisplayName(uid: string, isAnonymous: boolean): string {
-  return isAnonymous ? `Guest ${uid.slice(0, 4).toUpperCase()}` : 'Someone';
+/**
+ * A name to show when the provider gave us none.
+ *
+ * Email-link sign-in carries no display name, so without this every post on the wall would
+ * be attributed to "Someone" — which is worse than useless on a wall whose whole point is
+ * that the photos have people attached to them. The local part of the address is a far
+ * better guess: it is usually the person's actual name, and it is something they recognise
+ * as theirs and can correct.
+ */
+function fallbackDisplayName(uid: string, isAnonymous: boolean, email: string | null): string {
+  if (isAnonymous) return `Guest ${uid.slice(0, 4).toUpperCase()}`;
+
+  const localPart = email?.split('@')[0] ?? '';
+  const words = localPart
+    .split(/[._\-+\d]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+
+  return words.length > 0 ? words.join(' ') : 'Someone';
 }
 
 interface EnsureUserInput {
@@ -122,7 +138,7 @@ async function ensureUserRecord(input: EnsureUserInput): Promise<UserDoc> {
   const displayName = (
     input.displayName ||
     (snapshot.exists ? String(snapshot.get('displayName') ?? '') : '') ||
-    fallbackDisplayName(input.uid, input.isAnonymous)
+    fallbackDisplayName(input.uid, input.isAnonymous, input.email)
   ).slice(0, contentLimits.displayNameMaxLength);
 
   if (!snapshot.exists) {

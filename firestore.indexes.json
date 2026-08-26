@@ -40,6 +40,22 @@
         { "fieldPath": "role", "order": "ASCENDING" },
         { "fieldPath": "joinedAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rsvp.status", "order": "ASCENDING" },
+        { "fieldPath": "joinedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hostUid", "order": "ASCENDING" },
+        { "fieldPath": "startsAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

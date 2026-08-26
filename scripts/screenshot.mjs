@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000';
-const OUT = process.env.SHOT_DIR ?? '/tmp/wallboard-shots';
+const OUT = process.env.SHOT_DIR ?? '/tmp/marquee-shots';
 
 mkdirSync(OUT, { recursive: true });
 

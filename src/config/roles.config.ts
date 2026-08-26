@@ -40,6 +40,10 @@ export const PERMISSIONS = [
   'event:delete',
   'event:viewJoinCode',
   'event:rotateJoinCode',
+  // Invitation and RSVP
+  'rsvp:respond',
+  'rsvp:viewAll',
+  'rsvp:export',
   // Membership
   'member:list',
   'member:mute',
@@ -70,6 +74,7 @@ export const platformRolePermissions: Record<PlatformRole, readonly Permission[]
   user: ['event:create'],
   support: ['admin:accessConsole', 'admin:listAllEvents', 'admin:listAllUsers', 'event:view'],
   admin: [
+    'rsvp:viewAll',
     'admin:viewAuditLog',
     'admin:suspendUser',
     'post:deleteAny',
@@ -88,10 +93,14 @@ export const platformRolePermissions: Record<PlatformRole, readonly Permission[]
  * These only apply to the event the membership belongs to.
  */
 export const eventRolePermissions: Record<EventRole, readonly Permission[]> = {
-  viewer: ['event:view', 'post:view'],
+  // A viewer can answer the invitation and see who else is coming — neither is a
+  // privilege, they are what being invited means. The private notes that come with a
+  // reply are a different matter and need `rsvp:viewAll`.
+  viewer: ['event:view', 'post:view', 'rsvp:respond', 'member:list'],
   member: ['post:create', 'post:deleteOwn'],
-  moderator: ['post:deleteAny', 'member:list', 'member:mute'],
+  moderator: ['post:deleteAny', 'member:mute', 'rsvp:viewAll'],
   host: [
+    'rsvp:export',
     'event:update',
     'event:end',
     'event:extend',

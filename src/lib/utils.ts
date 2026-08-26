@@ -31,6 +31,62 @@ export function formatRelativeTime(timestamp: number, now = Date.now()): string 
   return `${Math.floor(seconds / 86_400)}d`;
 }
 
+/**
+ * "Saturday 14 June, 7:00 pm". Weekday included because an invitation is read days ahead
+ * and the day of the week is what people actually plan around.
+ */
+export function formatEventDate(timestamp: number | null): string {
+  if (timestamp === null) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(timestamp));
+}
+
+/** Date only, for a deadline where the time of day is noise. */
+export function formatDateOnly(timestamp: number | null): string {
+  if (timestamp === null) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(timestamp));
+}
+
+/** "in 3 days", "tomorrow", "today", "last Tuesday" — for the countdown to the event. */
+export function formatCountdownToEvent(startsAt: number | null, now = Date.now()): string {
+  if (startsAt === null) return '';
+  const days = Math.round((startOfDay(startsAt) - startOfDay(now)) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days === -1) return 'yesterday';
+  if (days > 1) return `in ${days} days`;
+  return `${Math.abs(days)} days ago`;
+}
+
+function startOfDay(timestamp: number): number {
+  const date = new Date(timestamp);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+/** Value for a datetime-local input, in the viewer's own timezone. */
+export function toDateTimeLocalValue(timestamp: number | null): string {
+  if (timestamp === null) return '';
+  const date = new Date(timestamp);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+export function fromDateTimeLocalValue(value: string): number | null {
+  if (!value) return null;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

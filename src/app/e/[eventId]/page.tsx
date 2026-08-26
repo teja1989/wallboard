@@ -1,19 +1,19 @@
 import type { Metadata } from 'next';
 import { brand } from '@/config';
-import { WallScreen } from '@/components/wall/wall-screen';
+import { EventScreen } from '@/components/event/event-screen';
 
 export const metadata: Metadata = {
-  title: 'Wall',
-  description: brand.description,
+  title: 'Invitation',
+  description: brand.shortPromise,
   robots: { index: false, follow: false },
 };
 
 /**
- * The wall is fully client-rendered: it is driven by a live Firestore listener under the
- * visitor's own identity, so there is nothing meaningful to render on the server that
- * would not immediately be replaced.
+ * Fully client-rendered: every part of this page is driven by the visitor's own identity,
+ * including a live Firestore listener, so there is nothing meaningful the server could
+ * render that would not be replaced a moment later.
  */
 export default async function EventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params;
-  return <WallScreen eventId={eventId} />;
+  return <EventScreen eventId={eventId} />;
 }

@@ -48,10 +48,19 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // Members can see who else is here.
+      // The guest list. Every member sees who is coming — that is what a guest list is
+      // for — so the RSVP answer and headcount live here.
       match /members/{memberId} {
         allow read: if isMemberOf(eventId) || isStaff();
         allow write: if false;
+      }
+
+      // The private half of a reply: the note to the host and the answer to their custom
+      // question. A separate subcollection because Firestore cannot restrict a single
+      // field, and a note addressed to the host is not for the rest of the guest list.
+      // Even the host reads these through the API, so the read is authorised and logged.
+      match /rsvpNotes/{guestId} {
+        allow read, write: if false;
       }
 
       // The live wall. Removed and quarantined posts stay invisible to members.

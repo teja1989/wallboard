@@ -32,6 +32,14 @@ shows up as a confusing rejection much later.
 If you catch yourself writing `if (file.size > 15 * 1024 * 1024)`, stop and import
 `mediaRules`.
 
+### Entitlements are not permissions
+
+`can()` answers _who you are_. `entitlementsFor()` answers _what was paid for_. Keep them
+apart. A paywall implemented as a permission is one an admin bypasses by accident; a
+permission implemented as an entitlement is one somebody can buy.
+
+Every paid gate is enforced on the server. A disabled button is a courtesy.
+
 ### Permissions go through `can()`
 
 `src/lib/authz/policy.ts` is the only place a permission decision is made. No `role === 'host'`
@@ -44,7 +52,7 @@ that asserts the **refusal** as well as the grant.
 ### Clients never write to Firestore
 
 Every mutation goes through a route handler. Rules deny all client writes and there is no
-exception, including for owners. See `.claude/skills/wallboard-security/SKILL.md` for the
+exception, including for owners. See `.claude/skills/marquee-security/SKILL.md` for the
 route-handler shape.
 
 ### Comments explain why
@@ -52,6 +60,12 @@ route-handler shape.
 Not what. If a line needs a comment to say what it does, the names are wrong. Comments that
 earn their place: a non-obvious ordering, a workaround with a reason, a trade-off someone
 would otherwise "fix".
+
+### Copy is product
+
+A string a guest reads lives in `branding.config.ts` or `occasions.config.ts`, not inline in
+a component. The occasion decides the wording — that is how a memorial avoids inheriting
+birthday copy. See [docs/BRAND.md](docs/BRAND.md) for voice.
 
 ### Error messages are for people
 

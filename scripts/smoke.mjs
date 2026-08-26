@@ -12,7 +12,7 @@ import { Buffer } from 'node:buffer';
 
 const BASE = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000';
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
-const PROJECT = 'wallboard-dev';
+const PROJECT = 'marquee-dev';
 const API_KEY = 'demo-api-key';
 
 let passed = 0;
@@ -141,7 +141,7 @@ async function resetRateLimits() {
 }
 
 async function main() {
-  console.log(`\nWallboard smoke test → ${BASE}\n`);
+  console.log(`\nMarquee smoke test → ${BASE}\n`);
   await resetRateLimits();
 
   // --- identity ------------------------------------------------------------
@@ -159,8 +159,13 @@ async function main() {
     body: {
       title: 'Smoke test party',
       description: 'Automated run',
+      occasion: 'party',
+      hostedBy: 'The smoke test',
       expiryPresetId: '24h',
       themeId: 'sunset',
+      startsAt: Date.now() + 3 * 24 * 60 * 60 * 1000,
+      location: { name: 'The Rooftop', address: '14 Bridge Street', url: null },
+      rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
       allowedKinds: ['text', 'image', 'video', 'audio'],
     },
   });
@@ -171,9 +176,32 @@ async function main() {
 
   const anonCreate = await call(guest.session, '/api/events/create', {
     method: 'POST',
-    body: { title: 'Nope', expiryPresetId: '1h' },
+    body: { title: 'Nope', occasion: 'party', expiryPresetId: '24h' },
   });
   check('anonymous visitor cannot create an event', anonCreate.status === 403);
+
+  const badDates = await call(host.session, '/api/events/create', {
+    method: 'POST',
+    body: {
+      title: 'Backwards',
+      occasion: 'party',
+      expiryPresetId: '24h',
+      startsAt: Date.now() + 86_400_000,
+      endsAt: Date.now(),
+    },
+  });
+  check('an end time before the start time is rejected', badDates.status === 400);
+
+  const badLink = await call(host.session, '/api/events/create', {
+    method: 'POST',
+    body: {
+      title: 'Dodgy link',
+      occasion: 'party',
+      expiryPresetId: '24h',
+      location: { name: 'X', address: '', url: 'javascript:alert(1)' },
+    },
+  });
+  check('a non-http location link is rejected', badLink.status === 400);
 
   // --- joining -------------------------------------------------------------
   const badJoin = await call(guest.session, '/api/events/join', {
@@ -196,6 +224,7 @@ async function main() {
   });
   check('re-joining is idempotent', repeatJoin.payload?.data?.alreadyMember === true);
 
+  const outsider = await signUp(`outsider-${stamp}@example.com`);
   const member = await signUp(`member-${stamp}@example.com`);
   const memberJoin = await call(member.session, '/api/events/join', {
     method: 'POST',
@@ -203,8 +232,76 @@ async function main() {
   });
   check('signed-in visitor joins as a member', memberJoin.payload?.data?.role === 'member');
 
+  // --- RSVP ----------------------------------------------------------------
+  const guestRsvp = await call(guest.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'yes', partySize: 2 },
+  });
+  check(
+    'an anonymous guest can answer the invitation',
+    guestRsvp.status === 200,
+    JSON.stringify(guestRsvp.payload),
+  );
+  check('their party size is recorded', guestRsvp.payload?.data?.rsvp?.partySize === 2);
+
+  const oversizedParty = await call(member.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'yes', partySize: 9 },
+  });
+  check('a party larger than the host allowed is refused', oversizedParty.status === 400);
+
+  const memberRsvp = await call(member.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'maybe', partySize: 3 },
+  });
+  check('a member can answer maybe', memberRsvp.status === 200);
+  check('maybe does not carry a party', memberRsvp.payload?.data?.rsvp?.partySize === 1);
+
+  const changed = await call(member.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'no' },
+  });
+  check('a guest can change their mind', changed.status === 200);
+  check('the change is recognised as a change', changed.payload?.data?.rsvp?.status === 'no');
+
+  const badStatus = await call(member.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'pending' },
+  });
+  check('pending cannot be chosen as an answer', badStatus.status === 400);
+
+  const strangerRsvp = await call(outsider.session, `/api/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: { status: 'yes' },
+  });
+  check('someone without the code cannot RSVP', strangerRsvp.status === 404);
+
+  // --- guest list ----------------------------------------------------------
+  const guestList = await call(host.session, `/api/events/${eventId}/guests`);
+  check(
+    'the host sees the guest list',
+    guestList.status === 200,
+    JSON.stringify(guestList.payload),
+  );
+  check('the host sees private notes', guestList.payload?.data?.canSeeNotes === true);
+
+  const tally = guestList.payload?.data?.tally;
+  // Host said yes (1), anonymous guest said yes with a plus one (2), member said no.
+  check('the headcount adds up', tally?.attending === 3, JSON.stringify(tally));
+  check('the tally counts the refusal', tally?.no === 1, JSON.stringify(tally));
+
+  const guestView = await call(member.session, `/api/events/${eventId}/guests`);
+  check('a member sees the guest list', guestView.status === 200);
+  check('a member does not see private notes', guestView.payload?.data?.canSeeNotes === false);
+  check(
+    'private notes are absent from a member response entirely',
+    (guestView.payload?.data?.guests ?? []).every((g) => g.note === undefined),
+  );
+
+  const strangerGuests = await call(outsider.session, `/api/events/${eventId}/guests`);
+  check('a non-member cannot see the guest list', strangerGuests.status === 404);
+
   // --- access boundaries ---------------------------------------------------
-  const outsider = await signUp(`outsider-${stamp}@example.com`);
   const outsiderPeek = await call(outsider.session, `/api/events/${eventId}`);
   check('a non-member cannot read the event', outsiderPeek.status === 404);
 

@@ -4,14 +4,16 @@
 
 ```
 Browser ──┬─ Next.js pages (RSC + client components)
-          │     └─ live wall: Firestore onSnapshot, under the visitor's own identity
+          │     ├─ invitation + RSVP  ─ fetched per request
+          │     └─ live wall          ─ Firestore onSnapshot, under the visitor's identity
           │
-          ├─ /api/* ─ Route Handlers ─ Zod ─ authz ─ rate limit ─ Firestore Admin
-          │                                                     └─ audit log
+          ├─ /api/* ─ Route Handlers ─ Zod ─ authz ─ entitlements ─ rate limit ─ Firestore
+          │                                                                    └─ audit log
           └─ PUT/POST (server-issued URL) ─────────► Cloud Storage / Storage emulator
 ```
 
-Three ideas carry most of the design.
+One event, three surfaces — invitation, wall and guest list — served from one page and one
+Firestore document tree. Four ideas carry most of the design.
 
 ### 1. Writes are server-only; reads can be direct
 
@@ -42,7 +44,24 @@ The server session is authoritative for identity. The client SDK's local state l
 IndexedDB, which a private window, a cleared site, or a different device will not have — so
 `AuthProvider` asks `GET /api/session` on mount before deciding anyone is a guest.
 
-### 3. Media never touches the app server
+### 3. Answers are public, notes are not
+
+An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
+the guest list — that is what a guest list is. The note a guest writes for the host, and
+their answer to the host's custom question, belong to the host alone.
+
+Firestore rules cannot restrict a single field, so the split has to be **structural**: the
+answer lives on `events/{id}/members/{uid}`, which members can read, and the note lives in
+`events/{id}/rsvpNotes/{uid}`, which nobody can read from a browser at all. The host reads
+notes through an API call that is authorised and logged.
+
+The `rsvpTally` on the event is maintained transactionally rather than counted on read. A
+host refreshing the guest list during a party should not trigger a scan of five hundred
+member documents, and the delta is always computed from the stored member document rather
+than from anything the client claims — otherwise replaying a request would inflate the
+headcount.
+
+### 4. Media never touches the app server
 
 Uploading is a two-step handshake:
 
@@ -58,6 +77,27 @@ Reading works the same way in reverse: post documents hold object _paths_, never
 Playable URLs are minted per request at `GET /api/media/[eventId]`, only for members, and
 they expire. A link pasted elsewhere stops working, and removing someone from an event
 actually removes their access to the media.
+
+## Plans and entitlements
+
+Two independent axes, deliberately not merged:
+
+|                  | Answers           | Lives in          | Consumed by         |
+| ---------------- | ----------------- | ----------------- | ------------------- |
+| **Permissions**  | who you are       | `roles.config.ts` | `can()`             |
+| **Entitlements** | what was paid for | `plans.config.ts` | `entitlementsFor()` |
+
+Merging them would mean a paywall an admin accidentally bypasses, or a permission a
+customer can buy. Both are pure and dependency-free, so both run on the server, in client
+components, and in tests.
+
+An event stores the plan it runs on. `effectivePlanId()` resolves it — and while
+`features.billing` is off, it returns `previewPlanId` for every event, so nothing is gated
+and every entitlement code path is still exercised on every request. Switching billing on is
+a flag, not a migration.
+
+That is a product decision as much as a technical one: gating an unproven product behind a
+paywall measures nothing except how quickly people leave.
 
 ## The storage adapter
 
@@ -123,5 +163,9 @@ their wall back intact.
 - **No admin console yet.** The role model, audit log, and `can()` matrix that it needs all
   ship now, because retrofitting those is how gaps get left behind. See
   [ROADMAP.md](./ROADMAP.md).
+- **No payment path.** The entitlement gates are written and tested; only Stripe is missing.
+  See [PRICING.md](./PRICING.md) for what turning it on involves.
+- **No email delivery.** Invitations are shared as a link or a code. Sending them by email is
+  a real gap against Evite and is the top item in phase 2.
 - **Rate limiting on Firestore.** One document write per check, which is the wrong long-term
   home. It is behind a `RateLimiter` interface; swapping in Memorystore is one line.

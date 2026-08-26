@@ -1,0 +1,107 @@
+# Pricing and the business case
+
+Nobody is being charged yet. `features.billing` is `false`, every event runs on
+`previewPlanId`, and the pricing page says so. This document is the reasoning behind the
+numbers so that turning billing on is a decision rather than a guess.
+
+## The model
+
+Two ways to pay, because hosts come in two shapes.
+
+| Plan          | Price          | For                                                                                                         |
+| ------------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Free**      | —              | A get-together this weekend. 25 guests, 7-day wall, four themes.                                            |
+| **One event** | **$19** once   | The wedding, the big birthday. 250 guests, 30-day wall, every theme, RSVP notes, guest export, no branding. |
+| **Pro**       | **$79** / year | People who host constantly. 500 guests, 90-day walls, 25 live events, 20 GB per event.                      |
+
+Asking a once-a-year wedding host to take a subscription is how you lose them to a
+competitor's one-off. Asking a monthly supper-club host to pay per event is how you make
+them resent you. So: both.
+
+### Why $19
+
+Evite Premium runs roughly $15–$250 per event depending on guest count. Paperless Post uses
+a coin system that works out similar and is famously confusing. Both charge _more for more
+guests_.
+
+$19 flat sits just under Evite's mid-tier, is a single obvious number, and lets the pitch be
+"no per-guest fees, ever" — which is the clearest differentiator available in this category
+and costs us almost nothing, because guest count is not what drives our costs. Storage is.
+
+### Why $79/year
+
+Roughly four events' worth. A host doing five or more a year is better off, and that is
+exactly the person we want on a subscription. Below that, the one-off is genuinely the
+better deal for them, and saying so builds more trust than it costs in revenue.
+
+### Why guest count is not the meter
+
+Because it is not the cost. A 400-guest event where nobody posts costs less to run than a
+40-guest wedding with 900 photos and an hour of video. Charging on guests would be charging
+on the wrong axis _and_ punishing the popular events we most want people to run here.
+
+Storage and wall lifetime are the real cost drivers, so those are what the plans actually
+differ on — 500 MB / 7 days, 5 GB / 30 days, 20 GB / 90 days.
+
+## Unit economics, roughly
+
+Per event, at Cloud Storage standard rates:
+
+| Plan            | Storage cap     | Storage cost at cap | Egress (est.) | Total      |
+| --------------- | --------------- | ------------------- | ------------- | ---------- |
+| Free            | 500 MB × 7 days | ~$0.003             | ~$0.05        | **~$0.05** |
+| One event       | 5 GB × 30 days  | ~$0.10              | ~$1.50        | **~$1.60** |
+| Pro (per event) | 20 GB × 90 days | ~$1.20              | ~$6.00        | **~$7.20** |
+
+Egress dominates, and it scales with how many guests actually watch — which is why media
+URLs are short-lived and minted per request rather than cached publicly. Cloud Run scales to
+zero, so an idle event costs storage only.
+
+Gross margin at $19 looks like ~90%. A Pro subscriber stays profitable to about ten heavy
+events a year, which is comfortably above where most will land. **The number to watch is
+egress per event**, not signups — it is the only line that could quietly invert this.
+
+## Where the money actually comes from
+
+The upgrade moment is not the pricing page. It is the create form, when a host who is
+already invested in one specific event sees a theme they want and it has a small lock on
+it. That is why premium themes are **shown and disabled** rather than hidden: a theme nobody
+can see is a theme nobody upgrades for.
+
+Two ratios matter more than traffic:
+
+1. **Code shared → guest joined.** Does the code work socially? If people are not sharing
+   it, nothing else matters.
+2. **Joined → first post.** Is the wall inviting enough to convert a replier into a poster?
+   This is where the hybrid access model either pays off or costs us, and it is the number
+   to check before loosening `allowAnonymousPosting`.
+
+## Turning billing on
+
+The gates are already written and tested; the switch is `features.billing`. What is missing
+is only the payment path:
+
+1. Stripe Checkout for the one-off; Stripe Billing for the subscription.
+2. A webhook that sets `events/{id}.plan` on a successful one-off payment, and a plan field
+   on the user for subscriptions. `planForNewEvent()` in `events.ts` is where the latter
+   attaches — deliberately a single function.
+3. An upgrade screen inside an existing event, since upgrading after sending must keep the
+   same link and code. Nothing in the data model prevents that today.
+4. Refund policy: full refund before the first guest replies. Cheap to honour, and it
+   removes the main reason someone hesitates on a $19 impulse purchase.
+
+Do not turn billing on before the archive download works. It is the single feature that most
+justifies the price, because it is the answer to "what happens to my photos" — and that is
+the question that decides whether people trust us with the event at all.
+
+## Deliberately not doing
+
+- **Per-guest pricing.** Wrong axis, punishes the events we want.
+- **A free trial of Pro.** The one-off already serves as the trial, and it converts better
+  because it is attached to a real occasion rather than a countdown.
+- **Charging guests anything, ever.** A guest who hits a paywall on someone else's
+  invitation is a guest who thinks less of the host. That would poison the referral loop the
+  whole business depends on.
+- **Ads on the free tier, for now.** See `ADS_MARKETING.md`. The free tier's job is to make
+  hosts, and hosts become customers; monetising their guests' attention directly would earn
+  pennies and cost the thing that actually works.

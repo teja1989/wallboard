@@ -4,7 +4,6 @@ import { FieldValue } from 'firebase-admin/firestore';
 import {
   collections,
   contentLimits,
-  eventLimits,
   mediaRules,
   sessionConfig,
   storagePaths,
@@ -12,6 +11,7 @@ import {
 } from '@/config';
 import { db } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/server/api';
+import { entitlementsFor } from '@/lib/billing/entitlements';
 import { extensionForMime, storage } from '@/lib/storage';
 import { eventRef } from '@/lib/services/events';
 import type { Actor, EventDoc, MediaAsset, PostDoc, ResolvedMedia } from '@/types/domain';
@@ -44,11 +44,12 @@ export async function prepareUpload(
   if (!event.settings.allowedKinds.includes(input.kind)) {
     throw new ApiError('forbidden', `The host has turned off ${input.kind} for this event.`);
   }
-  if (event.postCount >= eventLimits.maxPostsPerEvent) {
-    throw new ApiError('conflict', 'This wall is full.');
+  const entitlements = entitlementsFor(event.plan);
+  if (event.postCount >= entitlements.maxPostsPerEvent) {
+    throw new ApiError('conflict', 'This wall has reached its post limit.');
   }
-  if (event.storageBytes + input.bytes > eventLimits.maxStorageBytesPerEvent) {
-    throw new ApiError('conflict', 'This event has reached its storage limit.');
+  if (event.storageBytes + input.bytes > entitlements.maxStorageBytesPerEvent) {
+    throw new ApiError('conflict', 'This event has used all of its storage.');
   }
 
   const uploadId = randomUUID();

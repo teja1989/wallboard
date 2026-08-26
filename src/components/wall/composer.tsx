@@ -13,6 +13,8 @@ import { cn, formatBytes, formatDuration } from '@/lib/utils';
 interface ComposerProps {
   eventId: string;
   allowedKinds: readonly PostKind[];
+  /** Set from the occasion, so a memorial does not read like a birthday. */
+  placeholder: string;
   onPosted: () => void;
 }
 
@@ -20,7 +22,7 @@ interface ComposerProps {
  * The post composer. Media is probed and previewed locally before anything is uploaded, so
  * an oversized or over-long file is refused instantly rather than after a long transfer.
  */
-export function Composer({ eventId, allowedKinds, onPosted }: ComposerProps) {
+export function Composer({ eventId, allowedKinds, placeholder, onPosted }: ComposerProps) {
   const { notify } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState('');
@@ -108,7 +110,7 @@ export function Composer({ eventId, allowedKinds, onPosted }: ComposerProps) {
         id="composer-body"
         value={body}
         onChange={(event) => setBody(event.target.value)}
-        placeholder={dragging ? 'Drop it here…' : 'Say something…'}
+        placeholder={dragging ? 'Drop it here…' : placeholder}
         maxLength={contentLimits.postBodyMaxLength}
         rows={media ? 2 : 3}
         className="w-full resize-none bg-transparent text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"

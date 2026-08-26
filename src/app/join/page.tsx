@@ -50,9 +50,9 @@ export default function JoinPage() {
         ← Back
       </Link>
 
-      <h1 className="text-3xl font-semibold tracking-tight">Join an event</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Open your invitation</h1>
       <p className="mt-2 text-[var(--text-secondary)]">
-        Enter the {joinCodeConfig.length}-character code the host shared with you.
+        Enter the {joinCodeConfig.length}-character code your host sent you.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
@@ -91,13 +91,13 @@ export default function JoinPage() {
         )}
 
         <Button type="submit" size="lg" className="w-full" loading={submitting} disabled={!ready}>
-          Open the wall
+          Open it
           <ArrowRight className="size-4" aria-hidden />
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
-        You can watch without an account. Signing in lets you post.
+        No account needed to reply. Signing in lets you post to the wall too.
       </p>
     </main>
   );

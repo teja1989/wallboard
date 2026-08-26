@@ -1,13 +1,14 @@
 ---
-name: wallboard-security
-description: Security review checklist for Wallboard. Use before merging anything that touches authorization, Firestore or Storage rules, session handling, join codes, uploads, rate limits, the audit log, or the CSP — and whenever adding an API route or a new collection.
+name: marquee-security
+description: Security review checklist for Marquee. Use before merging anything that touches authorization, plan entitlements, Firestore or Storage rules, session handling, join codes, RSVPs, uploads, rate limits, the audit log, or the CSP — and whenever adding an API route or a new collection.
 ---
 
 # Security review
 
-Wallboard is a place people put photos of their friends behind an eight-character code. The
-threat model is not a nation state; it is someone who found a code, someone guessing codes,
-and someone who was removed from an event and wants back in.
+Marquee holds two things people care about: photos of their friends, and a guest list with
+notes their guests wrote for the host alone. The threat model is not a nation state; it is
+someone who found a code, someone guessing codes, another guest reading a note that was not
+for them, and someone who was removed from an event and wants back in.
 
 Work the sections that your change touches. Each item names what it actually prevents.
 
@@ -22,6 +23,11 @@ Break any of these and the review fails, whatever else is true:
 5. **Uploads are re-validated against the object that landed**, not the client's claim.
 6. **Media URLs are minted per request and expire.** No URL is ever stored in a document.
 7. **Every privileged action writes an audit entry** — including the failures.
+8. **RSVP notes never leave `rsvpNotes/`.** Answers and headcounts are public to the guest
+   list; the note and the custom answer are for the host only, and the split is structural
+   because Firestore rules cannot restrict a field.
+9. **Entitlements are not permissions.** `can()` answers who you are, `entitlementsFor()`
+   answers what was paid for. Neither may stand in for the other.
 
 ## If you added an API route
 
@@ -66,6 +72,30 @@ Break any of these and the review fails, whatever else is true:
 - [ ] Guest upgrade still uses `link*`, not a fresh sign-in — otherwise the uid changes and
       the guest silently loses their membership and their posts
 - [ ] Anything consuming a one-time code is guarded against double invocation
+
+## If you touched RSVPs or the guest list
+
+- [ ] `includePrivate` derived from the caller's permissions, never from a request
+      parameter — and the notes are _not fetched at all_ when it is false, so there is no
+      field left in the response to leak
+- [ ] Party size re-checked against the host's own `maxPartySize`, not just the schema
+      maximum; the schema cannot know which event it is for
+- [ ] Tally deltas computed from the stored member document, never from a client-supplied
+      previous value, so a guest cannot inflate the headcount by replaying a request
+- [ ] Anonymous guests can still reply — that is deliberate; requiring an account to say
+      "yes, I'll be there" loses replies for no security benefit
+- [ ] A rules test covering: a guest reading someone else's note, a guest writing their own
+      RSVP directly, and a guest answering on another person's behalf
+
+## If you touched plans or entitlements
+
+- [ ] Server-side gate present, not only a disabled button
+- [ ] Gate reads `entitlementsFor(event.plan)`, so the event's own plan decides — not the
+      viewer's, which would let a Pro guest unlock a free host's event
+- [ ] Refusal names the specific thing and the cheapest plan that fixes it
+      (`upgradeForFlag` / `upgradeForLimit`), rather than a generic upgrade wall
+- [ ] Behaviour verified with `features.billing` both on and off; the preview path is what
+      runs in production today and the gated path is what runs after launch
 
 ## If you touched uploads or media
 

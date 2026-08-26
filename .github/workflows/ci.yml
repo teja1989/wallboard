@@ -14,9 +14,9 @@ env:
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
   NEXT_PUBLIC_USE_EMULATORS: 'true'
   NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: wallboard-dev.firebaseapp.com
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: wallboard-dev
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: wallboard-dev.appspot.com
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: marquee-dev.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: marquee-dev
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: marquee-dev.appspot.com
   NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000'
   NEXT_PUBLIC_EMULATOR_HOST: 127.0.0.1
   STORAGE_DRIVER: emulator
@@ -78,7 +78,7 @@ jobs:
 
       - name: Start emulators
         run: |
-          npx firebase emulators:start --project wallboard-dev \
+          npx firebase emulators:start --project marquee-dev \
             --only auth,firestore,storage > /tmp/emulators.log 2>&1 &
           npx wait-on -t 120000 http-get://127.0.0.1:8080 http-get://127.0.0.1:9099
 

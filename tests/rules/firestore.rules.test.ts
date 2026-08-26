@@ -25,7 +25,7 @@ import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
  * Run via `npm run test:rules`, which starts the emulator around the suite.
  */
 
-const PROJECT_ID = 'wallboard-rules-test';
+const PROJECT_ID = 'marquee-rules-test';
 const EVENT_ID = 'event-alpha';
 const OTHER_EVENT_ID = 'event-beta';
 
@@ -63,8 +63,18 @@ beforeEach(async () => {
       code: 'ABCD2345',
       codeHash: 'deadbeef',
     });
-    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'member-uid'), { role: 'member' });
-    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'host-uid'), { role: 'host' });
+    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'member-uid'), {
+      role: 'member',
+      rsvp: { status: 'yes', partySize: 2, respondedAt: Date.now() },
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'host-uid'), {
+      role: 'host',
+      rsvp: { status: 'yes', partySize: 1, respondedAt: Date.now() },
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'rsvpNotes', 'member-uid'), {
+      note: 'Allergic to shellfish',
+      answer: '',
+    });
     await setDoc(doc(db, 'events', EVENT_ID, 'posts', 'post-visible'), {
       state: 'visible',
       body: 'hello',
@@ -225,6 +235,66 @@ describe('members', () => {
     await assertFails(
       setDoc(doc(member(), 'events', EVENT_ID, 'members', 'member-uid'), { role: 'host' }),
     );
+  });
+});
+
+describe('RSVP notes', () => {
+  it('are unreadable by other guests', async () => {
+    // A note addressed to the host is not for the rest of the guest list.
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable even by the person who wrote them', async () => {
+    // They read it back through the API, so the read is authorised and logged.
+    const author = testEnv.authenticatedContext('member-uid').firestore();
+    await assertFails(getDoc(doc(author, 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable by the host', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable by staff', async () => {
+    await assertFails(getDoc(doc(staff('owner'), 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('cannot be enumerated', async () => {
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'rsvpNotes')));
+  });
+
+  it('cannot be written by anyone', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'rsvpNotes', 'member-uid'), { note: 'edited' }),
+    );
+  });
+});
+
+describe('RSVP answers on the guest list', () => {
+  it('are visible to fellow guests, because that is what a guest list is', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID, 'members', 'host-uid')));
+  });
+
+  it('cannot be forged by answering on someone else’s behalf', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'members', 'host-uid'), {
+        rsvp: { status: 'no', partySize: 1 },
+      }),
+    );
+  });
+
+  it('cannot be self-written, even for yourself', async () => {
+    // Otherwise a guest could inflate their party size past the host's limit and skip the
+    // tally update the server maintains.
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'members', 'member-uid'), {
+        rsvp: { status: 'yes', partySize: 99 },
+      }),
+    );
+  });
+
+  it('stay invisible to non-members', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'members', 'member-uid')));
   });
 });
 

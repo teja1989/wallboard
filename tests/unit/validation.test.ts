@@ -4,6 +4,7 @@ import {
   createEventSchema,
   createPostSchema,
   joinCodeSchema,
+  rsvpSchema,
   uploadTargetSchema,
 } from '@/lib/validation/schemas';
 
@@ -24,42 +25,108 @@ describe('joinCodeSchema', () => {
   });
 });
 
+const baseEvent = { title: 'Party', occasion: 'party', expiryPresetId: '24h' };
+
 describe('createEventSchema', () => {
   it('requires a title with something in it', () => {
-    expect(createEventSchema.safeParse({ title: '   ', expiryPresetId: '24h' }).success).toBe(
-      false,
-    );
+    expect(createEventSchema.safeParse({ ...baseEvent, title: '   ' }).success).toBe(false);
   });
 
   it('trims and strips invisible characters from the title', () => {
     const parsed = createEventSchema.parse({
+      ...baseEvent,
       title: '  Priya​​s party  ',
-      expiryPresetId: '24h',
     });
     expect(parsed.title).toBe('Priyas party');
   });
 
   it('rejects an unknown expiry preset', () => {
-    expect(createEventSchema.safeParse({ title: 'Party', expiryPresetId: '99y' }).success).toBe(
+    expect(createEventSchema.safeParse({ ...baseEvent, expiryPresetId: '99y' }).success).toBe(
       false,
     );
   });
 
+  it('rejects an unknown occasion', () => {
+    expect(createEventSchema.safeParse({ ...baseEvent, occasion: 'coronation' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects an end time before the start time', () => {
+    const start = Date.UTC(2027, 5, 14, 19, 0);
+    expect(
+      createEventSchema.safeParse({ ...baseEvent, startsAt: start, endsAt: start - 3_600_000 })
+        .success,
+    ).toBe(false);
+    expect(
+      createEventSchema.safeParse({ ...baseEvent, startsAt: start, endsAt: start + 3_600_000 })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a date far outside any plausible event', () => {
+    expect(createEventSchema.safeParse({ ...baseEvent, startsAt: 1 }).success).toBe(false);
+    expect(createEventSchema.safeParse({ ...baseEvent, startsAt: 9e15 }).success).toBe(false);
+  });
+
+  it('refuses a location link that is not http(s)', () => {
+    const location = { name: 'The Rooftop', address: '', url: 'javascript:alert(1)' };
+    expect(createEventSchema.safeParse({ ...baseEvent, location }).success).toBe(false);
+    expect(
+      createEventSchema.safeParse({
+        ...baseEvent,
+        location: { ...location, url: 'https://maps.example.com/x' },
+      }).success,
+    ).toBe(true);
+  });
+
   it('rejects a title beyond the configured limit', () => {
     const title = 'x'.repeat(contentLimits.eventTitleMaxLength + 1);
-    expect(createEventSchema.safeParse({ title, expiryPresetId: '24h' }).success).toBe(false);
+    expect(createEventSchema.safeParse({ ...baseEvent, title }).success).toBe(false);
   });
 
   it('defaults to allowing every post kind', () => {
-    const parsed = createEventSchema.parse({ title: 'Party', expiryPresetId: '24h' });
+    const parsed = createEventSchema.parse(baseEvent);
     expect(parsed.allowedKinds).toContain('image');
     expect(parsed.allowedKinds).toContain('text');
   });
 
+  it('defaults RSVPs to on, because an invitation nobody can answer is a poster', () => {
+    expect(createEventSchema.parse(baseEvent).rsvp.enabled).toBe(true);
+  });
+
   it('rejects an empty allowedKinds list', () => {
+    expect(createEventSchema.safeParse({ ...baseEvent, allowedKinds: [] }).success).toBe(false);
+  });
+});
+
+describe('rsvpSchema', () => {
+  it('accepts a plain yes', () => {
+    expect(rsvpSchema.safeParse({ status: 'yes' }).success).toBe(true);
+  });
+
+  it('defaults a party to one person', () => {
+    expect(rsvpSchema.parse({ status: 'yes' }).partySize).toBe(1);
+  });
+
+  it('rejects pending as an answer', () => {
+    // `pending` is a state someone is in, not something they can choose.
+    expect(rsvpSchema.safeParse({ status: 'pending' }).success).toBe(false);
+  });
+
+  it('rejects a party size beyond the platform maximum', () => {
     expect(
-      createEventSchema.safeParse({ title: 'Party', expiryPresetId: '24h', allowedKinds: [] })
-        .success,
+      rsvpSchema.safeParse({ status: 'yes', partySize: contentLimits.maxPartySize + 1 }).success,
+    ).toBe(false);
+    expect(rsvpSchema.safeParse({ status: 'yes', partySize: 0 }).success).toBe(false);
+  });
+
+  it('bounds the private note', () => {
+    expect(
+      rsvpSchema.safeParse({
+        status: 'yes',
+        note: 'x'.repeat(contentLimits.rsvpNoteMaxLength + 1),
+      }).success,
     ).toBe(false);
   });
 });
