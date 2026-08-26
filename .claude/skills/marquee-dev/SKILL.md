@@ -150,6 +150,15 @@ to change one of them.
 
 ## Things that will bite you
 
+- **`next dev` and `next start` do not have the same CSP, and e2e only proves the one it
+  ran against.** CI runs Playwright against a _production build_ pointed at the emulators.
+  Passing locally against `npm run dev` proves nothing about that: the dev server relaxes
+  the policy. Before trusting a green e2e run, either push and read CI, or reproduce it —
+  `next build && next start` with the emulators up. This hid a broken sign-in for the whole
+  first month of the project.
+- **Emulator behaviour keys on `NEXT_PUBLIC_USE_EMULATORS`, never on `NODE_ENV`.** They are
+  independent: CI is a production build talking to emulators. Anything gated on the wrong
+  one breaks in exactly that configuration and nowhere else.
 - **Do not set `NODE_ENV` in `.env.local`.** Next sets it. Pinning it to `development` puts a
   development React build into a production bundle and the build fails at `/_global-error`.
 - **`server-only` throws in CLI scripts.** That is why `seed`, `grant`, and `cleanup` run with

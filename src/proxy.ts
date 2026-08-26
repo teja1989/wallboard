@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { appConfig } from '@/config';
 
 /**
  * Security headers, applied to every response.
@@ -9,10 +10,21 @@ import { NextResponse, type NextRequest } from 'next/server';
  * The CSP carries a per-request nonce rather than allowing 'unsafe-inline', so an injected
  * <script> cannot execute even if it makes it into the DOM. The nonce is passed to the
  * document through a request header, which Next reads in the root layout.
+ *
+ * Two independent switches, and conflating them was a bug:
+ *
+ *   - `isDev` (NODE_ENV) governs what the *dev server* needs — 'unsafe-eval' for React
+ *     Refresh — and whether to send HSTS.
+ *   - `useEmulators` governs whether the *browser* talks to Firebase on localhost.
+ *
+ * They are not the same question. CI runs a production build against the emulators, so
+ * keying the localhost allowance on NODE_ENV silently blocked every emulator call in that
+ * one configuration: sign-in failed, and the whole end-to-end suite with it. A real deploy
+ * sets NEXT_PUBLIC_USE_EMULATORS=false, so nothing here loosens production.
  */
 
-/** Origins the browser is allowed to reach. Emulators are added only in development. */
-function connectSources(isDev: boolean): string[] {
+/** Origins the browser is allowed to reach. */
+function connectSources(useEmulators: boolean): string[] {
   const sources = [
     "'self'",
     'https://*.googleapis.com',
@@ -22,18 +34,20 @@ function connectSources(isDev: boolean): string[] {
     'wss://*.firebaseio.com',
     'https://storage.googleapis.com',
   ];
-  if (isDev) sources.push('http://127.0.0.1:*', 'http://localhost:*', 'ws://127.0.0.1:*');
+  if (useEmulators) {
+    sources.push('http://127.0.0.1:*', 'http://localhost:*', 'ws://127.0.0.1:*');
+  }
   return sources;
 }
 
-function mediaSources(isDev: boolean): string[] {
+function mediaSources(useEmulators: boolean): string[] {
   const sources = ["'self'", 'blob:', 'data:', 'https://storage.googleapis.com'];
-  if (isDev) sources.push('http://127.0.0.1:*', 'http://localhost:*');
+  if (useEmulators) sources.push('http://127.0.0.1:*', 'http://localhost:*');
   return sources;
 }
 
-function contentSecurityPolicy(nonce: string, isDev: boolean): string {
-  const media = mediaSources(isDev).join(' ');
+function contentSecurityPolicy(nonce: string, isDev: boolean, useEmulators: boolean): string {
+  const media = mediaSources(useEmulators).join(' ');
   return [
     `default-src 'self'`,
     // strict-dynamic lets the nonced Next bootstrap load the chunks it needs without
@@ -46,7 +60,7 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     `img-src ${media} https://*.googleusercontent.com`,
     `media-src ${media}`,
     `font-src 'self' data: https://fonts.gstatic.com`,
-    `connect-src ${connectSources(isDev).join(' ')}`,
+    `connect-src ${connectSources(useEmulators).join(' ')}`,
     // Firebase Auth popups render in an iframe on the auth domain.
     `frame-src 'self' https://*.firebaseapp.com https://accounts.google.com`,
     `worker-src 'self' blob:`,
@@ -54,7 +68,9 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     `base-uri 'self'`,
     `form-action 'self'`,
     `frame-ancestors 'none'`,
-    `upgrade-insecure-requests`,
+    // Upgrading breaks the plain-http emulator origins the line above just allowed, and
+    // there is nothing to upgrade when everything is already local.
+    useEmulators ? '' : `upgrade-insecure-requests`,
   ]
     .filter(Boolean)
     .join('; ');
@@ -62,6 +78,7 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
 
 export default function proxy(request: NextRequest): NextResponse {
   const isDev = process.env.NODE_ENV !== 'production';
+  const useEmulators = appConfig.useEmulators;
   const nonce = crypto.randomUUID().replace(/-/g, '');
 
   const requestHeaders = new Headers(request.headers);
@@ -69,7 +86,10 @@ export default function proxy(request: NextRequest): NextResponse {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
-  response.headers.set('Content-Security-Policy', contentSecurityPolicy(nonce, isDev));
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicy(nonce, isDev, useEmulators),
+  );
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');

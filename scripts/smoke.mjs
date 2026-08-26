@@ -662,6 +662,22 @@ async function main() {
   check('CSP is present with a nonce', csp.includes("'nonce-"));
   check('CSP forbids framing', csp.includes("frame-ancestors 'none'"));
   check('CSP forbids objects', csp.includes("object-src 'none'"));
+
+  // This suite only ever runs against the emulators, so the CSP must allow them. It is a
+  // regression guard with real history: the emulator allowance used to be keyed on
+  // NODE_ENV rather than on whether emulators are actually in use, so a production build
+  // pointed at the emulators — exactly what CI runs — had every Firebase call blocked, and
+  // sign-in failed silently in the browser while every server-side check here still passed.
+  check(
+    'CSP allows the emulator origins it is being run against',
+    csp.includes('http://127.0.0.1:*'),
+    csp,
+  );
+  check(
+    'CSP does not force https onto the local emulators',
+    !csp.includes('upgrade-insecure-requests'),
+    csp,
+  );
   check('nosniff is set', headResponse.headers.get('x-content-type-options') === 'nosniff');
   check('referrer policy is set', !!headResponse.headers.get('referrer-policy'));
   check('the framework version is not advertised', !headResponse.headers.get('x-powered-by'));
