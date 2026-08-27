@@ -196,10 +196,12 @@ to change one of them.
 - **`google_identity_platform_config` turns off what it does not list.** Describing sign-in
   methods there is a complete declaration, not a set of additions — omitting `anonymous`
   disabled it, and with it every guest joining by code.
-- **Do not put an auth gate in front of the create form.** It was there once and it is the
-  wall every prospective host hits before seeing anything. The gate belongs at publish;
-  `event-draft.ts` is what makes that survive the email-link round trip. Anything new that
-  needs an account should ask at the moment of commitment, not on arrival.
+- **The create gate asks first, but must always keep its escape.** `/create` asks for an
+  account up front — that is the account that comes back — but the card carries "Have a look
+  around first", remembered for the session, and publish asks again. Removing the escape
+  turns the gate back into the wall every prospective host hits before seeing anything.
+  `event-draft.ts` is what makes the ask survive the email-link round trip. Check the gate
+  behind a `loading` guard, or the form flashes before the card replaces it.
 - **Never share `/e/{id}`.** It turns away non-members, which is everyone an invitation is
   sent to. The shareable link is `/i/{code}` (`invitationPath()`), which redeems on arrival
   and renders a preview card. This was wrong in both the email and the share sheet.
@@ -209,6 +211,21 @@ to change one of them.
   type, reliable on any page that acts on arrival. Do not reintroduce a boolean guard in
   `exchangeSession`: it must hand back the in-flight promise so callers await the real
   answer.
+- **The e2e helpers type the sign-in card's real button labels.** `signIn` and
+  `signInFromHere` click "Continue with email" and "Email me a link". Rewording
+  `sign-in-prompt.tsx` therefore breaks every signed-in test in the suite at once, in a way
+  that reads as an auth bug rather than a copy change. Grep `tests/e2e/helpers.ts` after
+  touching that component.
+- **`next start` on a taken port fails into the log, not the terminal.** It backgrounds
+  cleanly, the old process keeps answering on :3000, and the whole suite then runs against
+  the previous build — twice here, once producing a "failure" in code that was already
+  correct. Kill the old server and `grep EADDRINUSE` the log before believing a result.
+- **A provider's `name` claim will overwrite a chosen display name.** Google sends one on
+  every token, so `displayNameChosen` on the user document is what stops the next session
+  mint from undoing a rename. `src/lib/authz/display-name.ts` holds the precedence; keep it
+  free of `server-only` so it stays unit-testable.
+- **`server-only` in a module makes it untestable by Vitest.** Pure logic worth testing goes
+  in its own module without that import, and the server module imports it.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.

@@ -603,6 +603,54 @@ async function main() {
   });
   check('a forged unsubscribe token is refused', badUnsub.status === 403);
 
+  // --- the account ----------------------------------------------------------
+  // The account is the one page that reads across everything a host owns, so it is worth
+  // proving the endpoint behind it separately from the page that renders it.
+  const account = await call(host.session, '/api/account');
+  check('the account reads back', account.status === 200);
+  check('it names the host', typeof account.payload?.data?.profile?.displayName === 'string');
+  check(
+    'it does not leak the uid of anyone else',
+    account.payload?.data?.profile?.uid === host.actor.uid,
+  );
+  check('it reports a plan', typeof account.payload?.data?.billing?.effectivePlan === 'string');
+  check('it counts what the host has made', account.payload?.data?.stats?.events >= 1);
+
+  const anonAccount = await call(guest.session, '/api/account');
+  check('a code-only guest has no account to read', anonAccount.status === 403);
+
+  const renamed = await call(host.session, '/api/account', {
+    method: 'PATCH',
+    body: { displayName: 'Renamed Host' },
+  });
+  check('the host renames themselves', renamed.status === 200);
+  const afterRename = await call(host.session, '/api/account');
+  check(
+    'the new name is what reads back',
+    afterRename.payload?.data?.profile?.displayName === 'Renamed Host',
+  );
+
+  const emptyName = await call(host.session, '/api/account', {
+    method: 'PATCH',
+    body: { displayName: '   ' },
+  });
+  check('an empty name is refused', emptyName.status === 400);
+
+  const mine = await call(host.session, '/api/events/mine');
+  check('the host lists their own invitations', mine.status === 200);
+  check(
+    'and only their own',
+    mine.payload?.data?.events?.every(
+      (event) => event.hostUid === undefined || event.hostUid === host.actor.uid,
+    ) === true,
+  );
+
+  const guestMine = await call(guest.session, '/api/events/mine');
+  check(
+    'a code-only guest hosts nothing',
+    guestMine.status === 403 || guestMine.payload?.data?.events?.length === 0,
+  );
+
   // --- billing --------------------------------------------------------------
   // Billing is off by default, so checkout must refuse rather than silently succeed.
   const checkout = await call(host.session, '/api/billing/checkout', {

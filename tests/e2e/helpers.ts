@@ -62,9 +62,9 @@ export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/signin');
   const baseUrl = new URL(page.url()).origin;
 
-  await page.getByRole('button', { name: /use an email link instead/i }).click();
+  await page.getByRole('button', { name: /continue with email/i }).click();
   await page.getByLabel('Email address').fill(email);
-  await page.getByRole('button', { name: /send me a link/i }).click();
+  await page.getByRole('button', { name: /email me a link/i }).click();
 
   // Wait for the emulator to have actually issued the code before reaching for it.
   await page.waitForTimeout(300);
@@ -106,9 +106,9 @@ export async function browseCreateAnonymously(page: Page): Promise<void> {
 export async function signInFromHere(page: Page, email: string): Promise<void> {
   const baseUrl = new URL(page.url()).origin;
 
-  await page.getByRole('button', { name: /use an email link instead/i }).click();
+  await page.getByRole('button', { name: /continue with email/i }).click();
   await page.getByLabel('Email address').fill(email);
-  await page.getByRole('button', { name: /send me a link/i }).click();
+  await page.getByRole('button', { name: /email me a link/i }).click();
 
   await page.waitForTimeout(300);
   const link = toAppSignInLink(await latestSignInLink(page.request, email), baseUrl);

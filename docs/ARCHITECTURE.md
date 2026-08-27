@@ -44,27 +44,56 @@ The server session is authoritative for identity. The client SDK's local state l
 IndexedDB, which a private window, a cleared site, or a different device will not have — so
 `AuthProvider` asks `GET /api/session` on mount before deciding anyone is a guest.
 
-### 3. The account is asked for at publish, not at the door
+### 3. The account is asked for at the door, with a way past it
 
 Hosting needs a durable identity. The host alone can delete the event, read guests' private
 replies, rotate the join code and download the archive, and an anonymous session lives in
 browser storage that a cleared cookie takes with it — losing a wedding wall permanently
 while guests are still posting to it.
 
-None of that is true of a form nobody has submitted. So `/create` is open, and the account
-is asked for when publish is pressed, where the question answers itself: sign in so that
-only you can change this. The uid survives the upgrade, so the draft stays the same
-person's.
+`/create` asks first, because an account taken at the top of the funnel is the one that
+comes back: a host who signs in before typing can be reached, can be counted, and finds
+their invitation again from any device. But a gate with no way past it also turns away
+everyone who wanted to see what they were signing up for, so the card offers **"Have a look
+around first"**. Taking it is remembered for the session, and publish asks again — where
+the question answers itself: sign in so that only you can change this. The uid survives
+the upgrade, so the draft stays the same person's.
 
 The email-link path leaves the site entirely — inbox, then a different tab — so the draft is
-persisted to `localStorage` as it is typed and resumed on the way back. A draft that publish
-was pressed on finishes the job; one merely left behind is restored and left alone, because
+persisted to `localStorage` as it is typed and resumed on the way back, and `/auth/finish`
+returns to the path that sent them rather than the home page. A draft that publish was
+pressed on finishes the job; one merely left behind is restored and left alone, because
 signing in for some other reason must never send someone's half-written invitation.
 
-Opening that door removed the only sign-in surface the app had, which is what `/signin` is
-for: a host with a new phone needs a way back to invitations they already own.
+`/signin` is the same flow with no invitation attached: a host with a new phone needs a way
+back to invitations they already own.
 
-### 4. The invitation link is `/i/{code}`, and it previews
+### 4. The account is a place, not a menu item
+
+`/account` is where signing in is repaid: **invitations**, **plan and payment**, and
+**settings**, as three sections of one page rather than three routes, because there is not
+enough here to justify making someone navigate. `?tab=` deep-links a section so the header
+menu can land on one directly.
+
+`GET /api/account` answers it in a single call — profile, billing and counts — and is scoped
+entirely to the caller's session. There is no uid parameter, because a route that took one
+would be a route for reading someone else's account. `PATCH` changes exactly one field, the
+display name: email _is_ the identity and changing it is a re-auth, not a profile edit, and
+role is not the account holder's to set.
+
+A name someone typed outranks the one on the provider's token (`displayNameChosen` on the
+user document). Google puts a `name` claim on every token it issues, so without that flag
+the next session mint would put it back and the settings form would silently undo itself.
+The precedence lives in `src/lib/authz/display-name.ts`, away from `server-only`, so it is
+unit-testable without Firestore.
+
+The marketing header carries `AccountMenu`, a client island inside the otherwise-static
+server header. It renders signed-out on the server — which is also what a visitor with no
+JavaScript keeps — and swaps to an avatar menu once the session resolves. Sign-in providers
+come from `src/config/auth.config.ts` as a list, so adding X is an entry rather than a
+rewrite of the prompt.
+
+### 5. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -86,7 +115,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 5. Answers are public, notes are not
+### 6. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -103,7 +132,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 6. Media never touches the app server
+### 7. Media never touches the app server
 
 Uploading is a two-step handshake:
 

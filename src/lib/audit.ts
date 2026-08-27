@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = [
   'post.delete',
   'member.mute',
   'member.remove',
+  'user.renamed',
   'user.roleGranted',
   'user.suspended',
   'system.cleanup',

@@ -222,6 +222,7 @@ export const rateLimits = {
   uploadTargetPerUser: { limit: 40, windowMs: 10 * MINUTE },
   sessionPerIp: { limit: 60, windowMs: 10 * MINUTE },
   mediaUrlPerUser: { limit: 300, windowMs: 10 * MINUTE },
+  updateAccountPerUser: { limit: 20, windowMs: HOUR },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof rateLimits;

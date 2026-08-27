@@ -138,6 +138,17 @@ blocked sending domain means _nobody's_ invitations arrive — paying customers 
 - The mock gateway refuses to run when `NODE_ENV=production`, behind `BILLING_DRIVER`. A
   checkout that takes no money must never be reachable in production.
 
+## The account endpoint
+
+`GET /api/account` is scoped entirely to the caller's session. There is no uid parameter,
+because a route that accepted one would be a route for reading someone else's account —
+their email, their plan, and the size of their guest lists.
+
+`PATCH` accepts exactly one field. Email is the identity the session is minted from, so
+changing it is a re-auth rather than a profile edit, and role is set by CLI and custom
+claim, never by a request body. The write is rate-limited and audit-logged (`user.renamed`)
+like every other mutation.
+
 ## Rate limits
 
 Fixed-window counters, declared in `src/config/limits.config.ts`:
@@ -151,6 +162,7 @@ Fixed-window counters, declared in `src/config/limits.config.ts`:
 | upload target              | 40 / 10 min  |
 | media URL                  | 300 / 10 min |
 | session exchange (per IP)  | 60 / 10 min  |
+| rename account             | 20 / hour    |
 
 Per-IP limits are what actually block code guessing; per-account limits stop one identity
 farming attempts across addresses. Spent buckets expire via a Firestore TTL policy.

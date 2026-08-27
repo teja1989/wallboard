@@ -322,6 +322,19 @@ export const checkoutSchema = z.object({
   eventId: eventIdSchema.optional(),
 });
 
+/**
+ * The one field of a profile its owner may change.
+ *
+ * Cleaned like every other display name, and bounded by the same limit, because this is the
+ * same string that appears on an invitation and beside every post on a wall.
+ */
+export const updateAccountSchema = z.object({
+  displayName: cleanText(contentLimits.displayNameMaxLength).pipe(
+    z.string().min(1, 'A name cannot be empty.'),
+  ),
+});
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
 export const sessionSchema = z.object({ idToken: z.string().min(20).max(8192) });
 
 export const displayNameSchema = z.object({

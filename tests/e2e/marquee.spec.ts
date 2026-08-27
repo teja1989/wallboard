@@ -308,20 +308,81 @@ test.describe('the wall', () => {
 });
 
 test.describe('the account', () => {
-  test('a host finds what they made, on a page that repays signing in', async ({ page }) => {
+  test('a host is greeted by name and finds what they made', async ({ page }) => {
     const email = uniqueEmail('host');
     await signIn(page, email);
     await createEvent(page, 'Something I made');
 
     await page.goto('/account');
-    await expect(page.getByRole('heading', { name: /your invitations/i })).toBeVisible();
+
+    // The greeting is derived from the address when no provider supplied a name, so
+    // `host-…@example.com` becomes "Host".
+    await expect(page.getByRole('heading', { name: /hello, host/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Something I made' })).toBeVisible();
+    await expect(page.getByText(/1 invitation/)).toBeVisible();
+  });
+
+  test('the header carries an account menu once you are signed in', async ({ page }) => {
+    const email = uniqueEmail('host');
+    await signIn(page, email);
+
+    await page.goto('/');
+    const header = page.getByRole('banner');
+    // Signed in, the header stops selling and starts serving. Generous, because a cold load
+    // has to settle the Firebase SDK before the header knows who is looking.
+    await expect(header.getByRole('link', { name: /new invitation/i })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await header.getByRole('button', { name: /your account/i }).click();
     await expect(page.getByText(email)).toBeVisible();
+    await page.getByRole('menuitem', { name: /your invitations/i }).click();
+
+    await page.waitForURL(/\/account/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /hello, host/i })).toBeVisible();
+  });
+
+  test('a visitor with no account is offered a way in, not an account menu', async ({ page }) => {
+    await page.goto('/');
+    const header = page.getByRole('banner');
+    await expect(header.getByRole('link', { name: /^sign in$/i })).toBeVisible();
+    await expect(header.getByRole('link', { name: /start free/i })).toBeVisible();
+    await expect(header.getByRole('button', { name: /your account/i })).toHaveCount(0);
+  });
+
+  test('the plan section is honest that nothing is being charged', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+
+    await page.goto('/account?tab=plan');
+    await expect(page.getByText(/nothing is being charged/i)).toBeVisible();
+    // The preview runs every invitation on the top plan, and says so rather than dangling
+    // an upgrade button that would either take money or do nothing.
+    await expect(page.getByRole('button', { name: /^manage billing$/i })).toHaveCount(0);
+  });
+
+  test('a host renames themselves and it sticks', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+
+    await page.goto('/account?tab=settings');
+    const name = page.getByLabel('Your name');
+    await expect(name).toHaveValue(/.+/);
+    await name.fill('Ravi Patel');
+    await page.getByRole('button', { name: /^save$/i }).click();
+
+    await expect(page.getByRole('heading', { name: /hello, ravi/i })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // And it survives a reload, which is the only proof the server kept it.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: /hello, ravi/i })).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test('signing out ends the session', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
-    await page.goto('/account');
+    await page.goto('/account?tab=settings');
 
     await page.getByRole('button', { name: /sign out/i }).click();
     await page.waitForURL('/', { timeout: 15_000 });
@@ -344,7 +405,7 @@ test.describe('the account', () => {
     await signIn(otherPage, uniqueEmail('other'));
     await otherPage.goto('/account');
 
-    await expect(otherPage.getByRole('heading', { name: /your invitations/i })).toBeVisible();
+    await expect(otherPage.getByText(/no invitations yet/i)).toBeVisible({ timeout: 20_000 });
     await expect(otherPage.getByText('Private to its host')).toHaveCount(0);
     await otherContext.close();
   });

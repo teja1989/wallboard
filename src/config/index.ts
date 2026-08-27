@@ -3,6 +3,7 @@ export * from './billing.config';
 export * from './branding.config';
 export * from './email.config';
 export * from './features.config';
+export * from './auth.config';
 export * from './limits.config';
 export * from './occasions.config';
 export * from './plans.config';

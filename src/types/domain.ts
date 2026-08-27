@@ -183,6 +183,12 @@ export interface UserDoc {
   uid: string;
   email: string | null;
   displayName: string;
+  /**
+   * Set once the account holder has renamed themselves. Without it a Google account is
+   * renamed back to the name on the token every time the session is reminted, which would
+   * make the settings form appear to work and then silently undo itself.
+   */
+  displayNameChosen?: boolean;
   photoUrl: string | null;
   role: PlatformRole;
   isAnonymous: boolean;

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { brand } from '@/config';
+import { AccountMenu } from '@/components/auth/account-menu';
 
 /**
  * Shared header and footer for the pages that sell.
@@ -35,12 +36,11 @@ export function SiteHeader() {
         >
           I have a code
         </Link>
-        <Link
-          href="/create"
-          className="ml-1 inline-flex h-10 items-center rounded-[var(--radius-pill)] bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-contrast)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
-        >
-          Start free
-        </Link>
+        {/*
+          Who is looking changes what belongs here: a signed-in host wants their account and
+          a new invitation, not an invitation to start. AccountMenu renders both.
+        */}
+        <AccountMenu />
       </nav>
     </header>
   );
@@ -67,6 +67,9 @@ export function SiteFooter() {
           </Link>
           <Link href="/join" className="transition-colors hover:text-[var(--text-primary)]">
             Join with a code
+          </Link>
+          <Link href="/account" className="transition-colors hover:text-[var(--text-primary)]">
+            Your account
           </Link>
           <a
             href={`mailto:${brand.supportEmail}`}
