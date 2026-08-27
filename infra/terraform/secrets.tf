@@ -40,18 +40,27 @@ locals {
   }
 
   /**
-   * Secrets that come from outside, and so cannot be generated.
+   * Which secrets exist, decided by the driver rather than by looking at the key.
    *
-   * Only included when actually supplied: an empty Secret Manager version would make Cloud
-   * Run fail to start, which is a worse outcome than the feature staying switched off.
+   * This split matters. `for_each` keys may not be derived from a sensitive value, and
+   * asking `var.resend_api_key == ""` makes the *existence of the key* depend on a secret —
+   * which Terraform rejects for the whole plan, not just that expression. `email_driver` is
+   * an ordinary string, and the variable validation already guarantees the two agree.
+   *
+   * Only created when actually in use: an empty Secret Manager version would make Cloud Run
+   * fail to start, which is worse than the feature staying switched off.
    */
-  supplied_secrets = var.resend_api_key == "" ? {} : { RESEND_API_KEY = var.resend_api_key }
+  supplied_secret_names = var.email_driver == "resend" ? ["RESEND_API_KEY"] : []
 
-  secrets = merge(local.generated_secrets, local.supplied_secrets)
+  secret_names = concat(keys(local.generated_secrets), local.supplied_secret_names)
+
+  # Every value, including ones not currently in `secret_names`. Looked up by name, so an
+  # unused empty string is never written anywhere.
+  secret_values = merge(local.generated_secrets, { RESEND_API_KEY = var.resend_api_key })
 }
 
 resource "google_secret_manager_secret" "this" {
-  for_each = local.secrets
+  for_each = toset(local.secret_names)
 
   project   = var.project_id
   secret_id = "${var.service_name}-${lower(replace(each.key, "_", "-"))}"
@@ -70,8 +79,8 @@ resource "google_secret_manager_secret" "this" {
 }
 
 resource "google_secret_manager_secret_version" "this" {
-  for_each = local.secrets
+  for_each = toset(local.secret_names)
 
   secret      = google_secret_manager_secret.this[each.key].id
-  secret_data = each.value
+  secret_data = local.secret_values[each.key]
 }

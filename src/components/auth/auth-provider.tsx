@@ -12,14 +12,17 @@ import {
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
+  getRedirectResult,
   isSignInWithEmailLink,
   linkWithCredential,
   linkWithPopup,
+  linkWithRedirect,
   onIdTokenChanged,
   sendSignInLinkToEmail,
   signInAnonymously,
   signInWithEmailLink,
   signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
@@ -66,6 +69,27 @@ const EMAIL_LINK_STORAGE_KEY = 'marquee:pending-email';
  */
 const RETURN_TO_STORAGE_KEY = 'marquee:pending-return';
 
+/**
+ * Whether a failed popup is worth retrying as a full-page redirect.
+ *
+ * A popup is the better experience — the page stays alive, so a half-written invitation
+ * survives — but it is also the fragile one. Browsers block popups they did not tie to a
+ * gesture, embedded webviews have no popup at all, and the sign-in window is served from
+ * the Firebase auth domain rather than ours, so a browser restricting third-party storage
+ * can refuse it outright. Without this, every one of those is a dead end with a spinner.
+ *
+ * Deliberately not listed: `popup-closed-by-user` and `cancelled-popup-request`. Those mean
+ * somebody changed their mind, and throwing them into a redirect would be hostile.
+ */
+function needsRedirect(code: string | undefined): boolean {
+  return (
+    code === 'auth/popup-blocked' ||
+    code === 'auth/operation-not-supported-in-this-environment' ||
+    code === 'auth/web-storage-unsupported' ||
+    code === 'auth/internal-error'
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [actor, setActor] = useState<Actor | null>(null);
@@ -85,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const exchangeRef = useRef<Promise<void> | null>(null);
   /** Whether a server session is known to exist, without waiting on a re-render. */
   const sessionRef = useRef(false);
+  const redirectChecked = useRef(false);
 
   /** Trades the current ID token for a server session cookie. */
   const exchangeSession = useCallback(async (nextUser: User | null): Promise<void> => {
@@ -144,6 +169,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /**
+   * Finish a sign-in that went the redirect way.
+   *
+   * `getRedirectResult` is one-shot — it consumes the pending credential — so it needs the
+   * usual ref guard or Strict Mode's double invocation burns it and the visitor lands back
+   * on the page still signed out. Same trap as `/auth/finish`.
+   *
+   * Failure is silent on purpose: someone who abandoned the Google screen is not looking at
+   * an error, they are just back where they started.
+   */
+  useEffect(() => {
+    if (redirectChecked.current) return;
+    redirectChecked.current = true;
+
+    void (async () => {
+      try {
+        const result = await getRedirectResult(clientAuth());
+        if (result?.user) await exchangeSession(result.user);
+      } catch {
+        // Nothing pending, or the visitor changed their mind.
+      }
+    })();
+  }, [exchangeSession]);
+
   useEffect(() => {
     // onIdTokenChanged rather than onAuthStateChanged: it also fires on token refresh and
     // after linkWithCredential, which is exactly when the session cookie needs reminting.
@@ -200,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     provider.setCustomParameters({ prompt: 'select_account' });
     const current = auth.currentUser;
 
+    // Where to come back to, in case this turns into a redirect and the page is unloaded.
+    const here = `${window.location.pathname}${window.location.search}`;
+
     if (current?.isAnonymous) {
       try {
         const linked = await linkWithPopup(current, provider);
@@ -207,13 +259,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       } catch (error) {
         const code = (error as { code?: string }).code;
+        if (needsRedirect(code)) {
+          window.localStorage.setItem(RETURN_TO_STORAGE_KEY, here);
+          // Keeps the uid, so an anonymous guest does not lose their membership or posts.
+          await linkWithRedirect(current, provider);
+          return;
+        }
         if (code !== 'auth/credential-already-in-use' && code !== 'auth/email-already-in-use') {
           throw error;
         }
       }
     }
-    const credential = await signInWithPopup(auth, provider);
-    await exchangeSession(credential.user);
+
+    try {
+      const credential = await signInWithPopup(auth, provider);
+      await exchangeSession(credential.user);
+    } catch (error) {
+      if (!needsRedirect((error as { code?: string }).code)) throw error;
+      window.localStorage.setItem(RETURN_TO_STORAGE_KEY, here);
+      await signInWithRedirect(auth, provider);
+    }
   }, [exchangeSession]);
 
   const sendEmailLink = useCallback(async (email: string, returnTo?: string) => {

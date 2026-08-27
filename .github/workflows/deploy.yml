@@ -124,6 +124,10 @@ jobs:
             # A secret, so it comes from secrets rather than vars and never appears in the
             # printed tfvars below.
             echo "google_oauth_client_secret = \"${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}\""
+            # Cold starts are the whole cost of scale-to-zero. Set MIN_INSTANCES=1 to keep
+            # one warm: sign-in is the worst-hit path, because it makes several round
+            # trips and every one can land on a container that is still booting.
+            echo "min_instances = ${{ vars.MIN_INSTANCES || '0' }}"
             echo "billing_account = \"${{ vars.GCP_BILLING_ACCOUNT }}\""
             echo "budget_alert_emails = \"${{ vars.BUDGET_ALERT_EMAILS }}\""
             # Mail. Defaults keep it in the outbox, so a deploy that has not been given a
