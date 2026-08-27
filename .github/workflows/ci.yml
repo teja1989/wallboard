@@ -11,7 +11,14 @@ concurrency:
 
 env:
   # Emulator placeholders. No real credentials are involved anywhere in CI.
-  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  # Deliberately not the origin the tests browse to.
+  #
+  # These are two different things — the canonical public address, and where the browser
+  # actually is — and they diverge in real life the moment a custom domain is configured
+  # before its DNS is live. Pointing them at the same host let a bug through where the
+  # emailed sign-in link was built from the configured URL, so every link led to a domain
+  # that did not resolve. Keeping them different is what keeps that honest.
+  NEXT_PUBLIC_SITE_URL: https://marquee.example.com
   NEXT_PUBLIC_USE_EMULATORS: 'true'
   NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: marquee-dev.firebaseapp.com

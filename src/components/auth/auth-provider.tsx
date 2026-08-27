@@ -23,7 +23,6 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { appConfig } from '@/config';
 import { clientAuth } from '@/lib/firebase/client';
 import { api } from '@/lib/client/api-client';
 import type { Actor } from '@/types/domain';
@@ -217,7 +216,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendEmailLink = useCallback(async (email: string, returnTo?: string) => {
     await sendSignInLinkToEmail(clientAuth(), email, {
-      url: `${appConfig.siteUrl}/auth/finish`,
+      /**
+       * The origin the browser is actually on, not the configured one.
+       *
+       * These are not always the same host, and when they differ the configured one is
+       * wrong: a link that returns someone to a domain other than the one they signed in
+       * from is a link that either fails or logs them in somewhere they were not. It broke
+       * exactly that way the moment SITE_URL named a domain whose DNS was not live yet —
+       * every sign-in email pointed at a host that did not resolve, on every URL.
+       *
+       * Firebase only honours origins in `authorized_domains`, which is what stops this
+       * being an open redirect; Terraform lists the service URL and the custom domain both.
+       */
+      url: `${window.location.origin}/auth/finish`,
       handleCodeInApp: true,
     });
     window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, email);
