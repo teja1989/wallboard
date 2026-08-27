@@ -196,6 +196,7 @@ jobs:
           terraform output -json > /tmp/tf.json
           jq -r '
             "site_url=" + .site_url.value,
+            "service_url=" + .service_url.value,
             "registry=" + .artifact_repository.value,
             "api_key=" + .firebase_web_config.value.api_key,
             "auth_domain=" + .firebase_web_config.value.auth_domain,
@@ -243,6 +244,9 @@ jobs:
         if: ${{ !inputs.plan_only }}
         run: |
           URL="${{ steps.tf.outputs.service_url }}"
+          # An unset output would otherwise curl an empty string six times and report it as
+          # the service being down, which is a long way from what actually happened.
+          [ -n "$URL" ] || { echo "::error::service_url output is empty — nothing to check"; exit 1; }
           CODE=000
           for attempt in 1 2 3 4 5 6; do
             CODE="$(curl -s -o /tmp/body -w '%{http_code}' --max-time 30 "$URL/" || echo 000)"
