@@ -597,6 +597,101 @@ async function main() {
   });
   check('a member cannot send', memberSends.status === 403);
 
+  // --- guests by phone, per-guest links, and what "seen" is worth ------------
+  const byPhone = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ phone: '+1 415 555 0148', name: 'Phone Only' }] },
+  });
+  check('a guest can be added by phone alone', byPhone.payload?.data?.added === 1);
+
+  const sameNumberAgain = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ phone: '(415) 555-0148', name: 'Phone Only' }] },
+  });
+  check(
+    'the same number written differently is the same person',
+    sameNumberAgain.payload?.data?.duplicates === 1,
+    JSON.stringify(sameNumberAgain.payload),
+  );
+
+  const undialable = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ phone: '12', name: 'Nope' }] },
+  });
+  check(
+    'a number we could never dial is refused, not stored',
+    undialable.payload?.data?.invalid === 1,
+  );
+
+  const noContact = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ name: 'No Way To Reach Them' }] },
+  });
+  check('a guest with no address and no number is rejected', noContact.status === 400);
+
+  const listWithLinks = await call(host.session, `/api/events/${eventId}/invites`);
+  const listed = listWithLinks.payload?.data?.invitees ?? [];
+  check(
+    'the list comes back with the join code for the relay panel',
+    typeof listWithLinks.payload?.data?.joinCode === 'string',
+  );
+  check(
+    'every guest has their own link token',
+    listed.length > 0 && listed.every((i) => typeof i.token === 'string' && i.token.length >= 16),
+  );
+  check('no two guests share a token', new Set(listed.map((i) => i.token)).size === listed.length);
+
+  const tracked = listed.find((i) => i.email === `guest1-${stamp}@example.com`);
+  check('the emailed guest reads as sent', tracked?.status === 'sent', JSON.stringify(tracked));
+
+  // The whole point of the beacon. A plain server-side fetch of the invitation — which is
+  // exactly what Outlook Safe Links and Proofpoint do to every URL they scan — must not
+  // count as a person having looked.
+  const scannerFetch = await fetch(`${BASE}/i/${rotated.payload.data.code}?g=${tracked.token}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Proofpoint-URL-Scanner/1.0)' },
+  });
+  check('the invitation page still renders for a scanner', scannerFetch.status === 200);
+
+  const afterScan = await call(host.session, `/api/events/${eventId}/invites`);
+  const notSeen = (afterScan.payload?.data?.invitees ?? []).find((i) => i.id === tracked.id);
+  check('a link scanner fetching the page is not a view', notSeen?.status === 'sent');
+  check('and it did not inflate the view count', (notSeen?.viewCount ?? 0) === 0);
+
+  const beacon = await call(guest.session, `/api/events/${eventId}/invites/view`, {
+    method: 'POST',
+    body: { token: tracked.token },
+  });
+  check('the beacon records a view', beacon.status === 200);
+
+  const afterBeacon = await call(host.session, `/api/events/${eventId}/invites`);
+  const seen = (afterBeacon.payload?.data?.invitees ?? []).find((i) => i.id === tracked.id);
+  check('the guest now reads as seen', seen?.status === 'seen', JSON.stringify(seen));
+  check('and the view was counted once', seen?.viewCount === 1);
+  check('and the first view was stamped', typeof seen?.firstViewedAt === 'number');
+
+  const again = await call(guest.session, `/api/events/${eventId}/invites/view`, {
+    method: 'POST',
+    body: { token: tracked.token },
+  });
+  check('a second beacon is accepted', again.status === 200);
+  const afterSecond = await call(host.session, `/api/events/${eventId}/invites`);
+  const deduped = (afterSecond.payload?.data?.invitees ?? []).find((i) => i.id === tracked.id);
+  check('but coming straight back is one visit, not two', deduped?.viewCount === 1);
+
+  const forgedToken = await call(guest.session, `/api/events/${eventId}/invites/view`, {
+    method: 'POST',
+    body: { token: 'f'.repeat(32) },
+  });
+  // It must not say whether the token was real: answering would let anyone holding an event
+  // id test tokens, or confirm that a particular person is on the guest list.
+  check('an unknown token is not confirmed or denied', forgedToken.status === 200);
+
+  const malformedToken = await call(guest.session, `/api/events/${eventId}/invites/view`, {
+    method: 'POST',
+    body: { token: 'not-hex!' },
+  });
+  check('a malformed token is refused outright', malformedToken.status === 400);
+
   const badUnsub = await call(guest.session, '/api/unsubscribe', {
     method: 'POST',
     body: { eventId, email: `guest1-${stamp}@example.com`, token: 'f'.repeat(32) },
@@ -738,6 +833,19 @@ async function main() {
   check('referrer policy is set', !!headResponse.headers.get('referrer-policy'));
   check('the framework version is not advertised', !headResponse.headers.get('x-powered-by'));
 
+  // The delivery history hangs off the invitee. Firestore does not delete a document's
+  // subcollections with it, so this is what proves the delete sweeps recursively rather
+  // than leaving a record of who read what alive under a guest list that no longer exists.
+  const historyPath =
+    `http://127.0.0.1:8080/v1/projects/marquee-dev/databases/(default)/documents` +
+    `/events/${eventId}/invitees/${tracked.id}/deliveries`;
+  const historyBefore = await fetch(historyPath, { headers: { Authorization: 'Bearer owner' } });
+  const historyBeforeBody = await historyBefore.json();
+  check(
+    'the guest has a delivery history while the event lives',
+    (historyBeforeBody.documents ?? []).length > 0,
+  );
+
   // --- deletion, last, because it destroys everything above -----------------
   const deleted = await call(host.session, `/api/events/${eventId}/delete`, {
     method: 'POST',
@@ -751,6 +859,14 @@ async function main() {
 
   const afterDelete = await call(host.session, `/api/events/${eventId}`);
   check('the event is gone', afterDelete.status === 404);
+
+  const historyAfter = await fetch(historyPath, { headers: { Authorization: 'Bearer owner' } });
+  const historyAfterBody = await historyAfter.json();
+  check(
+    'deleting the event takes the delivery history with it',
+    (historyAfterBody.documents ?? []).length === 0,
+    JSON.stringify(historyAfterBody).slice(0, 200),
+  );
 
   const codeAfterDelete = await call(outsider.session, '/api/events/join', {
     method: 'POST',

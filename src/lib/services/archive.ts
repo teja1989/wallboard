@@ -293,7 +293,19 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
 
   summary.postsDeleted = await deleteSubcollection(event.id, collections.posts);
   summary.membersDeleted = await deleteSubcollection(event.id, collections.members);
-  summary.inviteesDeleted = await deleteSubcollection(event.id, collections.invitees);
+
+  // Invitees are swept recursively, not batch-deleted like the rest.
+  //
+  // Deleting a Firestore document does *not* delete its subcollections — they survive as
+  // unreachable orphans. Each invitee carries a `deliveries` history, so a plain batch
+  // delete would leave a record of who was sent what, and when they read it, alive forever
+  // under a guest list that no longer exists. Counting first because recursiveDelete does
+  // not report what it removed.
+  summary.inviteesDeleted = (
+    await reference.collection(collections.invitees).count().get()
+  ).data().count;
+  await db().recursiveDelete(reference.collection(collections.invitees));
+
   await deleteSubcollection(event.id, collections.rsvpNotes);
   await deleteSubcollection(event.id, collections.private);
 

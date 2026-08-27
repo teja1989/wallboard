@@ -69,6 +69,8 @@ export const collections = {
   private: 'private',
   rsvpNotes: 'rsvpNotes',
   invitees: 'invitees',
+  // Subcollection of events/{eventId}/invitees/{inviteeId}
+  deliveries: 'deliveries',
   // Development only: where the outbox driver puts mail instead of sending it.
   mailOutbox: 'mailOutbox',
 } as const;

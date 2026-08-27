@@ -223,6 +223,9 @@ export const rateLimits = {
   sessionPerIp: { limit: 60, windowMs: 10 * MINUTE },
   mediaUrlPerUser: { limit: 300, windowMs: 10 * MINUTE },
   updateAccountPerUser: { limit: 20, windowMs: HOUR },
+  // Generous: this fires once per guest per visit, and a wedding opens in bursts as a
+  // group chat reads the link. Tight enough that link tokens cannot be brute-forced.
+  viewBeaconPerIp: { limit: 120, windowMs: 10 * MINUTE },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof rateLimits;

@@ -42,6 +42,9 @@ export function isWellFormedJoinCode(input: string): boolean {
  * too — in the path rather than a query string, which keeps it out of `Referer` headers on
  * anything the page later loads, and lets the route render a real link preview.
  */
-export function invitationPath(code: string): string {
-  return `/i/${encodeURIComponent(code.replace(/-/g, '').toUpperCase())}`;
+export function invitationPath(code: string, guestToken?: string): string {
+  const path = `/i/${encodeURIComponent(code.replace(/-/g, '').toUpperCase())}`;
+  // The token names one guest, which is what makes "who opened it?" answerable. It grants
+  // nothing the code does not already grant — it only says who is holding it.
+  return guestToken ? `${path}?g=${encodeURIComponent(guestToken)}` : path;
 }

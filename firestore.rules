@@ -63,10 +63,16 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // The addresses a host is sending to. Server-only: a guest list of email addresses
-      // is exactly the thing that must not be readable by everyone holding the code, and
-      // the host reads it through an authorised API call.
-      match /invitees/{inviteeId} {
+      // Who the host is inviting. Server-only, and now doubly so: alongside the addresses
+      // and phone numbers, each document carries the link token that identifies that guest.
+      // A readable token would let anyone holding the code mark other people as having seen
+      // the invitation, and the list itself is exactly what must not be visible to everyone
+      // who has the code. The host reads it through an authorised API call.
+      //
+      // The recursive wildcard covers the deliveries subcollection: a per-guest record of
+      // what was sent and when it was read is no more public than the guest list it hangs
+      // off, and a rule written only for the parent would leave the children open.
+      match /invitees/{inviteeId}/{document=**} {
         allow read, write: if false;
       }
 

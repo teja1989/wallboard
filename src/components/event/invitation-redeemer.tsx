@@ -10,6 +10,10 @@ import type { EventPreview } from '@/types/domain';
 
 interface InvitationRedeemerProps {
   code: string;
+  /** Null when the code is unknown, in which case there is nothing to record against. */
+  eventId: string | null;
+  /** From `?g=` — which guest is holding this link. Null for the shared link. */
+  guestToken: string | null;
   /** Rendered while redeeming so the page is never blank. Null when the code is unknown. */
   title: string | null;
   hostedBy: string | null;
@@ -25,11 +29,18 @@ interface InvitationRedeemerProps {
  * When that fails — a rotated code, an event already over — it says which, and offers the
  * manual entry rather than dead-ending on an apology.
  */
-export function InvitationRedeemer({ code, title, hostedBy }: InvitationRedeemerProps) {
+export function InvitationRedeemer({
+  code,
+  eventId,
+  guestToken,
+  title,
+  hostedBy,
+}: InvitationRedeemerProps) {
   const router = useRouter();
   const { signInAsGuest, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const redeemed = useRef(false);
+  const beaconed = useRef(false);
 
   const redeem = useCallback(async () => {
     try {
@@ -40,6 +51,24 @@ export function InvitationRedeemer({ code, title, hostedBy }: InvitationRedeemer
       setError(errorMessage(caught, 'That invitation link did not work.'));
     }
   }, [code, router, signInAsGuest]);
+
+  /**
+   * Tell the host their guest looked.
+   *
+   * Its own effect, deliberately: it must not be blocked on signing in or on the code
+   * redeeming, because a guest whose code has been rotated still opened the invitation and
+   * the host still wants to know. Failure is silent — a guest's evening does not depend on
+   * our analytics.
+   */
+  useEffect(() => {
+    if (!eventId || !guestToken || beaconed.current) return;
+    beaconed.current = true;
+    void (async () => {
+      await api
+        .post(`/api/events/${eventId}/invites/view`, { token: guestToken })
+        .catch(() => undefined);
+    })();
+  }, [eventId, guestToken]);
 
   useEffect(() => {
     if (loading || redeemed.current) return;

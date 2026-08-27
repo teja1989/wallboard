@@ -149,6 +149,28 @@ changing it is a re-auth rather than a profile edit, and role is set by CLI and 
 claim, never by a request body. The write is rate-limited and audit-logged (`user.renamed`)
 like every other mutation.
 
+## Guest link tokens and the view beacon
+
+Each invitee carries a 128-bit random token, and their invitation link is
+`/i/{code}?g={token}`. Three properties matter:
+
+- **It grants nothing.** The code is still the credential; the token only names who is
+  holding it. A stolen token buys the ability to mark its own owner as having looked.
+- **It is never readable by a client.** Firestore rules deny the whole `invitees/` tree
+  including the `deliveries/` subcollection, via a recursive wildcard — a rule written for
+  the parent alone would have left the children open. A readable token would let anyone with
+  the code mark other guests as having seen the invitation, or enumerate the guest list a
+  person at a time.
+- **It is stored, not derived.** Unlike the unsubscribe token, this one has to be revocable
+  per guest: a link that leaks into a group chat should be replaceable without invalidating
+  everyone else's, which a shared pepper cannot do.
+
+`POST /api/events/{id}/invites/view` is deliberately unauthenticated — the visitor is a
+guest who may have no session yet, and the token is the credential. It is rate-limited per
+IP so tokens cannot be brute-forced, and **it never says whether a token was real**: an
+endpoint that answered "no such guest" would let anyone holding an event id test tokens, or
+confirm that a particular person is on a guest list.
+
 ## Rate limits
 
 Fixed-window counters, declared in `src/config/limits.config.ts`:
@@ -163,6 +185,7 @@ Fixed-window counters, declared in `src/config/limits.config.ts`:
 | media URL                  | 300 / 10 min |
 | session exchange (per IP)  | 60 / 10 min  |
 | rename account             | 20 / hour    |
+| invitation view beacon     | 120 / 10 min |
 
 Per-IP limits are what actually block code guessing; per-account limits stop one identity
 farming attempts across addresses. Spent buckets expire via a Firestore TTL policy.

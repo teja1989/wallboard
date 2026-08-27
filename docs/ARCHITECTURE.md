@@ -93,7 +93,45 @@ JavaScript keeps — and swaps to an avatar menu once the session resolves. Sign
 come from `src/config/auth.config.ts` as a list, so adding X is an entry rather than a
 rewrite of the prompt.
 
-### 5. The invitation link is `/i/{code}`, and it previews
+### 5. Every guest has their own link, and "seen" means seen
+
+An invitee used to be identified by their email address — the document id was a hash of it.
+People know each other by phone at least as often as by inbox, so identity is now the
+document itself: an opaque id with an address, a number, or both hanging off it. A guest who
+gains a phone number later stops being a second guest, and a host can fix a typo without
+losing what was recorded against it.
+
+Each invitee also carries a **link token**, and their invitation is `/i/{code}?g={token}`.
+The bare code still works and is still shareable; the token only says _who is holding it_
+and grants nothing the code does not. It is what makes "has Priya opened it?" answerable at
+all — and it prefills her name on the RSVP, which is worth having on its own.
+
+Status climbs a channel-independent ladder — `queued → sent → delivered → seen → replied`,
+with `failed`, `bounced` and `unsubscribed` ending the climb. `canTransition` in
+`src/config/comms.config.ts` is the only place a move is allowed, and it **only ever goes
+forwards**: delivery receipts arrive late and out of order, and without that rule a carrier
+acknowledging a twenty-minute-old message would overwrite "seen" with "delivered".
+
+The current state is denormalised onto the invitee so the guest list is one read; the full
+history lives in `invitees/{id}/deliveries/{id}` and is read only when a host opens one
+person.
+
+**What "seen" is worth, and why there is no "opened".** A view is recorded only by a beacon
+the browser fires _after hydration_. Corporate mail security — Outlook Safe Links,
+Proofpoint, Mimecast — fetches every URL in every message it scans, so counting a
+server-side request would report that everyone at a company had read their invitation
+seconds after it was sent. Requiring JavaScript to have run is the one signal a scanner does
+not produce. For the same family of reasons there is deliberately no "Opened" column: Apple
+Mail Privacy Protection pre-fetches every image on more than half of consumer email, so an
+open pixel fires whether or not a human looked, and a dashboard that says "opened" when it
+means "Apple prefetched it" sends hosts chasing people who never saw the invitation.
+
+Hosts can also **send it themselves**. The relay panel hands over each guest's personal link
+to paste into whatever thread they already talk to that person in. It costs nothing, needs
+no carrier registration, arrives from someone the guest knows — and tracks in full, because
+the link is per-guest.
+
+### 6. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -115,7 +153,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 6. Answers are public, notes are not
+### 7. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -132,7 +170,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 7. Media never touches the app server
+### 8. Media never touches the app server
 
 Uploading is a two-step handshake:
 

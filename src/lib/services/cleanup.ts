@@ -25,8 +25,11 @@ const SWEEP_BATCH_SIZE = 50;
  * A Firestore TTL policy deletes the document it is set on and *nothing underneath it*, so
  * when the event doc lapses its subcollections become unreachable orphans that live
  * forever. For `rsvpNotes` and `invitees` that is a privacy problem rather than a billing
- * one: a note a guest wrote for the host, and a list of the addresses the host invited,
- * would outlive the event they belong to. The sweep is what actually keeps the promise.
+ * one: a note a guest wrote for the host, and the addresses *and phone numbers* the host
+ * invited, would outlive the event they belong to. The sweep is what keeps the promise.
+ *
+ * `recursiveDelete` rather than a batch delete, because invitees carry a `deliveries`
+ * history of their own and deleting a document leaves its subcollections behind.
  */
 const EVENT_SUBCOLLECTIONS = [
   collections.members,

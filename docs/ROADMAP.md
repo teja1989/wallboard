@@ -22,12 +22,28 @@ behind.
 
 Ordered by what actually stops revenue.
 
-### Email delivery
+### Email delivery — shipped
 
-The biggest hole against Evite. Today an invitation is shared as a link or a code; there is
-no "type twenty addresses and send". Needs a transactional provider, an address list per
-event, delivery and open tracking, and a reminder for guests who have not replied. The
-reminder is the part hosts will actually love.
+A transactional provider, an address list per event, and a reminder for guests who have not
+replied.
+
+### Reaching people the way they actually reach each other — phase A shipped
+
+Guests are identified by an opaque id rather than an email address, so someone can be added
+by phone number alone. Every guest gets a personal invitation link, which is what makes
+per-person tracking possible at all, and the host can send those links themselves from
+whatever thread they already talk to that person in — no carrier, no registration, no
+compliance exposure, and it still tracks.
+
+Status climbs `queued → sent → delivered → seen → replied`. There is deliberately no
+"opened": see [ARCHITECTURE.md](./ARCHITECTURE.md) for why an open pixel measures Apple
+rather than a person.
+
+**Phase B, blocked on paperwork not code:** SMS and WhatsApp behind one channel adapter,
+carrier delivery receipts, a global STOP suppression list, quiet hours, and per-plan
+metering — US SMS costs roughly thirty times what email does. US A2P 10DLC brand and
+campaign registration and Meta business verification each take one to three weeks and must
+be started before any of that code is worth writing.
 
 ### Payments
 

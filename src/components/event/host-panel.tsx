@@ -15,6 +15,8 @@ interface HostPanelProps {
   eventId: string;
   /** Needed for the typed delete confirmation. */
   title: string;
+  /** Who the invitation is from — it goes in the message the host copies to send. */
+  hostedBy: string;
   /** The plan the event currently runs on, so the panel knows whether to offer an upgrade. */
   plan: string;
   open: boolean;
@@ -27,7 +29,15 @@ interface HostPanelProps {
  * here, which is what makes each read auditable and keeps it out of any response a
  * non-host could receive.
  */
-export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: HostPanelProps) {
+export function HostPanel({
+  eventId,
+  title,
+  hostedBy,
+  plan,
+  open,
+  onClose,
+  onChanged,
+}: HostPanelProps) {
   const { notify } = useToast();
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
@@ -168,7 +178,12 @@ export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: Ho
             </section>
 
             <section className="mb-6">
-              <InvitePanel eventId={eventId} onSent={onChanged} />
+              <InvitePanel
+                eventId={eventId}
+                eventTitle={title}
+                hostedBy={hostedBy}
+                onSent={onChanged}
+              />
             </section>
 
             <section className="mb-6">

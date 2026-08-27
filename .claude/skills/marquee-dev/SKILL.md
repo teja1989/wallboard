@@ -226,6 +226,26 @@ to change one of them.
   free of `server-only` so it stays unit-testable.
 - **`server-only` in a module makes it untestable by Vitest.** Pure logic worth testing goes
   in its own module without that import, and the server module imports it.
+- **A view is recorded by a beacon, never by a page render.** Outlook Safe Links, Proofpoint
+  and Mimecast fetch every URL in every message they scan. Anything that counts a
+  server-side request as "seen" will report a whole company as having read their invitations
+  seconds after they were sent. `recordView` is only ever reached from the client beacon in
+  `invitation-redeemer.tsx`, and the smoke suite asserts a scanner-agent fetch does not move
+  the status. Do not "simplify" this by recording the view in the page.
+- **Do not add an email open pixel.** Apple Mail Privacy Protection pre-fetches every image
+  on more than half of consumer email, so it fires whether or not a human looked. The
+  vocabulary is Delivered / Seen / Replied, and `seen` means they loaded the invitation.
+- **Delivery status only moves forwards.** `canTransition` in `comms.config.ts` is the only
+  gate. Receipts arrive late and out of order, and writing status directly would overwrite
+  "seen" with a twenty-minute-old "delivered".
+- **The invitee id is opaque and must stay that way.** It was a hash of the email address,
+  which made a guest with an address and a number into two guests and made a typo
+  uncorrectable. `legacyInviteeId` exists only for unsubscribe tombstones.
+- **Phone numbers are normalised to E.164 server-side or refused.** A number stored as typed
+  cannot be dialled, deduplicated, or checked against an opt-out list — and the guest
+  silently never hears anything. The client parser deliberately does _not_ dedupe format
+  variants: guessing without real phone metadata risks merging two different numbers and
+  dropping a guest, so the server collapses them and reports what it collapsed.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.

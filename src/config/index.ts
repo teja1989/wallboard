@@ -1,6 +1,7 @@
 export * from './app.config';
 export * from './billing.config';
 export * from './branding.config';
+export * from './comms.config';
 export * from './email.config';
 export * from './features.config';
 export * from './auth.config';

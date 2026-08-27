@@ -8,7 +8,10 @@ import { InvitationRedeemer } from '@/components/event/invitation-redeemer';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Params = { params: Promise<{ code: string }> };
+type Params = {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 /**
  * The invitation link.
@@ -64,13 +67,22 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function InvitationPage({ params }: Params) {
+export default async function InvitationPage({ params, searchParams }: Params) {
   const { code } = await params;
+  const query = await searchParams;
   const event = await eventForCode(code);
+
+  // `?g=` names which guest is holding this link. It is handed to the client rather than
+  // acted on here on purpose: the view it records has to come from a browser that ran the
+  // page, not from whatever fetched the HTML. See the beacon route for why.
+  const raw = query.g;
+  const guestToken = typeof raw === 'string' ? raw : null;
 
   return (
     <InvitationRedeemer
       code={code}
+      eventId={event?.id ?? null}
+      guestToken={guestToken}
       title={event?.title ?? null}
       hostedBy={event?.hostedBy ?? null}
     />

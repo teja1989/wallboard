@@ -4,6 +4,7 @@ import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
 import { requireEvent } from '@/lib/services/events';
 import { sendRsvpConfirmation } from '@/lib/services/invites';
+import { markReplied } from '@/lib/services/delivery';
 import { submitRsvp } from '@/lib/services/rsvp';
 import { ApiError, limitByUser, ok, parseBody, requireActor, route } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
@@ -40,6 +41,13 @@ export const POST = route(async (request, { params }: Params) => {
 
   const input = await parseBody(request, rsvpSchema);
   const outcome = await submitRsvp(actor, event, input);
+
+  // The host's list should say "replied" the moment they do, whichever link they came in
+  // on. Matched on address rather than on the guest token, because a forwarded link or a
+  // second device is still that person answering. Best-effort, like the confirmation below.
+  await markReplied(id, actor.email).catch((error: unknown) =>
+    console.error('[rsvp] could not mark the invitee replied', error),
+  );
 
   // A confirmation is a courtesy, so it must never be able to fail the reply that earned
   // it. Only for a yes, and only when we have an address to send it to.

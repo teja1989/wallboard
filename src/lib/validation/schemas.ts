@@ -257,20 +257,34 @@ export type RsvpInput = z.infer<typeof rsvpSchema>;
  * endpoint anywhere that accepts a message body. A host adds people to *their* event and
  * sends *that event's* invitation — which is what stops this being a spam relay.
  */
+/** A guest's personal link token: hex, fixed width, never anything else. */
+export const guestTokenSchema = z
+  .string()
+  .regex(/^[0-9a-f]{16,64}$/, 'That is not a valid invitation link.');
+
 export const addInviteesSchema = z.object({
   invitees: z
     .array(
-      z.object({
-        email: z
-          .string()
-          .trim()
-          .toLowerCase()
-          .max(254)
-          .pipe(z.string().email('That does not look like an email address.')),
-        name: cleanText(contentLimits.displayNameMaxLength).default(''),
-      }),
+      z
+        .object({
+          email: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .max(254)
+            .pipe(z.string().email('That does not look like an email address.'))
+            .nullish(),
+          // Validated properly server-side by libphonenumber; this only bounds the input.
+          phone: z.string().trim().max(32).nullish(),
+          name: cleanText(contentLimits.displayNameMaxLength).default(''),
+        })
+        // People are known by one or the other, and increasingly by the number rather than
+        // the address. Requiring both would exclude most of a phone's contact list.
+        .refine((entry) => Boolean(entry.email) || Boolean(entry.phone), {
+          message: 'Each guest needs either an email address or a phone number.',
+        }),
     )
-    .min(1, 'Add at least one address.')
+    .min(1, 'Add at least one person.')
     .max(emailConfig.maxInviteesPerRequest),
 });
 export type AddInviteesInput = z.infer<typeof addInviteesSchema>;

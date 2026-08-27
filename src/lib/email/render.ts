@@ -50,8 +50,8 @@ export function eventUrl(eventId: string): string {
  * rate limits, the anonymous bootstrap and the audit trail rather than inventing a second
  * way in — and it is the one URL that renders a preview when someone forwards it on.
  */
-export function joinUrl(joinCode: string): string {
-  return `${appConfig.siteUrl}${invitationPath(joinCode)}`;
+export function joinUrl(joinCode: string, guestToken?: string): string {
+  return `${appConfig.siteUrl}${invitationPath(joinCode, guestToken)}`;
 }
 
 interface Shell {
@@ -174,6 +174,8 @@ export interface RenderContext {
    * members yet; absent on a confirmation, whose recipient already is one.
    */
   joinCode?: string;
+  /** This guest's link token, so the view it produces has a name attached. */
+  guestToken?: string;
 }
 
 export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEmail {
@@ -187,11 +189,16 @@ export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEm
   }
 }
 
-function renderInvitation({ event, unsubscribeUrl, joinCode }: RenderContext): RenderedEmail {
+function renderInvitation({
+  event,
+  unsubscribeUrl,
+  joinCode,
+  guestToken,
+}: RenderContext): RenderedEmail {
   const occasion = occasionById(event.occasion);
   const template = templateById(event.templateId);
   const face = faceOf(template);
-  const url = joinCode ? joinUrl(joinCode) : eventUrl(event.id);
+  const url = joinCode ? joinUrl(joinCode, guestToken) : eventUrl(event.id);
 
   const bodyHtml = `
     <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">From ${escapeHtml(event.hostedBy)}</p>
@@ -226,11 +233,12 @@ function renderReminder({
   unsubscribeUrl,
   guestName,
   joinCode,
+  guestToken,
 }: RenderContext): RenderedEmail {
   const template = templateById(event.templateId);
   const face = faceOf(template);
   // A reminder goes to someone who has still not replied, so they are still not a member.
-  const url = joinCode ? joinUrl(joinCode) : eventUrl(event.id);
+  const url = joinCode ? joinUrl(joinCode, guestToken) : eventUrl(event.id);
   const greeting = guestName ? `${escapeHtml(guestName)}, we` : 'We';
 
   const bodyHtml = `

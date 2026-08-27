@@ -1,14 +1,16 @@
 import 'server-only';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { FieldValue } from 'firebase-admin/firestore';
-import { appConfig, collections, emailConfig, serverConfig } from '@/config';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
+import { appConfig, collections, commsConfig, emailConfig, serverConfig } from '@/config';
 import { entitlementsFor } from '@/lib/billing/entitlements';
 import { db } from '@/lib/firebase/admin';
 import { mailer } from '@/lib/email';
 import { renderEmail } from '@/lib/email/render';
 import { ApiError } from '@/lib/server/api';
 import { eventRef, readJoinCode } from '@/lib/services/events';
-import type { EventDoc, InviteeDoc, InviteeStatus } from '@/types/domain';
+import { recordAttempt } from '@/lib/services/delivery';
+import { normalizePhone } from '@/lib/phone';
+import type { CommsChannel, DeliveryState, EventDoc, InviteeDoc } from '@/types/domain';
 
 /**
  * The invitee list, and sending to it.
@@ -27,13 +29,37 @@ import type { EventDoc, InviteeDoc, InviteeStatus } from '@/types/domain';
  */
 
 /**
- * The address is the identity, so it is the document id — which makes "have we already got
- * this person?" a single get and makes double-adding impossible rather than merely
- * unlikely. Hashed because a raw address is not a safe Firestore id, and lower-cased
- * because `Sam@x.com` and `sam@x.com` are one guest.
+ * The id an address *used* to get.
+ *
+ * Kept because it is the document id of every invitee added before guests could have phone
+ * numbers, and because the unsubscribe link derives from the address rather than the id —
+ * an opt-out link in a mail sent last month has to keep working.
  */
-export function inviteeId(email: string): string {
+export function legacyInviteeId(email: string): string {
   return createHash('sha256').update(normalizeEmail(email)).digest('hex').slice(0, 32);
+}
+
+/**
+ * The id a new invitee gets: opaque, and deliberately not derived from anything.
+ *
+ * Deriving it from the address made "do we already have this person?" a single get, which
+ * was neat while an address was the only way to name someone. It also meant a guest who
+ * gave you a phone number and an email was two guests, and that a host could not correct a
+ * typo without losing everything recorded against it.
+ */
+function newInviteeId(): string {
+  return randomBytes(16).toString('hex');
+}
+
+/**
+ * The credential in a guest's personal invitation link.
+ *
+ * Stored rather than derived, unlike the unsubscribe token, because this one has to be
+ * revocable: a link that leaks into a group chat should be replaceable without invalidating
+ * every other guest's, which a shared pepper cannot do.
+ */
+export function mintLinkToken(): string {
+  return randomBytes(commsConfig.linkTokenBytes).toString('hex');
 }
 
 export function normalizeEmail(email: string): string {
@@ -77,42 +103,76 @@ export function unsubscribeUrl(eventId: string, email: string): string {
 export interface AddInviteesResult {
   added: number;
   duplicates: number;
-  /** Addresses refused because the guest previously unsubscribed. */
+  /** Refused because the guest previously opted out. */
   blocked: number;
+  /** Entries carrying neither a usable address nor a dialable number. */
+  invalid: number;
   total: number;
 }
 
+/** What the host is asking us to add. At least one of email or phone must survive parsing. */
+export interface InviteeInput {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
+/** The channel a guest is reachable on, given what we know about them. */
+function channelFor(email: string | null, phone: string | null): CommsChannel {
+  if (phone) return 'relay';
+  return email ? 'email' : 'relay';
+}
+
 /**
- * Adds addresses to an event's list. Idempotent: re-pasting the same block adds nobody
- * twice and reports how many were already there.
+ * Adds guests to an event's list.
+ *
+ * Idempotent by *person*, not by address: someone already on the list by email who is now
+ * pasted in with a phone number gains the number rather than becoming a second guest. That
+ * is the whole reason the document id stopped being a hash of the address.
+ *
+ * The existing list is read once up front. The previous version did a `get` per entry
+ * inside the loop, which made pasting a hundred addresses a hundred round trips.
  */
 export async function addInvitees(
   event: EventDoc,
-  entries: { email: string; name: string }[],
+  entries: InviteeInput[],
 ): Promise<AddInviteesResult> {
   if (entries.length > emailConfig.maxInviteesPerRequest) {
     throw new ApiError(
       'bad_request',
-      `That is more than ${emailConfig.maxInviteesPerRequest} addresses at once. Add them in smaller batches.`,
+      `That is more than ${emailConfig.maxInviteesPerRequest} people at once. Add them in smaller batches.`,
     );
   }
 
-  const existing = await inviteesRef(event.id).count().get();
+  const existing = await listInvitees(event.id);
   const cap = Math.min(entitlementsFor(event.plan).maxGuests, emailConfig.maxInviteesPerEvent);
 
-  // Deduplicate within the request before counting against the cap, so pasting the same
-  // address three times does not consume three slots.
-  const unique = new Map<string, { email: string; name: string }>();
-  for (const entry of entries) {
-    const normalized = normalizeEmail(entry.email);
-    if (!unique.has(normalized)) unique.set(normalized, { email: normalized, name: entry.name });
-  }
+  const byEmail = new Map(existing.filter((i) => i.email).map((i) => [i.email as string, i]));
+  const byPhone = new Map(existing.filter((i) => i.phone).map((i) => [i.phone as string, i]));
 
-  if (existing.data().count + unique.size > cap) {
-    throw new ApiError(
-      'conflict',
-      `That would take the list past ${cap} guests, which is this event's limit.`,
-    );
+  let invalid = 0;
+
+  // Normalise and collapse the request against itself first, so pasting the same person
+  // three times does not consume three slots against the cap.
+  const unique = new Map<string, InviteeInput & { email: string | null; phone: string | null }>();
+  for (const entry of entries) {
+    const email = entry.email ? normalizeEmail(entry.email) : null;
+    const phone = entry.phone ? normalizePhone(entry.phone) : null;
+
+    if (!email && !phone) {
+      invalid += 1;
+      continue;
+    }
+
+    const key = email ?? (phone as string);
+    const already = unique.get(key);
+    if (already) {
+      // Two lines for one person — take whichever detail each line carried.
+      already.email ??= email;
+      already.phone ??= phone;
+      continue;
+    }
+    unique.set(key, { name: entry.name, email, phone });
   }
 
   let added = 0;
@@ -120,56 +180,147 @@ export async function addInvitees(
   let blocked = 0;
   const now = Date.now();
   const batch = db().batch();
+  let pendingNew = 0;
 
   for (const entry of unique.values()) {
-    const reference = inviteesRef(event.id).doc(inviteeId(entry.email));
-    const snapshot = await reference.get();
+    const match =
+      (entry.email ? byEmail.get(entry.email) : undefined) ??
+      (entry.phone ? byPhone.get(entry.phone) : undefined);
 
-    if (snapshot.exists) {
+    if (match) {
       // Someone who opted out stays opted out. Re-adding them must not undo that.
-      if ((snapshot.data() as InviteeDoc).status === 'unsubscribed') blocked += 1;
-      else duplicates += 1;
+      if (match.status === 'unsubscribed') {
+        blocked += 1;
+        continue;
+      }
+
+      // Known person, new detail — fill the gap rather than adding them again.
+      const gained: Record<string, unknown> = {};
+      if (entry.email && !match.email) gained.email = entry.email;
+      if (entry.phone && !match.phone) gained.phone = entry.phone;
+      if (entry.name && !match.name) gained.name = entry.name;
+
+      if (Object.keys(gained).length > 0) {
+        batch.update(inviteesRef(event.id).doc(match.id), gained);
+      }
+      duplicates += 1;
       continue;
     }
 
+    if (existing.length + pendingNew >= cap) {
+      throw new ApiError(
+        'conflict',
+        `That would take the list past ${cap} guests, which is this event's limit.`,
+      );
+    }
+
+    const reference = inviteesRef(event.id).doc(newInviteeId());
     const invitee: InviteeDoc = {
       id: reference.id,
-      email: entry.email,
       name: entry.name,
+      email: entry.email,
+      phone: entry.phone,
+      channel: channelFor(entry.email, entry.phone),
+      token: mintLinkToken(),
       status: 'pending',
+      statusAt: now,
       addedAt: now,
       lastSentAt: null,
       sendCount: 0,
       lastError: null,
+      firstViewedAt: null,
+      lastViewedAt: null,
+      viewCount: 0,
+      repliedAt: null,
     };
     batch.set(reference, invitee);
     added += 1;
+    pendingNew += 1;
   }
 
   await batch.commit();
-  return { added, duplicates, blocked, total: existing.data().count + added };
+  return { added, duplicates, blocked, invalid, total: existing.length + added };
 }
 
+/**
+ * The guest list, with anything a older document is missing filled in.
+ *
+ * Invitees added before guests had phone numbers have no link token, and without one they
+ * cannot be tracked or sent a personal link. Rather than a migration script and a
+ * maintenance window, the gap is closed the first time the list is read — and only written
+ * back when something was actually missing, so the common case stays read-only.
+ */
 export async function listInvitees(eventId: string): Promise<InviteeDoc[]> {
   const snapshot = await inviteesRef(eventId)
     .orderBy('addedAt', 'asc')
     .limit(emailConfig.maxInviteesPerEvent)
     .get();
-  return snapshot.docs.map((doc) => doc.data() as InviteeDoc);
+
+  const batch = db().batch();
+  let repairs = 0;
+
+  const invitees = snapshot.docs.map((doc) => {
+    const raw = doc.data() as Partial<InviteeDoc> & { email?: string | null };
+    const patch: Record<string, unknown> = {};
+
+    if (typeof raw.token !== 'string') patch.token = mintLinkToken();
+    if (raw.phone === undefined) patch.phone = null;
+    if (raw.channel === undefined) patch.channel = channelFor(raw.email ?? null, null);
+    if (raw.statusAt === undefined) patch.statusAt = raw.addedAt ?? Date.now();
+    if (raw.viewCount === undefined) patch.viewCount = 0;
+    if (raw.firstViewedAt === undefined) patch.firstViewedAt = null;
+    if (raw.lastViewedAt === undefined) patch.lastViewedAt = null;
+    if (raw.repliedAt === undefined) patch.repliedAt = null;
+
+    if (Object.keys(patch).length > 0) {
+      batch.update(doc.ref, patch);
+      repairs += 1;
+    }
+
+    return { ...raw, ...patch, id: doc.id } as InviteeDoc;
+  });
+
+  if (repairs > 0) await batch.commit();
+  return invitees;
+}
+
+/** One guest, by the token their personal link carries. */
+export async function findInviteeByToken(
+  eventId: string,
+  token: string,
+): Promise<InviteeDoc | null> {
+  const snapshot = await inviteesRef(eventId).where('token', '==', token).limit(1).get();
+  const doc = snapshot.docs[0];
+  return doc ? { ...(doc.data() as InviteeDoc), id: doc.id } : null;
 }
 
 export async function removeInvitee(eventId: string, id: string): Promise<void> {
   await inviteesRef(eventId).doc(id).delete();
 }
 
-/** Marks an address as opted out. Permanent, and survives being re-added. */
+/**
+ * Marks an address as opted out. Permanent, and survives being re-added.
+ *
+ * When the address is not on the list — a host who already tidied them away — a tombstone
+ * is written under the legacy address-derived id anyway. Recording the decision matters
+ * more than tidiness, and deriving the id keeps a second unsubscribe idempotent.
+ */
 export async function unsubscribe(eventId: string, email: string): Promise<void> {
-  await inviteesRef(eventId)
-    .doc(inviteeId(email))
-    .set(
-      { status: 'unsubscribed' satisfies InviteeStatus, unsubscribedAt: Date.now() },
-      { merge: true },
-    );
+  const normalized = normalizeEmail(email);
+  const now = Date.now();
+
+  const found = await inviteesRef(eventId).where('email', '==', normalized).limit(1).get();
+  const reference = found.docs[0]?.ref ?? inviteesRef(eventId).doc(legacyInviteeId(normalized));
+
+  await reference.set(
+    {
+      email: normalized,
+      status: 'unsubscribed' satisfies DeliveryState,
+      statusAt: now,
+      unsubscribedAt: now,
+    },
+    { merge: true },
+  );
 }
 
 export interface SendSummary {
@@ -203,7 +354,9 @@ export async function sendToInvitees(
   const joinCode = await readJoinCode(event.id);
 
   for (const invitee of invitees) {
-    if (!isEligible(invitee, kind, repliedAddresses, now)) {
+    // A guest added by phone alone is reachable, just not by us and not yet — the host
+    // sends them their link from the relay panel. Skipping them here is not a failure.
+    if (!invitee.email || !isEligible(invitee, kind, repliedAddresses, now)) {
       summary.skipped += 1;
       continue;
     }
@@ -213,6 +366,8 @@ export async function sendToInvitees(
       unsubscribeUrl: unsubscribeUrl(event.id, invitee.email),
       guestName: invitee.name || undefined,
       joinCode,
+      // Their own link, so the view it produces has a name attached to it.
+      guestToken: invitee.token,
     });
 
     summary.attempted += 1;
@@ -228,17 +383,14 @@ export async function sendToInvitees(
       eventId: event.id,
     });
 
-    // Loosely typed because sendCount is a FieldValue increment, not a number.
-    const update: Record<string, unknown> = result.ok
-      ? {
-          status: 'sent' satisfies InviteeStatus,
-          lastSentAt: now,
-          sendCount: FieldValue.increment(1),
-          lastError: null,
-        }
-      : { status: 'failed' satisfies InviteeStatus, lastError: result.error ?? 'Send failed.' };
+    await recordAttempt(event.id, invitee, {
+      channel: 'email',
+      kind,
+      ok: result.ok,
+      providerMessageId: result.id ?? null,
+      error: result.error ?? null,
+    });
 
-    await inviteesRef(event.id).doc(invitee.id).update(update);
     if (result.ok) summary.sent += 1;
     else summary.failed += 1;
   }
@@ -259,7 +411,7 @@ function isEligible(
     return invitee.status === 'pending' || invitee.status === 'failed';
   }
 
-  if (repliedAddresses.has(invitee.email)) return false;
+  if (invitee.email && repliedAddresses.has(invitee.email)) return false;
   if (invitee.lastSentAt !== null && now - invitee.lastSentAt < emailConfig.reminderCooldownMs) {
     return false;
   }

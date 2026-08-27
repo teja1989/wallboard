@@ -1,4 +1,6 @@
 import type {
+  CommsChannel,
+  DeliveryState,
   EventRole,
   TemplateId,
   OccasionId,
@@ -9,7 +11,17 @@ import type {
 } from '@/config';
 
 // Re-exported so consumers can import domain, role and plan types from one place.
-export type { EventRole, TemplateId, OccasionId, PlanId, PlatformRole, PostKind, RsvpStatus };
+export type {
+  CommsChannel,
+  DeliveryState,
+  EventRole,
+  TemplateId,
+  OccasionId,
+  PlanId,
+  PlatformRole,
+  PostKind,
+  RsvpStatus,
+};
 
 /**
  * Wire-shaped domain types. Timestamps are epoch milliseconds so the same object
@@ -198,20 +210,70 @@ export interface UserDoc {
   suspendedReason: string | null;
 }
 
-/** Where an invited address currently stands. */
-export type InviteeStatus = 'pending' | 'sent' | 'failed' | 'unsubscribed';
-
+/**
+ * Someone the host means to invite.
+ *
+ * The id used to be a hash of the email address, because the address *was* the identity.
+ * People know each other by phone at least as often as by email, so identity is now the
+ * document itself: an opaque id, with an address, a number, or both hanging off it. That
+ * also means a guest can gain a phone later without becoming a second guest.
+ */
 export interface InviteeDoc {
-  /** A hash of the address — the address itself is the identity, so it is the id. */
+  /** Opaque. Deliberately not derived from any address — see above. */
   id: string;
-  email: string;
   name: string;
-  status: InviteeStatus;
+  email: string | null;
+  /** E.164. Normalised on the way in, so it is dialable or it is not stored. */
+  phone: string | null;
+  /** How the host means to reach them. `relay` is the host sending it themselves. */
+  channel: CommsChannel;
+
+  /**
+   * The credential in this guest's personal invitation link.
+   *
+   * It is what makes "who opened it?" answerable at all — without it every recipient shares
+   * one link and every view is anonymous. Minted on add, and lazily for rows that predate
+   * it, so no migration was needed.
+   */
+  token: string;
+
+  /** How far the invitation got. Denormalised from the timeline so the list is one read. */
+  status: DeliveryState;
+  statusAt: number;
+
   addedAt: number;
   lastSentAt: number | null;
   sendCount: number;
   lastError: string | null;
   unsubscribedAt?: number;
+
+  /** Set by the view beacon, never by a server-side fetch. See `recordView`. */
+  firstViewedAt: number | null;
+  lastViewedAt: number | null;
+  viewCount: number;
+  repliedAt: number | null;
+}
+
+/**
+ * One attempt to reach one guest, and what became of it.
+ *
+ * Lives at `invitees/{inviteeId}/deliveries/{id}` and is read only when the host opens a
+ * single guest. The current state is denormalised onto the invitee precisely so that the
+ * common case — drawing a list of two hundred guests — does not fan out into two hundred
+ * subcollection reads.
+ */
+export interface DeliveryDoc {
+  id: string;
+  channel: CommsChannel;
+  /** 'invitation' or 'reminder'. */
+  kind: string;
+  state: DeliveryState;
+  /** Every transition, in order, so a host can see when each thing happened. */
+  history: { state: DeliveryState; at: number; detail?: string }[];
+  /** The provider's id, for reconciling a webhook against the attempt that caused it. */
+  providerMessageId: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface AuditLogDoc {

@@ -296,6 +296,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       <HostPanel
         eventId={eventId}
         title={event.title}
+        hostedBy={event.hostedBy || event.hostName}
         plan={event.plan}
         open={hostPanelOpen}
         onClose={() => setHostPanelOpen(false)}

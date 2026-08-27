@@ -340,6 +340,32 @@ describe('the invitee list', () => {
       }),
     );
   });
+
+  /**
+   * The link token identifies one guest, and it is the credential their personal
+   * invitation link carries. Readable tokens would let anyone holding the code mark other
+   * people as having seen the invitation — and would turn the guest list into something
+   * that could be enumerated a person at a time.
+   */
+  it('never exposes a guest link token', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'abc123')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'invitees')));
+  });
+
+  /**
+   * The delivery history hangs off each guest. A rule written only for the parent document
+   * would leave these children wide open, which is why the rule uses a recursive wildcard.
+   */
+  it('keeps the delivery history shut too', async () => {
+    const path = ['events', EVENT_ID, 'invitees', 'abc123', 'deliveries', 'd1'] as const;
+
+    await assertFails(getDoc(doc(member(), ...path)));
+    await assertFails(getDoc(doc(staff('owner'), ...path)));
+    await assertFails(
+      getDocs(collection(member(), 'events', EVENT_ID, 'invitees', 'abc123', 'deliveries')),
+    );
+    await assertFails(setDoc(doc(member(), ...path), { state: 'seen' }));
+  });
 });
 
 describe('the mail outbox', () => {

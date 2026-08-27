@@ -567,7 +567,7 @@ test.describe('the invitation and RSVP', () => {
   });
 });
 
-test.describe('email invitations', () => {
+test.describe('inviting people', () => {
   test('a host builds a list, sends it, and does not send twice', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Email journey');
@@ -577,21 +577,42 @@ test.describe('email invitations', () => {
     await page.getByRole('button', { name: /host controls/i }).click();
 
     const panel = page.getByRole('dialog', { name: /host controls/i });
-    await panel.getByLabel('Email addresses').fill(`Priya Sharma <${guest}>`);
+    await panel.getByLabel(/phone numbers or email addresses/i).fill(`Priya Sharma <${guest}>`);
     await panel.getByRole('button', { name: /^add/i }).click();
 
     await expect(panel.getByText('Priya Sharma')).toBeVisible();
     await expect(panel.getByText('Not sent')).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
-    await panel.getByRole('button', { name: /send to 1 unsent/i }).click();
+    await panel.getByRole('button', { name: /email 1 unsent/i }).click();
     await expect(panel.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
 
     // The invitation goes once; that is what the nudge button is for.
-    await expect(panel.getByRole('button', { name: /send to 0 unsent/i })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: /email 0 unsent/i })).toBeDisabled();
   });
 
-  test('nothing that is not an address gets added', async ({ page }) => {
+  test('a guest can be added by phone number alone', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Phone journey');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByLabel(/phone numbers or email addresses/i).fill('Lee Nakamura <+14155550161>');
+    await panel.getByRole('button', { name: /^add/i }).click();
+
+    await expect(panel.getByText('Lee Nakamura')).toBeVisible();
+    // Normalised on the way in, so it is dialable or it is not stored.
+    await expect(panel.getByText('+14155550161')).toBeVisible();
+
+    // Nobody can be emailed, so the email buttons have nothing to offer.
+    await expect(panel.getByRole('button', { name: /email .* unsent/i })).toHaveCount(0);
+    // But the host can still send it themselves, which is the whole point.
+    await expect(panel.getByRole('button', { name: /copy every message/i })).toBeEnabled();
+  });
+
+  test('nothing that is not a contact gets added', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Bad addresses');
 
@@ -599,9 +620,48 @@ test.describe('email invitations', () => {
     await page.getByRole('button', { name: /host controls/i }).click();
 
     const panel = page.getByRole('dialog', { name: /host controls/i });
-    await panel.getByLabel('Email addresses').fill('please invite everyone');
-    await expect(panel.getByText(/no email addresses found/i)).toBeVisible();
+    await panel.getByLabel(/phone numbers or email addresses/i).fill('please invite everyone');
+    await expect(panel.getByText(/no numbers or addresses found/i)).toBeVisible();
     await expect(panel.getByRole('button', { name: /^add/i })).toBeDisabled();
+  });
+
+  /**
+   * The feature the whole phase exists for. Every guest gets their own link, and opening it
+   * in a real browser — the only thing that runs the beacon — is what moves them to "Seen".
+   */
+  test('the host sees when a guest has opened their invitation', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Watch it land');
+    const guest = uniqueEmail('guest');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+
+    await panel.getByLabel(/phone numbers or email addresses/i).fill(`Ada Lovelace <${guest}>`);
+    await panel.getByRole('button', { name: /^add/i }).click();
+    await expect(panel.getByText('Ada Lovelace')).toBeVisible();
+    await expect(panel.getByText('Not sent')).toBeVisible();
+
+    // Take the guest's own link straight from the API the panel reads.
+    const link = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/events/${id}/invites`, { credentials: 'same-origin' });
+      const body = await response.json();
+      const invitee = body.data.invitees[0];
+      return `/i/${body.data.joinCode}?g=${invitee.token}`;
+    }, eventId);
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(link);
+    // The beacon fires after hydration; give it a moment to land.
+    await guestPage.waitForTimeout(1500);
+    await guestContext.close();
+
+    await page.reload();
+    await page.getByRole('button', { name: /host controls/i }).click();
+    const reopened = page.getByRole('dialog', { name: /host controls/i });
+    await expect(reopened.getByText('Seen', { exact: true })).toBeVisible({ timeout: 20_000 });
   });
 });
 
