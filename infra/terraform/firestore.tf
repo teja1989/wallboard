@@ -68,6 +68,27 @@ locals {
         { path = "joinedAt", order = "ASCENDING" },
       ]
     }
+    # The active-event limit checked when a host creates one: equality on host and
+    # status, range on expiry. The range field has to come last, which is why the
+    # events_by_host index above cannot serve it — and why creating an event returned
+    # a 500 in production while passing every test, since the emulator does not
+    # enforce composite indexes at all.
+    events_active_for_host = {
+      collection = "events"
+      fields = [
+        { path = "hostUid", order = "ASCENDING" },
+        { path = "status", order = "ASCENDING" },
+        { path = "expiresAt", order = "ASCENDING" },
+      ]
+    }
+    # The cleanup sweep looking for live events old enough to have abandoned uploads.
+    events_stale_live = {
+      collection = "events"
+      fields = [
+        { path = "status", order = "ASCENDING" },
+        { path = "createdAt", order = "ASCENDING" },
+      ]
+    }
     events_for_host = {
       collection = "events"
       fields = [

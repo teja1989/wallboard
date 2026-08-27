@@ -52,6 +52,20 @@ resource "google_identity_platform_config" "auth" {
       # credential to store, leak and reset.
       password_required = false
     }
+
+    /**
+     * Guests.
+     *
+     * Not an afterthought — it is how everybody who is *not* the host uses the product.
+     * A visitor arriving from a shared code is signed in anonymously so their Firestore
+     * listener has an identity to authorize, and so that redeeming a code is one tap with
+     * no account. Describing sign-in methods here at all turns off whatever is not listed,
+     * so leaving this out disabled it: every guest hit `auth/admin-restricted-operation`
+     * and could not open an invitation at all.
+     */
+    anonymous {
+      enabled = true
+    }
   }
 
   # Redirect targets Firebase will honour for the sign-in link. Anything not

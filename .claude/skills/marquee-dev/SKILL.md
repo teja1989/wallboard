@@ -184,6 +184,18 @@ to change one of them.
 - **Canvas encoding is best-effort.** `toBlob` can return null, WebP support is not
   universal, and a huge image can exceed the variant's byte cap. `media-probe.ts` returns
   whatever succeeded and the upload claims only that.
+- **The emulator does not enforce composite indexes. Production does.** Any query combining
+  an equality with a range, or ordering by a field it also filters on, needs an entry in
+  _both_ `firestore.indexes.json` and `infra/terraform/firestore.tf` — and no test will ever
+  tell you, because every suite here runs against the emulator, which happily answers a
+  query no index could serve. This shipped a 500 on event creation that passed 36 e2e tests.
+  After adding or changing a `.where()` chain, list the queries and check them off by hand.
+- **The range field goes last in the index.** `hostUid == && status == && expiresAt >` needs
+  `(hostUid, status, expiresAt)`. An index of `(hostUid, status, createdAt)` looks close
+  enough to be mistaken for it and serves nothing.
+- **`google_identity_platform_config` turns off what it does not list.** Describing sign-in
+  methods there is a complete declaration, not a set of additions — omitting `anonymous`
+  disabled it, and with it every guest joining by code.
 - **Do not put an auth gate in front of the create form.** It was there once and it is the
   wall every prospective host hits before seeing anything. The gate belongs at publish;
   `event-draft.ts` is what makes that survive the email-link round trip. Anything new that
