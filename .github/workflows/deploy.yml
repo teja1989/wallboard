@@ -120,10 +120,15 @@ jobs:
             echo "owner_emails = \"${{ vars.OWNER_EMAILS }}\""
             echo "site_url = \"${{ vars.SITE_URL }}\""
             echo "google_sign_in = ${{ vars.GOOGLE_SIGN_IN || 'false' }}"
+            echo "google_oauth_client_id = \"${{ vars.GOOGLE_OAUTH_CLIENT_ID }}\""
+            # A secret, so it comes from secrets rather than vars and never appears in the
+            # printed tfvars below.
+            echo "google_oauth_client_secret = \"${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}\""
             echo "billing_account = \"${{ vars.GCP_BILLING_ACCOUNT }}\""
             echo "budget_alert_emails = \"${{ vars.BUDGET_ALERT_EMAILS }}\""
           } > infra/terraform/ci.auto.tfvars
-          cat infra/terraform/ci.auto.tfvars
+          # Everything except the OAuth secret, which this step now writes.
+          grep -v 'client_secret' infra/terraform/ci.auto.tfvars
 
       - name: Terraform plan
         if: ${{ inputs.plan_only }}

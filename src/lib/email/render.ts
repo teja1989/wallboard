@@ -1,4 +1,5 @@
 import 'server-only';
+import { invitationPath } from '@/lib/codes-format';
 import { appConfig, brand, emailSubjects, faceOf, occasionById, templateById } from '@/config';
 import { formatEventDate } from '@/lib/utils';
 import type { EmailKind } from '@/config';
@@ -35,6 +36,22 @@ function escapeHtml(value: string): string {
 
 export function eventUrl(eventId: string): string {
   return `${appConfig.siteUrl}/e/${eventId}`;
+}
+
+/**
+ * Where an invitation actually has to point.
+ *
+ * `/e/{id}` is the event, and the event turns away anyone who is not already a member —
+ * which is every single recipient of an invitation. Sending them there made the button in
+ * the message a dead end and the line beneath it ("no account, no app") a lie.
+ *
+ * The code is the credential, as it is everywhere else in the product; the email is a
+ * private channel to one named address. Redeeming through the invitation route reuses the
+ * rate limits, the anonymous bootstrap and the audit trail rather than inventing a second
+ * way in — and it is the one URL that renders a preview when someone forwards it on.
+ */
+export function joinUrl(joinCode: string): string {
+  return `${appConfig.siteUrl}${invitationPath(joinCode)}`;
 }
 
 interface Shell {
@@ -152,6 +169,11 @@ export interface RenderContext {
   unsubscribeUrl?: string;
   /** The guest's name, when we know it. */
   guestName?: string;
+  /**
+   * The event's join code. Present on invitations and reminders, whose recipients are not
+   * members yet; absent on a confirmation, whose recipient already is one.
+   */
+  joinCode?: string;
 }
 
 export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEmail {
@@ -165,11 +187,11 @@ export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEm
   }
 }
 
-function renderInvitation({ event, unsubscribeUrl }: RenderContext): RenderedEmail {
+function renderInvitation({ event, unsubscribeUrl, joinCode }: RenderContext): RenderedEmail {
   const occasion = occasionById(event.occasion);
   const template = templateById(event.templateId);
   const face = faceOf(template);
-  const url = eventUrl(event.id);
+  const url = joinCode ? joinUrl(joinCode) : eventUrl(event.id);
 
   const bodyHtml = `
     <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">From ${escapeHtml(event.hostedBy)}</p>
@@ -199,10 +221,16 @@ ${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}`
   };
 }
 
-function renderReminder({ event, unsubscribeUrl, guestName }: RenderContext): RenderedEmail {
+function renderReminder({
+  event,
+  unsubscribeUrl,
+  guestName,
+  joinCode,
+}: RenderContext): RenderedEmail {
   const template = templateById(event.templateId);
   const face = faceOf(template);
-  const url = eventUrl(event.id);
+  // A reminder goes to someone who has still not replied, so they are still not a member.
+  const url = joinCode ? joinUrl(joinCode) : eventUrl(event.id);
   const greeting = guestName ? `${escapeHtml(guestName)}, we` : 'We';
 
   const bodyHtml = `

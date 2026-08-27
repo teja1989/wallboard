@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase/admin';
 import { mailer } from '@/lib/email';
 import { renderEmail } from '@/lib/email/render';
 import { ApiError } from '@/lib/server/api';
-import { eventRef } from '@/lib/services/events';
+import { eventRef, readJoinCode } from '@/lib/services/events';
 import type { EventDoc, InviteeDoc, InviteeStatus } from '@/types/domain';
 
 /**
@@ -198,6 +198,10 @@ export async function sendToInvitees(
   const now = Date.now();
   const summary: SendSummary = { attempted: 0, sent: 0, failed: 0, skipped: 0 };
 
+  // Read once, not per recipient. The message has to carry the code: everyone on this list
+  // is by definition not a member yet, and the event itself turns non-members away.
+  const joinCode = await readJoinCode(event.id);
+
   for (const invitee of invitees) {
     if (!isEligible(invitee, kind, repliedAddresses, now)) {
       summary.skipped += 1;
@@ -208,6 +212,7 @@ export async function sendToInvitees(
       event,
       unsubscribeUrl: unsubscribeUrl(event.id, invitee.email),
       guestName: invitee.name || undefined,
+      joinCode,
     });
 
     summary.attempted += 1;

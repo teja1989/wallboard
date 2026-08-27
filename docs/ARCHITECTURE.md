@@ -13,7 +13,7 @@ Browser ──┬─ Next.js pages (RSC + client components)
 ```
 
 One event, three surfaces — invitation, wall and guest list — served from one page and one
-Firestore document tree. Five ideas carry most of the design.
+Firestore document tree. Six ideas carry most of the design.
 
 ### 1. Writes are server-only; reads can be direct
 
@@ -64,7 +64,29 @@ signing in for some other reason must never send someone's half-written invitati
 Opening that door removed the only sign-in surface the app had, which is what `/signin` is
 for: a host with a new phone needs a way back to invitations they already own.
 
-### 4. Answers are public, notes are not
+### 4. The invitation link is `/i/{code}`, and it previews
+
+`/e/{id}` is the event and it turns away non-members — which is every recipient of an
+invitation. Both the emailed button and the share sheet pointed there, so a shared
+invitation was a dead end for its whole audience while promising "one tap, no account, no
+app".
+
+The shareable link is now `/i/{code}`: it redeems on arrival and opens the invitation. The
+code is the credential everywhere else in the product, and putting it in the path rather
+than a query string keeps it out of `Referer` headers and lets the route render a preview.
+
+That preview is the point. Almost nobody arrives from a search result; they arrive because
+someone they know pasted a link, and a card carrying the event's name, date and palette
+converts a multiple of what a naked URL does. It is generated per event with `next/og`, in
+the event's own template colours — which is why `oklchToHex` exists, since Satori cannot
+read the `oklch()` the palettes are authored in.
+
+A preview is fetched by an unauthenticated crawler and cached by servers nobody here
+controls, so it carries only what the link already grants its holder: title, host, date.
+Never the guest list, the wall, or the code itself. And never indexed — a private
+invitation in a search result is a failure however good the card looks.
+
+### 5. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -81,7 +103,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 5. Media never touches the app server
+### 6. Media never touches the app server
 
 Uploading is a two-step handshake:
 

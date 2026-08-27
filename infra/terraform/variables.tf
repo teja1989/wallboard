@@ -44,11 +44,29 @@ variable "site_url" {
   default     = ""
 }
 
+variable "google_oauth_client_id" {
+  description = <<-EOT
+    OAuth 2.0 Web client ID for Google sign-in. Creating the client and its consent screen
+    is console work Terraform has no API for; wiring the result up is not, and doing it
+    here rather than by clicking in the Firebase console keeps the next apply from being
+    the thing that quietly reverts it.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Secret for that client. Comes from a GitHub Secret, never a variable."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "google_sign_in" {
   description = <<-EOT
-    Whether to offer the Google button. Needs an OAuth client and a configured
-    consent screen, which is console work Terraform cannot do — so this stays
-    false until that exists and the app offers the email link alone.
+    Whether to offer the Google button. Requires the OAuth client above: turning this on
+    without one puts a button on the page that fails with `auth/operation-not-allowed` the
+    first time anyone presses it, so the two are checked together at plan time.
   EOT
   type        = bool
   default     = false

@@ -65,25 +65,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // deciding "nobody is signed in" while one of them is still catching up.
   const [sessionChecked, setSessionChecked] = useState(false);
   const [firebaseChecked, setFirebaseChecked] = useState(false);
-  const exchangingRef = useRef(false);
+  /**
+   * The exchange in flight, if there is one.
+   *
+   * A boolean here used to mean "someone else is doing it, so return" — and returning
+   * early is a lie to the caller, who awaited this precisely to know the cookie exists.
+   * Holding the promise lets concurrent callers join the same exchange and all wait for
+   * the real answer, which is what they each asked for.
+   */
+  const exchangeRef = useRef<Promise<void> | null>(null);
+  /** Whether a server session is known to exist, without waiting on a re-render. */
+  const sessionRef = useRef(false);
 
   /** Trades the current ID token for a server session cookie. */
-  const exchangeSession = useCallback(async (nextUser: User | null) => {
+  const exchangeSession = useCallback(async (nextUser: User | null): Promise<void> => {
     if (!nextUser) {
+      sessionRef.current = false;
       setActor(null);
       return;
     }
-    if (exchangingRef.current) return;
-    exchangingRef.current = true;
-    try {
-      const idToken = await nextUser.getIdToken();
-      const result = await api.post<{ actor: Actor | null }>('/api/session', { idToken });
-      setActor(result.actor);
-    } catch {
-      setActor(null);
-    } finally {
-      exchangingRef.current = false;
-    }
+    if (exchangeRef.current) return exchangeRef.current;
+
+    const run = (async () => {
+      try {
+        const idToken = await nextUser.getIdToken();
+        const result = await api.post<{ actor: Actor | null }>('/api/session', { idToken });
+        sessionRef.current = result.actor !== null;
+        setActor(result.actor);
+      } catch {
+        sessionRef.current = false;
+        setActor(null);
+      }
+    })().finally(() => {
+      exchangeRef.current = null;
+    });
+
+    exchangeRef.current = run;
+    return run;
   }, []);
 
   /**
@@ -101,7 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const result = await api.get<{ actor: Actor | null }>('/api/session');
-        if (!cancelled && result.actor) setActor(result.actor);
+        if (!cancelled && result.actor) {
+          sessionRef.current = true;
+          setActor(result.actor);
+        }
       } catch {
         // No session, or it has expired. Either way there is nobody to restore.
       } finally {
@@ -131,17 +152,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * No-op when the visitor already has an identity, from either source. Callers invoke
    * this on page load, so it must never replace a real account with a guest one.
    */
+  /**
+   * Resolves only once the caller can actually make an authorized request.
+   *
+   * `signInAnonymously` creates the Firebase user; the *cookie* every API route checks is
+   * minted separately, by the token listener. Awaiting only the former returned before
+   * there was a session, so anything that called this and immediately posted raced its own
+   * sign-in and got a 401 — invisible wherever a human pauses to type, and reliable on any
+   * page that redeems on arrival.
+   */
   const signInAsGuest = useCallback(async () => {
-    if (clientAuth().currentUser) return;
-    const existing = await api
-      .get<{ actor: Actor | null }>('/api/session')
-      .catch(() => ({ actor: null }));
-    if (existing.actor) {
-      setActor(existing.actor);
-      return;
+    if (sessionRef.current) return;
+
+    const current = clientAuth().currentUser;
+    if (!current) {
+      const existing = await api
+        .get<{ actor: Actor | null }>('/api/session')
+        .catch(() => ({ actor: null }));
+      if (existing.actor) {
+        sessionRef.current = true;
+        setActor(existing.actor);
+        return;
+      }
     }
-    await signInAnonymously(clientAuth());
-  }, []);
+
+    const credential = current ?? (await signInAnonymously(clientAuth())).user;
+    await exchangeSession(credential);
+  }, [exchangeSession]);
 
   /**
    * Upgrades in place when there is an anonymous session to preserve. Firebase rejects the

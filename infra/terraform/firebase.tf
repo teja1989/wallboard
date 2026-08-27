@@ -69,3 +69,36 @@ resource "google_identity_platform_config" "auth" {
     google_project_service.this,
   ]
 }
+
+/**
+ * Google as a sign-in provider.
+ *
+ * Only created once a client exists. Google sign-in is one tap where the email link is a
+ * round trip through an inbox, so it is the single biggest conversion difference available
+ * on the way in — and it removes email deliverability from the critical path of somebody
+ * simply trying to sign in.
+ */
+resource "google_identity_platform_default_supported_idp_config" "google" {
+  count = var.google_oauth_client_id != "" ? 1 : 0
+
+  provider      = google-beta
+  project       = var.project_id
+  enabled       = true
+  idp_id        = "google.com"
+  client_id     = var.google_oauth_client_id
+  client_secret = var.google_oauth_client_secret
+
+  depends_on = [google_identity_platform_config.auth]
+}
+
+# Fail at plan time rather than shipping a button nobody can use.
+resource "terraform_data" "google_sign_in_guard" {
+  count = var.google_sign_in && var.google_oauth_client_id == "" ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = false
+      error_message = "google_sign_in is true but google_oauth_client_id is empty. Set GOOGLE_OAUTH_CLIENT_ID and the GOOGLE_OAUTH_CLIENT_SECRET secret, or leave GOOGLE_SIGN_IN false."
+    }
+  }
+}

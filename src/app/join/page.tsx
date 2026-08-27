@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { joinCodeConfig } from '@/config';
@@ -13,30 +13,61 @@ import type { EventPreview } from '@/types/domain';
 /**
  * Code entry. Signing in as a guest happens silently on mount so that redeeming a code is
  * a single action — the visitor types eight characters and lands on the wall.
+ *
+ * `?code=` is how an emailed invitation arrives. The whole promise of that message is "one
+ * tap, no account, no app", so a recipient who followed it should not then be asked to
+ * copy eight characters out of the URL they just clicked: the code is filled in and
+ * redeemed for them, and they land on the invitation. If it fails — a rotated code, an
+ * ended event — the form is right there with the reason.
  */
 export default function JoinPage() {
   const router = useRouter();
+  const params = useSearchParams();
   const { signInAsGuest, loading } = useAuth();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => params.get('code') ?? '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const autoRedeemed = useRef(false);
 
   useEffect(() => {
     if (!loading) void signInAsGuest();
   }, [loading, signInAsGuest]);
 
-  async function handleSubmit(event: FormEvent) {
+  const redeem = useCallback(
+    async (value: string) => {
+      setError(null);
+      setSubmitting(true);
+      try {
+        await signInAsGuest();
+        const result = await api.post<{ event: EventPreview }>('/api/events/join', {
+          code: value,
+        });
+        router.push(`/e/${result.event.id}`);
+      } catch (caught) {
+        setError(errorMessage(caught, 'That code did not work.'));
+        setSubmitting(false);
+      }
+    },
+    [router, signInAsGuest],
+  );
+
+  // Arriving from an invitation: redeem what the link carried, once.
+  useEffect(() => {
+    if (loading || autoRedeemed.current) return;
+    const fromLink = params.get('code');
+    if (!fromLink || fromLink.replace(/-/g, '').length !== joinCodeConfig.length) return;
+
+    autoRedeemed.current = true;
+    // Inside an async callback rather than the effect body: `redeem` sets state on its
+    // first line, and doing that synchronously during an effect cascades renders.
+    void (async () => {
+      await redeem(fromLink);
+    })();
+  }, [loading, params, redeem]);
+
+  function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await signInAsGuest();
-      const result = await api.post<{ event: EventPreview }>('/api/events/join', { code });
-      router.push(`/e/${result.event.id}`);
-    } catch (caught) {
-      setError(errorMessage(caught, 'That code did not work.'));
-      setSubmitting(false);
-    }
+    void redeem(code);
   }
 
   const ready = code.replace(/-/g, '').length === joinCodeConfig.length;

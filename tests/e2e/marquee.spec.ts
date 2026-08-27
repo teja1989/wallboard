@@ -288,6 +288,56 @@ test.describe('the wall', () => {
   });
 });
 
+test.describe('the invitation link', () => {
+  test('a shared link opens the invitation for someone with no account', async ({
+    browser,
+    page,
+  }) => {
+    // The link is the product's whole distribution loop. It used to point at /e/{id},
+    // which turns away everyone who is not already a member — that is, every recipient.
+    await signIn(page, uniqueEmail('host'));
+    const { joinCode } = await createEvent(page, 'Shared link party');
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+
+    // No code typed, no account, no app — exactly what the invitation promises.
+    await expect(guestPage.getByRole('heading', { name: 'Shared link party' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(guestPage).toHaveURL(/\/e\//);
+    await guestContext.close();
+  });
+
+  test('a link carrying a dead code explains itself', async ({ browser }) => {
+    const context = await browser.newContext();
+    const guestPage = await context.newPage();
+
+    await guestPage.goto('/i/ZZZZZZZZ');
+    await expect(guestPage.getByRole('heading', { name: /did not open/i })).toBeVisible();
+    await expect(guestPage.getByRole('button', { name: /enter a code instead/i })).toBeVisible();
+    await context.close();
+  });
+
+  test('the link carries a preview card for a group chat', async ({ page, request }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { joinCode } = await createEvent(page, 'Preview party');
+    const code = joinCode.replace('-', '');
+
+    // What a crawler sees, which is where almost every guest first meets the product.
+    await page.goto(`/i/${code}`);
+    const og = page.locator('meta[property="og:title"]');
+    await expect(og).toHaveAttribute('content', /Preview party/);
+
+    const image = await request.get(`/i/${code}/opengraph-image`);
+    expect(image.status()).toBe(200);
+    expect(image.headers()['content-type']).toContain('image/png');
+    expect((await image.body()).byteLength).toBeGreaterThan(1000);
+  });
+});
+
 test.describe('the invitation and RSVP', () => {
   test('a guest opens the invitation, replies, and lands on the guest list', async ({
     browser,

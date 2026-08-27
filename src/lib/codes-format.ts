@@ -30,3 +30,18 @@ export function isWellFormedJoinCode(input: string): boolean {
   if (normalized.length !== length) return false;
   return [...normalized].every((character) => alphabet.includes(character));
 }
+
+/**
+ * The link a host actually shares.
+ *
+ * Not `/e/{id}`: the event turns away anyone who is not already a member, which is every
+ * person an invitation is sent to. Both the emailed button and the share sheet used to
+ * point there, so a shared invitation was a dead end for its entire audience.
+ *
+ * The code is the credential everywhere else in the product, so it is the credential here
+ * too — in the path rather than a query string, which keeps it out of `Referer` headers on
+ * anything the page later loads, and lets the route render a real link preview.
+ */
+export function invitationPath(code: string): string {
+  return `/i/${encodeURIComponent(code.replace(/-/g, '').toUpperCase())}`;
+}

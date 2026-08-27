@@ -24,7 +24,7 @@ import { useToast } from '@/components/ui/toast';
 import { canUseExpiryPreset, canUseTemplate } from '@/lib/billing/entitlements';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/client/event-draft';
-import { formatJoinCode } from '@/lib/codes-format';
+import { formatJoinCode, invitationPath } from '@/lib/codes-format';
 import { cn, fromDateTimeLocalValue } from '@/lib/utils';
 import type { EventPreview } from '@/types/domain';
 
@@ -294,7 +294,6 @@ export default function CreateEventPage() {
       <CreatedPanel
         title={created.event.title}
         code={created.joinCode}
-        eventId={created.event.id}
         onCopied={() => notify('Copied', 'success')}
         onOpen={() => router.push(`/e/${created.event.id}`)}
       />
@@ -560,7 +559,6 @@ export default function CreateEventPage() {
 interface CreatedPanelProps {
   title: string;
   code: string;
-  eventId: string;
   onCopied: () => void;
   onOpen: () => void;
 }
@@ -569,9 +567,12 @@ interface CreatedPanelProps {
  * The code is shown once, here. Re-reading it later is a separate audited call from inside
  * the event, so it never turns up in a payload someone could stumble across.
  */
-function CreatedPanel({ title, code, eventId, onCopied, onOpen }: CreatedPanelProps) {
+function CreatedPanel({ title, code, onCopied, onOpen }: CreatedPanelProps) {
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
-  const link = typeof window === 'undefined' ? '' : `${window.location.origin}/e/${eventId}`;
+  // The invitation link, not the event URL: `/e/{id}` turns away everyone who is not
+  // already a member, which is every person this gets shared with.
+  const link =
+    typeof window === 'undefined' ? '' : `${window.location.origin}${invitationPath(code)}`;
 
   async function copy(what: 'code' | 'link') {
     await navigator.clipboard.writeText(what === 'code' ? formatJoinCode(code) : link);

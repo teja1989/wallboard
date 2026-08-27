@@ -188,6 +188,15 @@ to change one of them.
   wall every prospective host hits before seeing anything. The gate belongs at publish;
   `event-draft.ts` is what makes that survive the email-link round trip. Anything new that
   needs an account should ask at the moment of commitment, not on arrival.
+- **Never share `/e/{id}`.** It turns away non-members, which is everyone an invitation is
+  sent to. The shareable link is `/i/{code}` (`invitationPath()`), which redeems on arrival
+  and renders a preview card. This was wrong in both the email and the share sheet.
+- **`await signInAsGuest()` now means the cookie exists.** It used to resolve after
+  `signInAnonymously` but before the session was minted, so anything that signed in and
+  immediately called an API raced itself into a 401 — invisible wherever a human pauses to
+  type, reliable on any page that acts on arrival. Do not reintroduce a boolean guard in
+  `exchangeSession`: it must hand back the in-flight promise so callers await the real
+  answer.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.
