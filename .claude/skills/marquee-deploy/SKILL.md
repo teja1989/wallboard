@@ -28,6 +28,24 @@ terraform fmt -recursive        # the workflow fails on -check, so run this firs
 terraform validate
 ```
 
+**`terraform validate` is not optional, and `fmt` is not a substitute.** `fmt` only
+reformats; it happily passes a config Terraform will refuse to initialise. A constant
+`precondition` shipped exactly that way once and broke every deploy for hours — CI fails at
+`terraform init`, before a single resource is read, so nothing warns you earlier.
+
+Where the provider registry is unreachable, mirror the providers from
+`releases.hashicorp.com` (which is usually still allowed) and validate offline:
+
+```bash
+for p in google google-beta; do
+  curl -sO "https://releases.hashicorp.com/terraform-provider-$p/6.20.0/terraform-provider-${p}_6.20.0_linux_amd64.zip"
+  unzip -oq "terraform-provider-${p}_6.20.0_linux_amd64.zip" \
+    -d "/tmp/tfplugins/registry.terraform.io/hashicorp/$p/6.20.0/linux_amd64"
+done
+# temporarily comment out the `backend "gcs"` block, then:
+terraform init -backend=false -plugin-dir=/tmp/tfplugins && terraform validate
+```
+
 **Locally: plan, never apply.** `var.image` defaults to empty, and empty means Google's
 `hello` placeholder — so a local `terraform apply` without the variables CI generates will
 happily roll the live service back to a sample container. The workflow is the only thing

@@ -57,10 +57,15 @@ resource "google_identity_platform_config" "auth" {
   # Redirect targets Firebase will honour for the sign-in link. Anything not
   # listed here cannot complete a sign-in, which is what stops a link being
   # replayed against an attacker's page.
+  # The run.app host stays listed even once a custom domain is the canonical one. DNS takes
+  # time to propagate and certificates take longer, and during that window the service's own
+  # URL is the only one that answers — dropping it would break sign-in on the exact address
+  # someone falls back to when the new domain is not live yet.
   authorized_domains = distinct(compact([
     "localhost",
     "${var.project_id}.firebaseapp.com",
     "${var.project_id}.web.app",
+    replace(replace(local.predicted_url, "https://", ""), "http://", ""),
     replace(replace(local.site_url, "https://", ""), "http://", ""),
   ]))
 
@@ -92,12 +97,16 @@ resource "google_identity_platform_default_supported_idp_config" "google" {
 }
 
 # Fail at plan time rather than shipping a button nobody can use.
+#
+# The condition has to reference something — Terraform rejects a constant, on the grounds
+# that a check which cannot vary is not checking anything. So the guard exists only when
+# the flag is on, and asserts the client is present.
 resource "terraform_data" "google_sign_in_guard" {
-  count = var.google_sign_in && var.google_oauth_client_id == "" ? 1 : 0
+  count = var.google_sign_in ? 1 : 0
 
   lifecycle {
     precondition {
-      condition     = false
+      condition     = var.google_oauth_client_id != ""
       error_message = "google_sign_in is true but google_oauth_client_id is empty. Set GOOGLE_OAUTH_CLIENT_ID and the GOOGLE_OAUTH_CLIENT_SECRET secret, or leave GOOGLE_SIGN_IN false."
     }
   }
