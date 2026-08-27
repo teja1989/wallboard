@@ -21,7 +21,7 @@ import type { EventDoc, EventRole, ResolvedMedia, RsvpStatus } from '@/types/dom
 interface EventResponse {
   event: EventDoc;
   role: EventRole | null;
-  rsvp: { status: RsvpStatus; partySize: number };
+  rsvp: { status: RsvpStatus; partySize: number; adults: number; children: number };
   permissions: {
     canPost: boolean;
     canModerate: boolean;
@@ -193,7 +193,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <RsvpCard
               event={event}
               status={rsvp.status}
-              partySize={rsvp.partySize}
+              adults={rsvp.adults}
+              childGuests={rsvp.children}
               onAnswered={onAnswered}
             />
             {isAnonymous && (

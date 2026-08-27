@@ -79,8 +79,15 @@ export interface RsvpSettings {
 
 export interface RsvpResponse {
   status: RsvpStatus;
-  /** Including the guest. 1 means just them. */
+  /**
+   * Everyone coming, the guest included. Kept as the total because it is what every
+   * headcount, tally and export is actually asking for; `adults` and `children` are the
+   * breakdown behind it and always sum to it.
+   */
   partySize: number;
+  /** Including the guest, so at least 1 for anyone who is coming. */
+  adults: number;
+  children: number;
   respondedAt: number | null;
 }
 

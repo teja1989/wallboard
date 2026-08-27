@@ -127,6 +127,36 @@ real one in the same run.
 
 ---
 
+## Putting it on a real domain
+
+The site runs on its `run.app` URL until `SITE_URL` names something else. Do this **before
+sending a single real invitation**: an invitation lives in someone's inbox for weeks and is
+opened the night before the party, so a link on a URL you later abandon is a dead link to a
+real guest at a real event. It cannot be fixed after the fact.
+
+1. **Verify the domain to the project.** Terraform has no API for this.
+   `gcloud domains verify marqueersvp.com` opens Search Console; add the TXT record it
+   gives you at your registrar. Until this is done, the mapping apply fails — clearly, and
+   without breaking anything already running.
+
+2. **Set `SITE_URL`** to `https://marqueersvp.com` as a repository variable and deploy.
+   Terraform creates the Cloud Run domain mapping and outputs the DNS records to add.
+
+   Cloud Run's own mapping rather than a load balancer, deliberately: a global HTTPS load
+   balancer carries roughly $18 a month in standing charges for capability this does not
+   need. Mapping is free and manages its own certificate.
+
+3. **Add the DNS records** it outputs at your registrar — usually four `A` and four `AAAA`
+   records for the apex, or one `CNAME` for a subdomain. The certificate provisions within
+   about fifteen minutes of the records resolving.
+
+Everything else follows from `SITE_URL` on the next deploy: the bucket's CORS origin, the
+`authorized_domains` Firebase Auth will complete a sign-in link against, and the origin
+baked into the invitation links in outgoing mail.
+
+**Mind the OAuth client.** If Google sign-in is configured, add the new origin to the
+client's authorised JavaScript origins, or the button breaks the moment the domain changes.
+
 ## Deliberately deferred
 
 Both are wired end-to-end and switched off, so turning them on is a variable change and a

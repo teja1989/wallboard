@@ -15,6 +15,8 @@ interface Guest {
   role: string;
   status: RsvpStatus;
   partySize: number;
+  adults: number;
+  children: number;
   respondedAt: number | null;
   isAnonymous: boolean;
   note?: string;
@@ -160,7 +162,13 @@ function GuestGroup({
                   <span className="text-xs text-[var(--text-muted)]">Host</span>
                 )}
                 {guest.status === 'yes' && guest.partySize > 1 && (
-                  <span className="text-xs text-[var(--text-muted)]">+{guest.partySize - 1}</span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {/* The breakdown, because catering for four adults and catering for
+                        two adults and two children are different jobs. */}
+                    +{guest.partySize - 1}
+                    {guest.children > 0 &&
+                      ` (${guest.children} ${guest.children === 1 ? 'child' : 'children'})`}
+                  </span>
                 )}
               </div>
 

@@ -152,7 +152,7 @@ function newMember(actor: Actor, role: MemberDoc['role'], displayName?: string):
     joinedAt: Date.now(),
     mutedAt: null,
     isAnonymous: actor.isAnonymous,
-    rsvp: { status: 'pending', partySize: 1, respondedAt: null },
+    rsvp: { status: 'pending', partySize: 1, adults: 1, children: 0, respondedAt: null },
   };
 }
 
@@ -268,7 +268,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     });
     const hostMember: MemberDoc = {
       ...newMember(actor, 'host'),
-      rsvp: { status: 'yes', partySize: 1, respondedAt: now },
+      rsvp: { status: 'yes', partySize: 1, adults: 1, children: 0, respondedAt: now },
     };
     transaction.set(reference.collection(collections.members).doc(actor.uid), hostMember);
     return code;

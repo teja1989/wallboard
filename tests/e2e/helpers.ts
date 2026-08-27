@@ -76,6 +76,28 @@ export async function signIn(page: Page, email: string): Promise<void> {
 }
 
 /**
+ * Completes an email sign-in *from wherever the page already is*.
+ *
+ * `signIn` starts at /signin, which is right for tests that just need a session. This one
+ * exists to exercise the real journey: someone interrupted mid-task who must be put back
+ * where they were. Navigating anywhere by hand afterwards would hide exactly the bug this
+ * is here to catch — the link used to always land on the home page.
+ */
+export async function signInFromHere(page: Page, email: string): Promise<void> {
+  const baseUrl = new URL(page.url()).origin;
+
+  await page.getByRole('button', { name: /use an email link instead/i }).click();
+  await page.getByLabel('Email address').fill(email);
+  await page.getByRole('button', { name: /send me a link/i }).click();
+
+  await page.waitForTimeout(300);
+  const link = toAppSignInLink(await latestSignInLink(page.request, email), baseUrl);
+
+  await page.goto(link);
+  await page.waitForURL((url) => !url.pathname.startsWith('/auth/finish'), { timeout: 20_000 });
+}
+
+/**
  * Signs in as a code-only guest, the way the join page does: land on it and let the page
  * bootstrap an anonymous identity.
  */

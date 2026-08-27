@@ -47,7 +47,7 @@ interface AuthContextValue {
   isAnonymous: boolean;
   signInAsGuest: () => Promise<void>;
   upgradeWithGoogle: () => Promise<void>;
-  sendEmailLink: (email: string) => Promise<void>;
+  sendEmailLink: (email: string, returnTo?: string) => Promise<void>;
   completeEmailLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshActor: () => Promise<void>;
@@ -56,6 +56,16 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const EMAIL_LINK_STORAGE_KEY = 'marquee:pending-email';
+/**
+ * Where to put someone back once the link is used.
+ *
+ * An email link is a round trip out of the site and back through a different tab, and it
+ * used to always land on the home page. Someone who was half-way through writing an
+ * invitation got signed in and dropped on the marketing page, with the work they had done
+ * still saved but nothing to bring them back to it. Signing in is never the thing anyone
+ * came to do; it is the interruption.
+ */
+const RETURN_TO_STORAGE_KEY = 'marquee:pending-return';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -205,12 +215,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(auth, provider);
   }, []);
 
-  const sendEmailLink = useCallback(async (email: string) => {
+  const sendEmailLink = useCallback(async (email: string, returnTo?: string) => {
     await sendSignInLinkToEmail(clientAuth(), email, {
       url: `${appConfig.siteUrl}/auth/finish`,
       handleCodeInApp: true,
     });
     window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, email);
+
+    const destination = returnTo ?? `${window.location.pathname}${window.location.search}`;
+    window.localStorage.setItem(RETURN_TO_STORAGE_KEY, destination);
   }, []);
 
   const completeEmailLink = useCallback(async (email: string) => {
@@ -286,3 +299,18 @@ export function useAuth(): AuthContextValue {
 }
 
 export const pendingEmailKey = EMAIL_LINK_STORAGE_KEY;
+
+/**
+ * Reads and clears the path to return to, refusing anything that is not a same-site path.
+ * A sign-in page that will forward anywhere is how a phishing link borrows a domain.
+ */
+export function takePendingReturn(): string {
+  try {
+    const stored = window.localStorage.getItem(RETURN_TO_STORAGE_KEY);
+    window.localStorage.removeItem(RETURN_TO_STORAGE_KEY);
+    if (stored && stored.startsWith('/') && !stored.startsWith('//')) return stored;
+  } catch {
+    // Storage unavailable; home is a safe place to land.
+  }
+  return '/';
+}

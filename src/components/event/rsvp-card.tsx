@@ -20,7 +20,9 @@ interface RsvpCardProps {
   event: EventDoc;
   /** The viewer's current answer, or `pending` if they have not replied. */
   status: RsvpStatus;
-  partySize: number;
+  adults: number;
+  /** Not `children`: React reserves that prop name for nested elements. */
+  childGuests: number;
   onAnswered: () => void;
 }
 
@@ -32,12 +34,13 @@ interface RsvpCardProps {
  * and the note only appear after "Going" is chosen — asking how many people are coming
  * before someone has said they are coming is the wrong order.
  */
-export function RsvpCard({ event, status, partySize, onAnswered }: RsvpCardProps) {
+export function RsvpCard({ event, status, adults, childGuests, onAnswered }: RsvpCardProps) {
   const { notify } = useToast();
   const occasion = occasionById(event.occasion);
 
   const [choice, setChoice] = useState<RsvpStatus>(status);
-  const [party, setParty] = useState(partySize);
+  const [adultCount, setAdultCount] = useState(adults);
+  const [childCount, setChildCount] = useState(childGuests);
   const [note, setNote] = useState('');
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
@@ -47,6 +50,9 @@ export function RsvpCard({ event, status, partySize, onAnswered }: RsvpCardProps
   const [mountedAt] = useState(() => Date.now());
   const deadlinePassed = event.rsvp.deadline !== null && mountedAt > event.rsvp.deadline;
   const maxParty = event.rsvp.allowPlusOnes ? event.rsvp.maxPartySize : 1;
+  const party = adultCount + childCount;
+  /** What is left before the host's limit — a stepper that cannot say why it stopped is worse. */
+  const remaining = maxParty - party;
   const hasReplied = status !== 'pending';
 
   async function submit(next: RsvpStatus) {
@@ -55,7 +61,8 @@ export function RsvpCard({ event, status, partySize, onAnswered }: RsvpCardProps
     try {
       await api.post(`/api/events/${event.id}/rsvp`, {
         status: next,
-        partySize: next === 'yes' ? party : 1,
+        adults: next === 'yes' ? adultCount : 1,
+        children: next === 'yes' ? childCount : 0,
         note,
         answer,
       });
@@ -140,33 +147,40 @@ export function RsvpCard({ event, status, partySize, onAnswered }: RsvpCardProps
             className="overflow-hidden"
           >
             <div className="space-y-4 pt-4">
+              {/*
+                Who, not just how many. A host counting chairs, meals and car seats needs
+                to know that "three" is two adults and a toddler — and asking costs the
+                guest one extra tap only if they have someone to bring.
+              */}
               {maxParty > 1 && (
-                <div>
-                  <label
-                    htmlFor="rsvp-party"
-                    className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]"
-                  >
-                    How many of you, including yourself?
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.from({ length: maxParty }, (_, index) => index + 1).map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        id={size === 1 ? 'rsvp-party' : undefined}
-                        aria-pressed={party === size}
-                        onClick={() => setParty(size)}
-                        className={cn(
-                          'size-11 rounded-full text-sm font-medium transition-all duration-200',
-                          party === size
-                            ? 'bg-[var(--accent-soft)] ring-2 ring-[var(--accent)]'
-                            : 'bg-[var(--surface-sunken)] hover:bg-[var(--accent-soft)]',
-                        )}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">
+                    Bringing anyone with you?
+                  </p>
+
+                  <Stepper
+                    id="rsvp-adults"
+                    label="Adults"
+                    hint="Including you"
+                    value={adultCount}
+                    min={1}
+                    canIncrease={remaining > 0}
+                    onChange={setAdultCount}
+                  />
+                  <Stepper
+                    id="rsvp-children"
+                    label="Children"
+                    value={childCount}
+                    min={0}
+                    canIncrease={remaining > 0}
+                    onChange={setChildCount}
+                  />
+
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {remaining > 0
+                      ? `${party} of you so far. This invitation covers up to ${maxParty}.`
+                      : `That is the ${maxParty} this invitation covers.`}
+                  </p>
                 </div>
               )}
 
@@ -217,5 +231,56 @@ export function RsvpCard({ event, status, partySize, onAnswered }: RsvpCardProps
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+interface StepperProps {
+  id: string;
+  label: string;
+  hint?: string;
+  value: number;
+  min: number;
+  canIncrease: boolean;
+  onChange: (next: number) => void;
+}
+
+/**
+ * A counter with two big targets.
+ *
+ * Not a number input: on a phone that summons a keyboard over the thing you are filling
+ * in, and the range here is small enough that tapping is faster than typing anyway.
+ */
+function Stepper({ id, label, hint, value, min, canIncrease, onChange }: StepperProps) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <label htmlFor={id} className="text-sm">
+        {label}
+        {hint && <span className="ml-1.5 text-xs text-[var(--text-muted)]">{hint}</span>}
+      </label>
+
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={`One fewer ${label.toLowerCase()}`}
+          disabled={value <= min}
+          onClick={() => onChange(value - 1)}
+          className="size-10 rounded-full bg-[var(--surface-sunken)] text-lg transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-40"
+        >
+          −
+        </button>
+        <output id={id} className="w-8 text-center text-sm font-semibold tabular-nums">
+          {value}
+        </output>
+        <button
+          type="button"
+          aria-label={`One more ${label.toLowerCase()}`}
+          disabled={!canIncrease}
+          onClick={() => onChange(value + 1)}
+          className="size-10 rounded-full bg-[var(--surface-sunken)] text-lg transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+    </div>
   );
 }

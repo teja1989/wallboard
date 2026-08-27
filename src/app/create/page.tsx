@@ -13,6 +13,7 @@ import {
   expiryPresets,
   occasionById,
   occasions,
+  partySizeChoices,
   type PostKind,
 } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -76,7 +77,10 @@ export default function CreateEventPage() {
   const [templateTouched, setTemplateTouched] = useState(false);
   const [expiryPresetId, setExpiryPresetId] = useState<string>(defaultExpiryPresetId);
   const [allowedKinds, setAllowedKinds] = useState<PostKind[]>([...POST_KINDS]);
-  const [allowPlusOnes, setAllowPlusOnes] = useState(true);
+  // How many people a reply may cover in total, the guest included. A boolean here used to
+  // mean "one extra" without ever saying so — a host who wanted couples with a child had
+  // no way to express it, and the guest had no way to tell us.
+  const [maxPartySize, setMaxPartySize] = useState(2);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ event: EventPreview; joinCode: string } | null>(null);
@@ -120,7 +124,7 @@ export default function CreateEventPage() {
       templateTouched,
       expiryPresetId,
       allowedKinds,
-      allowPlusOnes,
+      maxPartySize,
     }),
     [
       occasionId,
@@ -135,7 +139,7 @@ export default function CreateEventPage() {
       templateTouched,
       expiryPresetId,
       allowedKinds,
-      allowPlusOnes,
+      maxPartySize,
     ],
   );
 
@@ -161,8 +165,8 @@ export default function CreateEventPage() {
           rsvp: {
             enabled: true,
             deadline: null,
-            allowPlusOnes: fields.allowPlusOnes,
-            maxPartySize: fields.allowPlusOnes ? 2 : 1,
+            allowPlusOnes: fields.maxPartySize > 1,
+            maxPartySize: fields.maxPartySize,
             askNote: false,
             question: null,
           },
@@ -235,7 +239,7 @@ export default function CreateEventPage() {
       setTemplateTouched(draft.templateTouched);
       setExpiryPresetId(draft.expiryPresetId);
       setAllowedKinds(draft.allowedKinds);
-      setAllowPlusOnes(draft.allowPlusOnes);
+      setMaxPartySize(draft.maxPartySize);
       setNeedsAccount(false);
       setRestored(true);
 
@@ -256,7 +260,7 @@ export default function CreateEventPage() {
           templateTouched: draft.templateTouched,
           expiryPresetId: draft.expiryPresetId,
           allowedKinds: draft.allowedKinds,
-          allowPlusOnes: draft.allowPlusOnes,
+          maxPartySize: draft.maxPartySize,
         });
       }
     })();
@@ -280,6 +284,7 @@ export default function CreateEventPage() {
           title="Almost there"
           body={`Sign in and “${title.trim()}” goes out. It takes an account because you are the only one who should be able to change it, delete it, or read what your guests write to you privately.`}
           note="Your invitation is saved — signing in will not lose it."
+          returnTo="/create"
           onSignedIn={() => {
             setNeedsAccount(false);
             void publish(draftFields);
@@ -456,29 +461,30 @@ export default function CreateEventPage() {
 
         <fieldset>
           <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            Can guests bring someone?
+            Can guests bring anyone?
           </legend>
-          <div className="flex gap-2">
-            {[
-              [true, 'Yes, plus one'],
-              [false, 'Just them'],
-            ].map(([value, label]) => (
+          <div className="flex flex-wrap gap-2">
+            {partySizeChoices.map(({ value, label }) => (
               <button
-                key={String(value)}
+                key={value}
                 type="button"
-                onClick={() => setAllowPlusOnes(value as boolean)}
-                aria-pressed={allowPlusOnes === value}
+                onClick={() => setMaxPartySize(value)}
+                aria-pressed={maxPartySize === value}
                 className={cn(
                   'rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
-                  allowPlusOnes === value
+                  maxPartySize === value
                     ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
                     : 'bg-[var(--surface-sunken)] text-[var(--text-muted)] hover:bg-[var(--accent-soft)]',
                 )}
               >
-                {label as string}
+                {label}
               </button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            Guests say how many adults and children are coming, so you get a headcount you can
+            actually cater for.
+          </p>
         </fieldset>
 
         <fieldset>

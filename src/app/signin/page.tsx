@@ -52,6 +52,7 @@ export default function SignInPage() {
         <SignInPrompt
           title="Sign in"
           body="To pick up an invitation you already made, or to send a new one."
+          returnTo={next}
           onSignedIn={() => router.push(next)}
         />
       )}

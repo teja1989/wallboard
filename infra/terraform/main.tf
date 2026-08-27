@@ -40,6 +40,11 @@ locals {
   predicted_url = "https://${var.service_name}-${data.google_project.this.number}.${var.region}.run.app"
   site_url      = var.site_url != "" ? var.site_url : local.predicted_url
 
+  # The bare host, when a custom domain has been set. Empty on the run.app URL, which
+  # needs no mapping and cannot be mapped.
+  custom_domain = var.site_url != "" ? replace(replace(var.site_url, "https://", ""), "http://", "") : ""
+
+
   # The very first apply runs before any image has been pushed, because the
   # registry it would be pushed to does not exist yet. Google's own sample
   # container stands in for exactly one apply; CI passes the real image on the

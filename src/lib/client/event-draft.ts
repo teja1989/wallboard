@@ -33,7 +33,7 @@ export interface EventDraft {
   templateTouched: boolean;
   expiryPresetId: string;
   allowedKinds: PostKind[];
-  allowPlusOnes: boolean;
+  maxPartySize: number;
   /** Set when the host pressed publish and was sent to sign in. Drives the auto-resume. */
   pendingPublish: boolean;
   savedAt: number;
@@ -69,7 +69,7 @@ function parse(raw: string): EventDraft | null {
     allowedKinds: Array.isArray(d.allowedKinds)
       ? (d.allowedKinds.filter(isString) as PostKind[])
       : [],
-    allowPlusOnes: d.allowPlusOnes !== false,
+    maxPartySize: typeof d.maxPartySize === 'number' ? d.maxPartySize : 2,
     pendingPublish: d.pendingPublish === true,
     savedAt: d.savedAt,
   };

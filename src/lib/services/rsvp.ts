@@ -58,6 +58,8 @@ function tallyDelta(
 export interface RsvpOutcome {
   status: RsvpStatus;
   partySize: number;
+  adults: number;
+  children: number;
   /** True when the guest was changing an answer rather than giving a first one. */
   changed: boolean;
 }
@@ -81,8 +83,11 @@ export async function submitRsvp(
     throw new ApiError('gone', 'The date for replies has passed. Message the host directly.');
   }
 
+  // Derived here, never accepted: the breakdown is what the guest chose, and the total is
+  // arithmetic. Taking both from the client is how they end up disagreeing.
+  const requestedParty = input.adults + input.children;
   const allowedParty = event.rsvp.allowPlusOnes ? event.rsvp.maxPartySize : 1;
-  if (input.partySize > allowedParty) {
+  if (requestedParty > allowedParty) {
     throw new ApiError(
       'bad_request',
       allowedParty === 1
@@ -93,7 +98,10 @@ export async function submitRsvp(
 
   // Someone who says no or maybe is not bringing anyone, whatever the form submitted.
   const status = input.status as Exclude<RsvpStatus, 'pending'>;
-  const partySize = status === 'yes' ? input.partySize : 1;
+  const coming = status === 'yes';
+  const partySize = coming ? requestedParty : 1;
+  const adults = coming ? input.adults : 1;
+  const children = coming ? input.children : 0;
   const entitlements = entitlementsFor(event.plan);
   const now = Date.now();
 
@@ -108,6 +116,8 @@ export async function submitRsvp(
     transaction.update(memberRef(event.id, actor.uid), {
       'rsvp.status': status,
       'rsvp.partySize': partySize,
+      'rsvp.adults': adults,
+      'rsvp.children': children,
       'rsvp.respondedAt': now,
       ...(input.displayName ? { displayName: input.displayName } : {}),
     });
@@ -138,7 +148,7 @@ export async function submitRsvp(
       .catch(() => undefined);
   }
 
-  return { status, partySize, changed: outcome.changed };
+  return { status, partySize, adults, children, changed: outcome.changed };
 }
 
 export interface GuestEntry {
@@ -148,6 +158,8 @@ export interface GuestEntry {
   role: MemberDoc['role'];
   status: RsvpStatus;
   partySize: number;
+  adults: number;
+  children: number;
   respondedAt: number | null;
   isAnonymous: boolean;
   /** Present only for hosts, moderators and staff. */
@@ -180,6 +192,10 @@ export async function listGuests(eventId: string, includePrivate: boolean): Prom
       role: member.role,
       status: member.rsvp?.status ?? 'pending',
       partySize: member.rsvp?.partySize ?? 1,
+      // Replies recorded before the breakdown existed are all adults, which is the only
+      // reading of them that does not invent information.
+      adults: member.rsvp?.adults ?? member.rsvp?.partySize ?? 1,
+      children: member.rsvp?.children ?? 0,
       respondedAt: member.rsvp?.respondedAt ?? null,
       isAnonymous: member.isAnonymous,
     };
@@ -217,7 +233,18 @@ export async function recomputeTally(eventId: string): Promise<RsvpTally> {
 /** CSV of the guest list. A paid entitlement, checked by the caller. */
 export function guestsToCsv(guests: GuestEntry[], event: EventDoc): string {
   const occasion = occasionById(event.occasion);
-  const header = ['Name', 'Reply', 'Party size', 'Replied at', 'Note', occasion.label + ' answer'];
+  // Adults and children as their own columns: a host pasting this into a caterer's
+  // spreadsheet needs to sort by them, not read them out of a combined string.
+  const header = [
+    'Name',
+    'Reply',
+    'Party size',
+    'Adults',
+    'Children',
+    'Replied at',
+    'Note',
+    occasion.label + ' answer',
+  ];
 
   const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const rows = guests.map((guest) =>
@@ -225,6 +252,8 @@ export function guestsToCsv(guests: GuestEntry[], event: EventDoc): string {
       guest.displayName,
       guest.status,
       String(guest.partySize),
+      String(guest.adults),
+      String(guest.children),
       guest.respondedAt ? new Date(guest.respondedAt).toISOString() : '',
       guest.note ?? '',
       guest.answer ?? '',

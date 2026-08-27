@@ -106,8 +106,22 @@ describe('rsvpSchema', () => {
     expect(rsvpSchema.safeParse({ status: 'yes' }).success).toBe(true);
   });
 
-  it('defaults a party to one person', () => {
-    expect(rsvpSchema.parse({ status: 'yes' }).partySize).toBe(1);
+  it('defaults a party to the guest alone', () => {
+    const parsed = rsvpSchema.parse({ status: 'yes' });
+    expect(parsed.adults).toBe(1);
+    expect(parsed.children).toBe(0);
+  });
+
+  it('takes a breakdown of who is coming', () => {
+    const parsed = rsvpSchema.parse({ status: 'yes', adults: 2, children: 3 });
+    expect(parsed.adults).toBe(2);
+    expect(parsed.children).toBe(3);
+  });
+
+  it('refuses a party with nobody in it', () => {
+    // The guest themself is always one of the adults; zero would be a reply from no one.
+    expect(rsvpSchema.safeParse({ status: 'yes', adults: 0 }).success).toBe(false);
+    expect(rsvpSchema.safeParse({ status: 'yes', children: -1 }).success).toBe(false);
   });
 
   it('rejects pending as an answer', () => {
@@ -115,11 +129,13 @@ describe('rsvpSchema', () => {
     expect(rsvpSchema.safeParse({ status: 'pending' }).success).toBe(false);
   });
 
-  it('rejects a party size beyond the platform maximum', () => {
+  it('rejects a party beyond the platform maximum', () => {
     expect(
-      rsvpSchema.safeParse({ status: 'yes', partySize: contentLimits.maxPartySize + 1 }).success,
+      rsvpSchema.safeParse({ status: 'yes', adults: contentLimits.maxPartySize + 1 }).success,
     ).toBe(false);
-    expect(rsvpSchema.safeParse({ status: 'yes', partySize: 0 }).success).toBe(false);
+    expect(
+      rsvpSchema.safeParse({ status: 'yes', children: contentLimits.maxPartySize }).success,
+    ).toBe(false);
   });
 
   it('bounds the private note', () => {

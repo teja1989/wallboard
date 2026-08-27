@@ -225,3 +225,29 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+/**
+ * The custom domain.
+ *
+ * Created only once `site_url` names one. Cloud Run's own domain mapping rather than a
+ * load balancer: a global HTTPS load balancer is roughly $18 a month standing charge for
+ * capability this does not need, and mapping is free and manages its own certificate.
+ *
+ * The domain has to be verified to the project first — Terraform cannot do that, and the
+ * apply fails with a clear message until it is. See docs/DEPLOYMENT.md.
+ */
+resource "google_cloud_run_domain_mapping" "custom" {
+  count = local.custom_domain != "" ? 1 : 0
+
+  project  = var.project_id
+  location = var.region
+  name     = local.custom_domain
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.app.name
+  }
+}

@@ -230,7 +230,20 @@ export type CreatePostInput = z.infer<typeof createPostSchema>;
  */
 export const rsvpSchema = z.object({
   status: z.enum(rsvpChoiceIds),
-  partySize: z.number().int().min(1).max(contentLimits.maxPartySize).default(1),
+  /**
+   * Who is coming, not just how many. "Two people" and "one adult and a toddler" are very
+   * different for a host counting chairs, meals and car seats, and asking is free.
+   *
+   * The total is derived server-side rather than accepted, so `adults + children` and
+   * `partySize` cannot disagree.
+   */
+  adults: z.number().int().min(1).max(contentLimits.maxPartySize).default(1),
+  children: z
+    .number()
+    .int()
+    .min(0)
+    .max(contentLimits.maxPartySize - 1)
+    .default(0),
   note: cleanText(contentLimits.rsvpNoteMaxLength).default(''),
   answer: cleanText(contentLimits.rsvpAnswerMaxLength).default(''),
   displayName: cleanText(contentLimits.displayNameMaxLength).optional(),

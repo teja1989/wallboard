@@ -73,7 +73,8 @@ async function main(): Promise<void> {
   for (const [index, guest] of guests.entries()) {
     await submitRsvp(guest, event, {
       status: answers[index % answers.length]!,
-      partySize: index === 0 ? 2 : 1,
+      adults: index === 0 ? 2 : 1,
+      children: index === 0 ? 1 : 0,
       note: '',
       answer: '',
     });

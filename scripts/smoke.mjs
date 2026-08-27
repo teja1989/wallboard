@@ -238,27 +238,33 @@ async function main() {
   // --- RSVP ----------------------------------------------------------------
   const guestRsvp = await call(guest.session, `/api/events/${eventId}/rsvp`, {
     method: 'POST',
-    body: { status: 'yes', partySize: 2 },
+    body: { status: 'yes', adults: 2, children: 1 },
   });
   check(
     'an anonymous guest can answer the invitation',
     guestRsvp.status === 200,
     JSON.stringify(guestRsvp.payload),
   );
-  check('their party size is recorded', guestRsvp.payload?.data?.rsvp?.partySize === 2);
+  check('their party size is recorded', guestRsvp.payload?.data?.rsvp?.partySize === 3);
+  check(
+    'the breakdown is recorded, not just the total',
+    guestRsvp.payload?.data?.rsvp?.adults === 2 && guestRsvp.payload?.data?.rsvp?.children === 1,
+    JSON.stringify(guestRsvp.payload?.data?.rsvp),
+  );
 
   const oversizedParty = await call(member.session, `/api/events/${eventId}/rsvp`, {
     method: 'POST',
-    body: { status: 'yes', partySize: 9 },
+    body: { status: 'yes', adults: 9 },
   });
   check('a party larger than the host allowed is refused', oversizedParty.status === 400);
 
   const memberRsvp = await call(member.session, `/api/events/${eventId}/rsvp`, {
     method: 'POST',
-    body: { status: 'maybe', partySize: 3 },
+    body: { status: 'maybe', adults: 2, children: 1 },
   });
   check('a member can answer maybe', memberRsvp.status === 200);
   check('maybe does not carry a party', memberRsvp.payload?.data?.rsvp?.partySize === 1);
+  check('maybe carries no children either', memberRsvp.payload?.data?.rsvp?.children === 0);
 
   const changed = await call(member.session, `/api/events/${eventId}/rsvp`, {
     method: 'POST',
@@ -289,8 +295,10 @@ async function main() {
   check('the host sees private notes', guestList.payload?.data?.canSeeNotes === true);
 
   const tally = guestList.payload?.data?.tally;
-  // Host said yes (1), anonymous guest said yes with a plus one (2), member said no.
-  check('the headcount adds up', tally?.attending === 3, JSON.stringify(tally));
+  // Host said yes (1), the anonymous guest brought two adults and a child (3), the member
+  // said no. The headcount is people, not replies — which is the number a host is actually
+  // trying to find out.
+  check('the headcount adds up', tally?.attending === 4, JSON.stringify(tally));
   check('the tally counts the refusal', tally?.no === 1, JSON.stringify(tally));
 
   const guestView = await call(member.session, `/api/events/${eventId}/guests`);

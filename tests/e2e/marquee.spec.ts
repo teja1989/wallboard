@@ -5,6 +5,7 @@ import {
   resetRateLimits,
   signIn,
   signInAsGuest,
+  signInFromHere,
   uniqueEmail,
 } from './helpers';
 
@@ -82,11 +83,11 @@ test.describe('creating an event', () => {
     await expect(page.getByRole('heading', { name: /almost there/i })).toBeVisible();
     await expect(page.getByText(/your invitation is saved/i)).toBeVisible();
 
-    // Signing in leaves the site for an inbox and returns through a different page, which
-    // is exactly the trip the draft has to survive.
-    await signIn(page, email);
+    // Sign in from right here, and navigate nowhere afterwards. The link has to bring them
+    // back on its own: it used to drop everyone on the home page, which left the draft
+    // saved and unreachable and the invitation never created.
+    await signInFromHere(page, email);
 
-    await page.goto('/create');
     await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible({
       timeout: 20_000,
     });
@@ -402,6 +403,33 @@ test.describe('the invitation and RSVP', () => {
 
     await page.reload();
     await expect(page.getByText('Maybe').first()).toBeVisible();
+  });
+
+  test('a guest says who is coming, not just how many', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId, joinCode } = await createEvent(page, 'Family picnic');
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await expect(guestPage.getByRole('heading', { name: 'Family picnic' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await guestPage.getByRole('radio', { name: 'Going' }).click();
+    await expect(guestPage.getByText(/bringing anyone with you/i)).toBeVisible();
+
+    // Two adults and a child — a headcount of four that a host can actually cater for.
+    await guestPage.getByRole('button', { name: /one more adults/i }).click();
+    await guestPage.getByRole('button', { name: /one more children/i }).click();
+    await guestPage.getByRole('button', { name: /i'll be there/i }).click();
+    await expect(guestPage.getByText(/you are on the list/i)).toBeVisible();
+
+    // The host sees the breakdown, not a bare number.
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: 'Guests' }).click();
+    await expect(page.getByText(/1 child/i)).toBeVisible();
+    await guestContext.close();
   });
 
   test('the guest list shows the headcount, not just the reply count', async ({ page }) => {

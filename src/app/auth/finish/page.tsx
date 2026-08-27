@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { pendingEmailKey, useAuth } from '@/components/auth/auth-provider';
+import { pendingEmailKey, takePendingReturn, useAuth } from '@/components/auth/auth-provider';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
 import { errorMessage } from '@/lib/client/api-client';
@@ -39,7 +39,8 @@ export default function FinishSignInPage() {
       }
       try {
         await completeEmailLink(stored);
-        router.replace('/');
+        // Back to whatever they were doing when signing in interrupted them.
+        router.replace(takePendingReturn());
       } catch (caught) {
         setMessage(errorMessage(caught, 'That link could not be used.'));
         setStatus('error');
@@ -51,7 +52,7 @@ export default function FinishSignInPage() {
     setStatus('working');
     try {
       await completeEmailLink(email);
-      router.replace('/');
+      router.replace(takePendingReturn());
     } catch (caught) {
       setMessage(errorMessage(caught, 'That link could not be used.'));
       setStatus('error');

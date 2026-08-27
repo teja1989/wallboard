@@ -87,6 +87,19 @@ export const IMAGE_VARIANT_IDS = ['preview', 'display'] as const;
  * navigation or the sign-in costs them their work. Long enough to find the email, short
  * enough that a draft from last month does not ambush someone.
  */
+/**
+ * What a host can allow a reply to cover, the guest included.
+ *
+ * Phrased as people rather than "plus ones": a plus one is one, and a family with two
+ * children is the ordinary case at half the occasions this product serves.
+ */
+export const partySizeChoices = [
+  { value: 1, label: 'Just them' },
+  { value: 2, label: 'Someone with them' },
+  { value: 4, label: 'Up to 4' },
+  { value: 6, label: 'Up to 6' },
+] as const;
+
 export const eventDraft = {
   storageKey: 'marquee.draft.event.v1',
   ttlMs: 24 * HOUR,

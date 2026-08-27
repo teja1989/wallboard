@@ -22,6 +22,11 @@ interface SignInPromptProps {
   onSignedIn?: () => void;
   /** Shown under the buttons. Somewhere to reassure a host their draft is safe. */
   note?: string;
+  /**
+   * Where the email link should put them when it lands. Defaults to the current page,
+   * which is right whenever signing in interrupted something happening here.
+   */
+  returnTo?: string;
 }
 
 /**
@@ -35,6 +40,7 @@ export function SignInPrompt({
   compact = false,
   onSignedIn,
   note,
+  returnTo,
 }: SignInPromptProps) {
   const { upgradeWithGoogle, sendEmailLink } = useAuth();
   const { notify } = useToast();
@@ -61,7 +67,7 @@ export function SignInPrompt({
     event.preventDefault();
     setBusy('email');
     try {
-      await sendEmailLink(email);
+      await sendEmailLink(email, returnTo);
       notify('Check your inbox for the sign-in link.', 'success');
       setShowEmail(false);
     } catch (caught) {

@@ -38,6 +38,10 @@ export const GET = route(async (_request, { params }: Params) => {
     rsvp: {
       status: membership?.rsvp?.status ?? 'pending',
       partySize: membership?.rsvp?.partySize ?? 1,
+      // Replies written before the breakdown existed count as adults; inventing children
+      // for them would be worse than the missing detail.
+      adults: membership?.rsvp?.adults ?? membership?.rsvp?.partySize ?? 1,
+      children: membership?.rsvp?.children ?? 0,
     },
     permissions: {
       canPost:
