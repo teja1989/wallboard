@@ -28,6 +28,17 @@ terraform fmt -recursive        # the workflow fails on -check, so run this firs
 terraform validate
 ```
 
+**Locally: plan, never apply.** `var.image` defaults to empty, and empty means Google's
+`hello` placeholder — so a local `terraform apply` without the variables CI generates will
+happily roll the live service back to a sample container. The workflow is the only thing
+that knows which image is current. A local plan needs credentials the backend can see:
+
+```bash
+gcloud auth application-default login   # separate from `gcloud auth login`
+terraform init -reconfigure -backend-config="bucket=<project>-marquee-tfstate"
+terraform plan -var="project_id=…" -var="owner_emails=…" -var="image=$(gcloud run services describe marquee --region us-central1 --format='value(spec.template.spec.containers[0].image)')"
+```
+
 For anything structural, use the workflow's **plan only** dispatch rather than guessing.
 It runs validate and plan against real state and deploys nothing.
 
