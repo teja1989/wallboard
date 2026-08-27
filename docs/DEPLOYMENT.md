@@ -134,21 +134,54 @@ sending a single real invitation**: an invitation lives in someone's inbox for w
 opened the night before the party, so a link on a URL you later abandon is a dead link to a
 real guest at a real event. It cannot be fixed after the fact.
 
-1. **Verify the domain to the project.** Terraform has no API for this.
-   `gcloud domains verify marqueersvp.com` opens Search Console; add the TXT record it
-   gives you at your registrar. Until this is done, the mapping apply fails — clearly, and
-   without breaking anything already running.
+1. **Verify the domain, by DNS.** Terraform has no API for this.
 
-2. **Set `SITE_URL`** to `https://marqueersvp.com` as a repository variable and deploy.
+   `gcloud domains verify` offers an HTML file. Do not use it: the file has to be served
+   from the domain being verified, and nothing serves that domain until the mapping exists,
+   which needs the verification. Verify by TXT instead — it is the method that works before
+   anything is live.
+
+   [Search Console](https://search.google.com/search-console) → Add property → **Domain**
+   (not "URL prefix") → add the `google-site-verification=…` TXT record it gives you on the
+   apex, then verify.
+
+2. **Add the deploy service account as a property owner.** This is the step that is easy to
+   miss and fails confusingly. The mapping is created by CI, running as
+   `marquee-deployer@…`, and Google checks that _that_ identity owns the verified property
+   — verifying it as yourself is not enough. In Search Console: Settings → Users and
+   permissions → Add user → the deployer's email → **Owner**.
+
+   Confirm with `gcloud domains list-user-verified`.
+
+3. **Set `SITE_URL`** to `https://marqueersvp.com` as a repository variable and deploy.
    Terraform creates the Cloud Run domain mapping and outputs the DNS records to add.
 
    Cloud Run's own mapping rather than a load balancer, deliberately: a global HTTPS load
    balancer carries roughly $18 a month in standing charges for capability this does not
    need. Mapping is free and manages its own certificate.
 
-3. **Add the DNS records** it outputs at your registrar — usually four `A` and four `AAAA`
+4. **Add the DNS records** it outputs at your registrar — usually four `A` and four `AAAA`
    records for the apex, or one `CNAME` for a subdomain. The certificate provisions within
    about fifteen minutes of the records resolving.
+
+### On Cloudflare specifically
+
+**Turn the proxy off** — the grey cloud, "DNS only", on every record Cloud Run gives you.
+Proxied (orange) records stop Google provisioning the managed certificate, and the symptom
+is a certificate error or a redirect loop rather than anything that names the cause.
+Cloudflare's own TLS terminates at their edge, which is not what the mapping is checking.
+
+**Pick one hostname and mean it.** Invitation links get pasted into text messages, so the
+apex is the better canonical: `marqueersvp.com/i/ABCD1234` reads better than the same thing
+with `www.` in front. Map the apex, and add a Cloudflare Redirect Rule sending
+`www.marqueersvp.com/*` to `https://marqueersvp.com/$1`. Serving both without a redirect
+splits every shared link across two origins and breaks sign-in on whichever one is not in
+`authorized_domains`.
+
+A `CNAME` pointing straight at the `run.app` hostname does not work, whichever host you
+choose. Cloud Run routes by the domain mapping, so it answers such a request with a
+certificate for the wrong name. The apex takes the four `A` and four `AAAA` records the
+mapping outputs; a subdomain takes a `CNAME` to `ghs.googlehosted.com`.
 
 Everything else follows from `SITE_URL` on the next deploy: the bucket's CORS origin, the
 `authorized_domains` Firebase Auth will complete a sign-in link against, and the origin
