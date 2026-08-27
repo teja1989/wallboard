@@ -164,6 +164,58 @@ real guest at a real event. It cannot be fixed after the fact.
    records for the apex, or one `CNAME` for a subdomain. The certificate provisions within
    about fifteen minutes of the records resolving.
 
+### The Cloudflare records, in order
+
+**a. Get the records.** The deploy summary prints them. Or ask the mapping directly:
+
+```bash
+gcloud beta run domain-mappings describe --domain marqueersvp.com \
+  --region us-central1 --project quantum-pulsar \
+  --format="table(status.resourceRecords[].type, status.resourceRecords[].rrdata)"
+```
+
+**b. Clear what is already there.** Cloudflare adds parking records when a domain is
+registered with them, and any earlier attempt leaves its own. In DNS → Records, delete
+every existing `A`, `AAAA` and `CNAME` on `@` and `www`. An old record left in place is
+answered alongside the new ones and roughly half of all requests go to the wrong place.
+
+**c. Add the apex records** — four `A` and four `AAAA`, all on name `@`, every one of them
+**DNS only** (grey cloud). Use the values from step (a); at the time of writing Cloud Run
+answers the apex on `216.239.32.21`, `216.239.34.21`, `216.239.36.21`, `216.239.38.21` and
+the matching `2001:4860:4802:32::15`, `:34::15`, `:36::15`, `:38::15`.
+
+**d. Add `www`** as a `CNAME` to `marqueersvp.com`, this one **Proxied** (orange). It only
+ever redirects, so it never reaches an origin, and Cloudflare's own certificate covers it.
+
+**e. Redirect `www` to the apex.** Rules → Redirect Rules → Create:
+custom filter `hostname equals www.marqueersvp.com`, dynamic redirect, **301**, expression
+`concat("https://marqueersvp.com", http.request.uri.path)`, preserve query string. A
+hostname must be proxied for a rule to fire on it, which is why (d) is orange.
+
+**f. Wait, then check.**
+
+```bash
+dig marqueersvp.com +short            # the four A records
+curl -sI https://marqueersvp.com | head -3
+```
+
+The certificate is Google's to issue and lands within about fifteen minutes of the records
+resolving, occasionally an hour. Until then the domain answers with a TLS error rather than
+a 404 — that is the certificate, not the mapping. Watch it with:
+
+```bash
+gcloud beta run domain-mappings describe --domain marqueersvp.com \
+  --region us-central1 --format="value(status.conditions)"
+```
+
+| Symptom                              | Cause                                                           |
+| ------------------------------------ | --------------------------------------------------------------- |
+| TLS error that persists past an hour | A record is proxied. Grey cloud, then wait again.               |
+| Certificate for the wrong name       | A `CNAME` points at the `run.app` host. Use the apex A records. |
+| Redirect loop on `www`               | `www` is DNS-only, so the redirect rule never fires.            |
+| Half of requests 404                 | An old parking record was left alongside the new ones.          |
+| `ERR_TOO_MANY_REDIRECTS` on the apex | Cloudflare SSL/TLS set to Flexible. Use Full (strict).          |
+
 ### On Cloudflare specifically
 
 **Turn the proxy off** — the grey cloud, "DNS only", on every record Cloud Run gives you.
