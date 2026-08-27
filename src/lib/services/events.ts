@@ -137,6 +137,7 @@ export function toPreview(event: EventDoc): EventPreview {
     status: effectiveStatus(event),
     expiresAt: event.expiresAt,
     startsAt: event.startsAt,
+    timeZone: event.timeZone ?? null,
     hostedBy: event.hostedBy,
     memberCount: event.memberCount,
   };
@@ -230,6 +231,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     status: 'live',
     startsAt: input.startsAt,
     endsAt: input.endsAt,
+    timeZone: input.timeZone ?? null,
     location:
       input.location && (input.location.name || input.location.address) ? input.location : null,
     dressCode: input.dressCode,

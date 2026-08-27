@@ -32,24 +32,64 @@ export function formatRelativeTime(timestamp: number, now = Date.now()): string 
 }
 
 /**
+ * Whether a string is an IANA zone this runtime knows.
+ *
+ * Asking the formatter is the only reliable check — the list differs by runtime and ships
+ * with the ICU data, so a hardcoded set would drift.
+ */
+export function isValidTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * "Saturday 14 June, 7:00 pm". Weekday included because an invitation is read days ahead
  * and the day of the week is what people actually plan around.
+ *
+ * **Rendered in the event's own timezone, not the reader's.** A party at 7pm in California
+ * is at 7pm for everybody reading about it; showing a guest in New York "10:00 pm" because
+ * that is what their laptop thinks is how people miss things. Events created before the
+ * zone was recorded pass null and fall back to the reader's zone, which is the old
+ * behaviour and no worse than it was.
+ *
+ * `showZone` decides whether the abbreviation is appended:
+ *  - `auto` compares against the rendering environment and only adds it when they differ,
+ *    which is right in the app — a local guest does not need to be told their own zone.
+ *  - `always` is for email and link previews, where we have no idea who is reading and an
+ *    unlabelled time is a guess.
  */
-export function formatEventDate(timestamp: number | null): string {
+export function formatEventDate(
+  timestamp: number | null,
+  timeZone?: string | null,
+  showZone: 'auto' | 'always' = 'auto',
+): string {
   if (timestamp === null) return '';
+
+  const zone = timeZone && isValidTimeZone(timeZone) ? timeZone : undefined;
+  const here = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const label = zone !== undefined && (showZone === 'always' || zone !== here);
+
   return new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     hour: 'numeric',
     minute: '2-digit',
+    ...(zone ? { timeZone: zone } : {}),
+    ...(label ? { timeZoneName: 'short' as const } : {}),
   }).format(new Date(timestamp));
 }
 
 /** Date only, for a deadline where the time of day is noise. */
-export function formatDateOnly(timestamp: number | null): string {
+export function formatDateOnly(timestamp: number | null, timeZone?: string | null): string {
   if (timestamp === null) return '';
+  const zone = timeZone && isValidTimeZone(timeZone) ? timeZone : undefined;
   return new Intl.DateTimeFormat(undefined, {
+    ...(zone ? { timeZone: zone } : {}),
     day: 'numeric',
     month: 'long',
     year: 'numeric',

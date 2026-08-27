@@ -100,6 +100,82 @@ Credentials.
 Do **not** set `NODE_ENV` yourself anywhere. Next sets it, and pinning it to `development`
 puts a development build of React into a production bundle.
 
+## Sending real email
+
+Until this is done, **nothing is actually sent**. `EMAIL_DRIVER` defaults to `outbox`, which
+writes each message to a Firestore `mailOutbox` collection instead — useful in development,
+and the reason a deploy that forgets its keys cannot spam anybody.
+
+Three things, in order. The DNS step is the slow one.
+
+### 1. A Resend account and a verified domain
+
+Add `marqueersvp.com` in the Resend dashboard under **Domains**. Resend gives you a set of
+DNS records — typically a `MX` and a `TXT` for the bounce subdomain, a `TXT` for DKIM, and
+optionally a DMARC `TXT`.
+
+Add each one in Cloudflare with **proxying off** (grey cloud, not orange). Proxying rewrites
+records and breaks verification. Propagation is usually minutes; Resend re-checks on its own
+and the domain flips to Verified.
+
+> Sending from a domain you have not verified fails SPF, and the mail lands in spam or is
+> rejected outright. This is not optional, and it is why `invitations@marquee.app` — a domain
+> nobody here owns — had to go.
+
+### 2. The key, and the switch
+
+Create an API key in Resend with **Sending access** only.
+
+In the GitHub repository:
+
+| Where                          | Name                 | Value                         |
+| ------------------------------ | -------------------- | ----------------------------- |
+| Settings → Secrets → Actions   | `RESEND_API_KEY`     | the key                       |
+| Settings → Variables → Actions | `EMAIL_DRIVER`       | `resend`                      |
+| Settings → Variables → Actions | `EMAIL_FROM_ADDRESS` | `invitations@marqueersvp.com` |
+
+A secret, not a variable, for the key — variables are printed in logs. Terraform refuses to
+apply `email_driver = resend` without a key, so a half-configured deploy fails at plan rather
+than at boot.
+
+### 3. Push, then check
+
+The next push deploys it. To confirm mail is really leaving, send one invitation to an
+address you control and look at the Resend dashboard's **Logs** — it shows accepted,
+delivered, bounced and complained per message.
+
+### Testing before DNS has propagated
+
+Resend accepts `onboarding@resend.dev` as a from-address with no domain set up at all, but it
+will only deliver to the address that owns the Resend account. Set `EMAIL_FROM_ADDRESS` to it
+for a first end-to-end test, then switch to your own domain once it verifies.
+
+Resend also has addresses that force an outcome, which is the honest way to see a failure
+path without waiting for a real bounce:
+
+| Address                 | What happens   |
+| ----------------------- | -------------- |
+| `delivered@resend.dev`  | delivers       |
+| `bounced@resend.dev`    | hard bounce    |
+| `complained@resend.dev` | marked as spam |
+
+## Walking one event end to end
+
+`npm run walkthrough` creates one event, adds guests, sends the invitation, opens it as a
+guest and prints every link — then **leaves it standing** so you can click through it.
+
+```bash
+npm run walkthrough                                     # local, against the emulators
+GUESTS="you+one@gmail.com,you+two@gmail.com" npm run walkthrough
+BASE=https://marqueersvp.com npm run walkthrough        # prints the steps; see below
+```
+
+Against production it stops at sign-in on purpose: the script cannot impersonate an account,
+and it should not be able to. Do those steps in a browser — they are the same steps.
+
+Guests default to `@example.com`, which is reserved by RFC 2606 and can never receive mail,
+so a stray run cannot email a stranger.
+
 ## Troubleshooting
 
 | Symptom                                           | Cause                                                                        |

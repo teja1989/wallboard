@@ -18,6 +18,7 @@ interface HostedEvent {
   title: string;
   occasion: string;
   startsAt: number | null;
+  timeZone: string | null;
   createdAt: number;
   status: string;
   postCount: number;
@@ -237,7 +238,7 @@ function Invitations({ events, onCreate }: { events: HostedEvent[] | null; onCre
                   <h2 className="truncate text-lg font-medium">{event.title}</h2>
                   <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                     {occasionById(event.occasion).label}
-                    {event.startsAt ? ` · ${formatEventDate(event.startsAt)}` : ''}
+                    {event.startsAt ? ` · ${formatEventDate(event.startsAt, event.timeZone)}` : ''}
                   </p>
                 </div>
                 <span

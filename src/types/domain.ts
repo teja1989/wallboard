@@ -127,6 +127,14 @@ export interface EventDoc {
   /** When the event itself happens — distinct from when the wall expires. */
   startsAt: number | null;
   endsAt: number | null;
+  /**
+   * The IANA zone the event happens in, e.g. `America/Los_Angeles`.
+   *
+   * Without it every reader saw the start time converted into their own zone, so a guest a
+   * state away was told the wrong time — and email, rendered on a server running UTC, told
+   * everyone the wrong time. Null on events created before this was recorded.
+   */
+  timeZone: string | null;
   location: EventLocation | null;
   dressCode: string;
   rsvp: RsvpSettings;
@@ -145,7 +153,7 @@ export interface EventDoc {
 /** What a visitor is allowed to see about an event before joining. */
 export type EventPreview = Pick<
   EventDoc,
-  'id' | 'title' | 'templateId' | 'occasion' | 'status' | 'expiresAt' | 'startsAt'
+  'id' | 'title' | 'templateId' | 'occasion' | 'status' | 'expiresAt' | 'startsAt' | 'timeZone'
 > & {
   hostedBy: string;
   memberCount: number;

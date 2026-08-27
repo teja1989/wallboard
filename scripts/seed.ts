@@ -48,6 +48,8 @@ async function main(): Promise<void> {
     templateId: 'sunset',
     startsAt: Date.now() + 5 * DAY_MS,
     endsAt: null,
+    // A real zone, so the seeded event exercises the same path a hosted one does.
+    timeZone: 'America/Los_Angeles',
     location: {
       name: 'The Rooftop',
       address: '14 Bridge Street',

@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
 
   const occasion = occasionById(event.occasion);
-  const when = event.startsAt ? formatEventDate(event.startsAt) : null;
+  const when = event.startsAt ? formatEventDate(event.startsAt, event.timeZone, 'always') : null;
   const title = `${event.title}${event.hostedBy ? ` · ${event.hostedBy}` : ''}`;
   const description = [when, occasion.rsvpPrompt].filter(Boolean).join(' — ');
 

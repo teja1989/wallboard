@@ -1,5 +1,5 @@
 import 'server-only';
-import { emailConfig, serverConfig } from '@/config';
+import { serverConfig } from '@/config';
 import type { EmailAdapter, OutgoingEmail, SendResult } from './types';
 
 /**
@@ -33,7 +33,7 @@ export const resendAdapter: EmailAdapter = {
           'Idempotency-Key': `${message.eventId}:${message.kind}:${message.to}`,
         },
         body: JSON.stringify({
-          from: `${message.fromName} <${emailConfig.fromAddress}>`,
+          from: `${message.fromName} <${serverConfig().email.fromAddress}>`,
           to: [message.to],
           reply_to: message.replyTo,
           subject: message.subject,

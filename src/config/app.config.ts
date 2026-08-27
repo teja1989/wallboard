@@ -41,6 +41,7 @@ export function serverConfig() {
     joinCodePepper: env.JOIN_CODE_PEPPER,
     email: {
       driver: env.EMAIL_DRIVER,
+      fromAddress: env.EMAIL_FROM_ADDRESS,
     },
     resendApiKey: env.RESEND_API_KEY,
     billing: {

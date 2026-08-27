@@ -38,7 +38,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
 
   const title = event?.title ?? 'You are invited';
   const host = event?.hostedBy ? `From ${event.hostedBy}` : brand.name;
-  const when = event?.startsAt ? formatEventDate(event.startsAt) : null;
+  const when = event?.startsAt ? formatEventDate(event.startsAt, event.timeZone, 'always') : null;
   const prompt = event ? occasionById(event.occasion).rsvpPrompt : brand.shortPromise;
 
   return new ImageResponse(

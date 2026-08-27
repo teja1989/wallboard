@@ -3,9 +3,11 @@ import { DAY, HOUR, MINUTE } from '@/config';
 import {
   formatBytes,
   formatDuration,
+  formatEventDate,
   formatRelativeTime,
   formatTimeRemaining,
   initialsOf,
+  isValidTimeZone,
 } from '@/lib/utils';
 
 const NOW = 1_700_000_000_000;
@@ -77,5 +79,64 @@ describe('initialsOf', () => {
 
   it('does not crash on an empty name', () => {
     expect(initialsOf('   ')).toBe('?');
+  });
+});
+
+/**
+ * The bug this exists to prevent: every reader used to see the start time converted into
+ * their own zone, so a guest a state away was told the wrong hour — and email, rendered on
+ * a server running UTC, told everybody the wrong hour.
+ */
+describe('formatEventDate across timezones', () => {
+  // 2026-06-14T19:00 in Los Angeles.
+  const evening = Date.parse('2026-06-15T02:00:00Z');
+
+  it('shows the event in its own zone, not the reader’s', () => {
+    const shown = formatEventDate(evening, 'America/Los_Angeles', 'always');
+    expect(shown).toMatch(/7:00/);
+    expect(shown).not.toMatch(/10:00/);
+  });
+
+  it('shows the same wall-clock time whatever zone it is asked about', () => {
+    // The point of storing the zone: one event, one time, for everyone reading it.
+    const asLA = formatEventDate(evening, 'America/Los_Angeles', 'always');
+    const alsoLA = formatEventDate(evening, 'America/Los_Angeles', 'always');
+    expect(asLA).toBe(alsoLA);
+
+    // And a different zone genuinely is a different wall-clock time.
+    expect(formatEventDate(evening, 'America/New_York', 'always')).toMatch(/10:00/);
+  });
+
+  it('labels the zone when the reader is told to expect one', () => {
+    expect(formatEventDate(evening, 'America/Los_Angeles', 'always')).toMatch(/P[DS]T/);
+  });
+
+  it('falls back to the reader’s zone for events created before this was recorded', () => {
+    // No worse than the old behaviour, and it must not throw.
+    expect(formatEventDate(evening, null)).toBeTruthy();
+    expect(formatEventDate(evening)).toBeTruthy();
+  });
+
+  it('ignores a zone the runtime does not know rather than throwing', () => {
+    // An unparseable zone reaching Intl would break the invitation for every guest.
+    expect(formatEventDate(evening, 'Mars/Olympus_Mons')).toBeTruthy();
+  });
+
+  it('returns nothing for an event with no date', () => {
+    expect(formatEventDate(null, 'America/Los_Angeles')).toBe('');
+  });
+});
+
+describe('isValidTimeZone', () => {
+  it('accepts real zones', () => {
+    expect(isValidTimeZone('America/Los_Angeles')).toBe(true);
+    expect(isValidTimeZone('Asia/Kolkata')).toBe(true);
+    expect(isValidTimeZone('UTC')).toBe(true);
+  });
+
+  it('rejects anything else', () => {
+    expect(isValidTimeZone('Mars/Olympus_Mons')).toBe(false);
+    expect(isValidTimeZone('not a zone')).toBe(false);
+    expect(isValidTimeZone('')).toBe(false);
   });
 });

@@ -126,9 +126,14 @@ jobs:
             echo "google_oauth_client_secret = \"${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}\""
             echo "billing_account = \"${{ vars.GCP_BILLING_ACCOUNT }}\""
             echo "budget_alert_emails = \"${{ vars.BUDGET_ALERT_EMAILS }}\""
+            # Mail. Defaults keep it in the outbox, so a deploy that has not been given a
+            # key writes invitations to Firestore rather than failing to start.
+            echo "email_driver = \"${{ vars.EMAIL_DRIVER || 'outbox' }}\""
+            echo "email_from_address = \"${{ vars.EMAIL_FROM_ADDRESS || 'invitations@marqueersvp.com' }}\""
+            echo "resend_api_key = \"${{ secrets.RESEND_API_KEY }}\""
           } > infra/terraform/ci.auto.tfvars
-          # Everything except the OAuth secret, which this step now writes.
-          grep -v 'client_secret' infra/terraform/ci.auto.tfvars
+          # Everything except the secrets, which this step writes but must not print.
+          grep -vE 'client_secret|api_key' infra/terraform/ci.auto.tfvars
 
       - name: Terraform plan
         if: ${{ inputs.plan_only }}

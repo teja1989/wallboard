@@ -19,10 +19,17 @@ export const emailConfig = {
    * Mail is sent from Marquee's own domain with the host's name in the display name, and
    * their address as reply-to. Sending as the host would require every host to verify DNS,
    * which no consumer will do, and would fail SPF for everyone who did not.
+   *
+   * The domain has to be one we actually own and have verified with the provider. It used
+   * to read `marquee.app`, which we do not: every real send would have failed SPF and
+   * landed in spam, if it left at all.
+   *
+   * The *from* address itself is a server concern and lives in `serverConfig().email`, so
+   * it can be overridden per deploy — this file reaches client components, and an env read
+   * here would be inlined at build time.
    */
-  fromAddress: 'invitations@marquee.app',
+  sendingDomain: 'marqueersvp.com',
   fromNameSuffix: 'via Marquee',
-  supportAddress: 'hello@marquee.app',
 
   /** Invitees a host may add to one event, before the plan's guest cap also applies. */
   maxInviteesPerEvent: 500,
@@ -41,6 +48,9 @@ export const emailConfig = {
   /** Unsubscribe tokens are derived, not stored, so there is nothing extra to leak. */
   unsubscribeTokenBytes: 32,
 } as const;
+
+/** Where a guest writes when something is wrong. */
+export const supportAddress = `hello@${emailConfig.sendingDomain}`;
 
 /**
  * Per-account sending limits, on top of the per-event caps.

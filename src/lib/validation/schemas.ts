@@ -13,6 +13,7 @@ import {
   rsvpChoices,
   type MediaKind,
 } from '@/config';
+import { isValidTimeZone } from '@/lib/utils';
 
 /**
  * Request schemas. Every route handler parses its input through one of these — there is no
@@ -65,6 +66,19 @@ const externalUrl = z
   .transform((value) => (value === '' ? null : value))
   .nullable();
 
+/**
+ * The event's timezone, as the host's browser reports it.
+ *
+ * Validated against the runtime's own zone database rather than a regex: an unparseable
+ * zone would throw inside Intl at render time, on the invitation, for every guest.
+ */
+const timeZoneSchema = z
+  .string()
+  .max(64)
+  .refine(isValidTimeZone, 'That is not a timezone this system knows.')
+  .nullable()
+  .default(null);
+
 const locationSchema = z
   .object({
     name: cleanText(contentLimits.locationNameMaxLength).default(''),
@@ -110,6 +124,7 @@ export const createEventSchema = z
     startsAt: eventTimestamp.default(null),
     endsAt: eventTimestamp.default(null),
     location: locationSchema,
+    timeZone: timeZoneSchema,
     dressCode: cleanText(contentLimits.dressCodeMaxLength).default(''),
     rsvp: rsvpSettingsSchema.prefault({}),
     expiryPresetId: z.enum(presetIds),
@@ -134,6 +149,7 @@ export const updateEventSchema = z
     startsAt: eventTimestamp.optional(),
     endsAt: eventTimestamp.optional(),
     location: locationSchema.optional(),
+    timeZone: timeZoneSchema.optional(),
     dressCode: cleanText(contentLimits.dressCodeMaxLength).optional(),
     rsvp: rsvpSettingsSchema.partial().optional(),
     whoCanPost: z.enum(['members', 'anyone']).optional(),

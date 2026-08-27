@@ -43,7 +43,9 @@ export const brand = {
   ],
   /** Shown on free-tier events. Removing it is a paid entitlement. */
   attribution: 'Made with Marquee',
-  supportEmail: 'hello@marquee.app',
+  // The domain we actually own. `marquee.app` was here and is not ours — a mailto nobody
+  // reads is a support channel that silently does not exist.
+  supportEmail: 'hello@marqueersvp.com',
 } as const;
 
 export type PillarId = (typeof brand.pillars)[number]['id'];

@@ -33,10 +33,21 @@ resource "random_password" "cleanup_task_secret" {
 }
 
 locals {
-  secrets = {
+  # The generated ones. Nothing secret passes through a terminal or a chat window.
+  generated_secrets = {
     JOIN_CODE_PEPPER    = random_password.join_code_pepper.result
     CLEANUP_TASK_SECRET = random_password.cleanup_task_secret.result
   }
+
+  /**
+   * Secrets that come from outside, and so cannot be generated.
+   *
+   * Only included when actually supplied: an empty Secret Manager version would make Cloud
+   * Run fail to start, which is a worse outcome than the feature staying switched off.
+   */
+  supplied_secrets = var.resend_api_key == "" ? {} : { RESEND_API_KEY = var.resend_api_key }
+
+  secrets = merge(local.generated_secrets, local.supplied_secrets)
 }
 
 resource "google_secret_manager_secret" "this" {

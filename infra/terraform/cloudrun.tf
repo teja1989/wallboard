@@ -163,6 +163,10 @@ resource "google_cloud_run_v2_service" "app" {
         value = var.email_driver
       }
       env {
+        name  = "EMAIL_FROM_ADDRESS"
+        value = var.email_from_address
+      }
+      env {
         name  = "BILLING_DRIVER"
         value = var.billing_driver
       }

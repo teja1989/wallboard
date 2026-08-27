@@ -241,7 +241,7 @@ function renderIndexHtml(event: EventDoc, posts: PostDoc[]): string {
     <p class="eyebrow">${escapeHtml(occasion.label)} · from ${escapeHtml(event.hostedBy)}</p>
     <h1>${escapeHtml(event.title)}</h1>
     ${event.description ? `<p class="meta">${escapeHtml(event.description)}</p>` : ''}
-    ${event.startsAt ? `<p class="meta">${escapeHtml(formatEventDate(event.startsAt))}</p>` : ''}
+    ${event.startsAt ? `<p class="meta">${escapeHtml(formatEventDate(event.startsAt, event.timeZone, 'always'))}</p>` : ''}
     ${
       event.location?.name || event.location?.address
         ? `<p class="meta">${escapeHtml([event.location.name, event.location.address].filter(Boolean).join(', '))}</p>`

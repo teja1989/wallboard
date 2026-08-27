@@ -27,10 +27,12 @@ export function Invitation({ event }: { event: EventDoc }) {
     <dl className="space-y-3">
       {event.startsAt !== null && (
         <Detail icon={<CalendarDays className="size-4" aria-hidden />} label="When">
-          <span>{formatEventDate(event.startsAt)}</span>
+          <span>{formatEventDate(event.startsAt, event.timeZone)}</span>
           <span className="ml-2 opacity-70">({formatCountdownToEvent(event.startsAt)})</span>
           {event.endsAt !== null && (
-            <span className="mt-0.5 block opacity-70">until {formatEventDate(event.endsAt)}</span>
+            <span className="mt-0.5 block opacity-70">
+              until {formatEventDate(event.endsAt, event.timeZone)}
+            </span>
           )}
         </Detail>
       )}

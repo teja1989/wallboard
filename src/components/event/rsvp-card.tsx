@@ -86,8 +86,8 @@ export function RsvpCard({ event, status, adults, childGuests, onAnswered }: Rsv
       <div className="card p-5 text-center">
         <p className="font-medium">Replies have closed</p>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          The date for replies was {formatDateOnly(event.rsvp.deadline)}. Message {event.hostedBy}{' '}
-          directly if you would still like to come.
+          The date for replies was {formatDateOnly(event.rsvp.deadline, event.timeZone)}. Message{' '}
+          {event.hostedBy} directly if you would still like to come.
         </p>
       </div>
     );
@@ -102,7 +102,7 @@ export function RsvpCard({ event, status, adults, childGuests, onAnswered }: Rsv
           </h2>
           {event.rsvp.deadline !== null && !hasReplied && (
             <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-              Please reply by {formatDateOnly(event.rsvp.deadline)}.
+              Please reply by {formatDateOnly(event.rsvp.deadline, event.timeZone)}.
             </p>
           )}
         </div>

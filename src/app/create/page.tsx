@@ -59,6 +59,21 @@ const KIND_LABELS: Record<PostKind, string> = {
  * same person's. The email-link path leaves the site for an inbox, which is why the draft
  * is persisted before the link is sent and resumed on the way back.
  */
+/**
+ * The zone the host's browser is in.
+ *
+ * Read at publish rather than kept in the draft on purpose: someone who starts an
+ * invitation on a laptop in London and finishes it in New York means the zone they are in
+ * when they press publish, not the one they were in when they started typing.
+ */
+function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateEventPage() {
   const router = useRouter();
   const { notify } = useToast();
@@ -69,6 +84,7 @@ export default function CreateEventPage() {
   const [hostedBy, setHostedBy] = useState('');
   const [description, setDescription] = useState('');
   const [startsAt, setStartsAt] = useState('');
+  const [shownTimeZone, setShownTimeZone] = useState<string | null>(null);
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [dressCode, setDressCode] = useState('');
@@ -91,6 +107,16 @@ export default function CreateEventPage() {
   /** Whether they chose to look around before signing in. Session-scoped. */
   const [browsing, setBrowsing] = useState(false);
   const resumed = useRef(false);
+
+  // Same reason as the effect below: the server runs in UTC and has no idea what zone the
+  // host is in, so resolving it during render would hydrate to a different tree.
+  useEffect(() => {
+    // In an async callback, matching the effect below: `react-hooks/set-state-in-effect`
+    // refuses a synchronous setState here, and it is right to.
+    void (async () => {
+      setShownTimeZone(browserTimeZone());
+    })();
+  }, []);
 
   // Read after mount, never during render: sessionStorage does not exist on the server, and
   // reading it in an initialiser would hydrate to a different tree than the server sent.
@@ -183,6 +209,11 @@ export default function CreateEventPage() {
           templateId: fields.templateId,
           startsAt: fromDateTimeLocalValue(fields.startsAt),
           endsAt: null,
+          // The time the host typed is the time in the zone they typed it in. Recording
+          // that is what stops a guest a state away being told the wrong hour — and what
+          // stops the emailed invitation, rendered on a server running UTC, telling
+          // everybody the wrong hour.
+          timeZone: browserTimeZone(),
           location:
             fields.locationName || fields.locationAddress
               ? { name: fields.locationName, address: fields.locationAddress, url: null }
@@ -496,6 +527,15 @@ export default function CreateEventPage() {
           />
           <p className="mt-1.5 text-sm text-[var(--text-muted)]">
             Optional — you can send a save-the-date without one.
+            {startsAt && shownTimeZone && (
+              // Named rather than assumed. Guests are shown this time in *your* zone, so a
+              // host setting up a party while travelling can catch a wrong zone here rather
+              // than after two hundred people have the wrong hour.
+              <>
+                {' '}
+                Times are in <span className="text-[var(--text-secondary)]">{shownTimeZone}</span>.
+              </>
+            )}
           </p>
         </div>
 

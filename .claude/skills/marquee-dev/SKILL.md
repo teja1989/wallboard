@@ -246,6 +246,17 @@ to change one of them.
   silently never hears anything. The client parser deliberately does _not_ dedupe format
   variants: guessing without real phone metadata risks merging two different numbers and
   dropping a guest, so the server collapses them and reports what it collapsed.
+- **Never format an event time without its zone.** `formatEventDate(startsAt)` alone renders
+  in whoever is looking — which on a Cloud Run container is UTC, so every emailed invitation
+  carried the wrong hour. Pass `event.timeZone`, and pass `'always'` anywhere the reader is
+  unknown (email, the link preview, the archive).
+- **The sending domain must be one we own and have verified.** It read `marquee.app` for
+  months, which is not ours; every real send would have failed SPF. It is `marqueersvp.com`
+  now, and `EMAIL_FROM_ADDRESS` overrides it per deploy. `EMAIL_DRIVER` still defaults to
+  `outbox`, so a deploy without keys writes mail to Firestore rather than failing to boot.
+- **`npm run walkthrough` is the fastest way to see a whole event.** It creates one, invites,
+  sends, opens it as a guest, and prints every link instead of tearing down. Use it before
+  reaching for the UI to reproduce something.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.

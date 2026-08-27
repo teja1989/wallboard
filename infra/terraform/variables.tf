@@ -81,6 +81,26 @@ variable "email_driver" {
     condition     = contains(["outbox", "resend"], var.email_driver)
     error_message = "email_driver must be outbox or resend."
   }
+
+  validation {
+    # Failing here beats failing at boot, where the symptom is a service that will not start
+    # and a log line nobody is watching for.
+    condition     = var.email_driver != "resend" || var.resend_api_key != ""
+    error_message = "email_driver = resend needs resend_api_key to be set."
+  }
+}
+
+variable "resend_api_key" {
+  description = "Resend API key. Required when email_driver is resend; empty keeps mail in the outbox."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "email_from_address" {
+  description = "Who invitations come from. Must be on a domain verified with the provider."
+  type        = string
+  default     = "invitations@marqueersvp.com"
 }
 
 variable "billing_driver" {

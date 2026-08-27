@@ -127,7 +127,7 @@ function detailsHtml(event: EventDoc): string {
   const rows: string[] = [];
 
   if (event.startsAt !== null) {
-    rows.push(row('When', escapeHtml(formatEventDate(event.startsAt))));
+    rows.push(row('When', escapeHtml(formatEventDate(event.startsAt, event.timeZone, 'always'))));
   }
   if (event.location?.name || event.location?.address) {
     const place = [event.location.name, event.location.address].filter(Boolean).join(', ');
@@ -152,7 +152,8 @@ function row(label: string, value: string): string {
 
 function detailsText(event: EventDoc): string {
   const lines: string[] = [];
-  if (event.startsAt !== null) lines.push(`When:  ${formatEventDate(event.startsAt)}`);
+  if (event.startsAt !== null)
+    lines.push(`When:  ${formatEventDate(event.startsAt, event.timeZone, 'always')}`);
   if (event.location?.name || event.location?.address) {
     lines.push(
       `Where: ${[event.location.name, event.location.address].filter(Boolean).join(', ')}`,
@@ -218,7 +219,7 @@ ${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}`
     html: shell({
       event,
       preview:
-        `${occasion.rsvpPrompt} ${event.startsAt ? formatEventDate(event.startsAt) : ''}`.trim(),
+        `${occasion.rsvpPrompt} ${event.startsAt ? formatEventDate(event.startsAt, event.timeZone, 'always') : ''}`.trim(),
       bodyHtml,
       ctaLabel: 'Open the invitation',
       ctaUrl: url,

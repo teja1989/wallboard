@@ -64,6 +64,14 @@ const serverEnvSchema = z.object({
    */
   EMAIL_DRIVER: z.enum(['outbox', 'resend']).default('outbox'),
   RESEND_API_KEY: z.string().optional(),
+  /**
+   * Who invitations come from. Must be on a domain verified with the provider, or every
+   * send fails SPF and lands in spam — assuming it leaves at all.
+   *
+   * Overridable so a preview deploy, or a first test before DNS has propagated, can send
+   * from the provider's own sandbox domain instead.
+   */
+  EMAIL_FROM_ADDRESS: z.string().email().default('invitations@marqueersvp.com'),
 
   /**
    * Payments. Defaults to `mock` so a deploy that forgets its keys cannot half-take real

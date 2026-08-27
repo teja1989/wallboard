@@ -131,7 +131,28 @@ to paste into whatever thread they already talk to that person in. It costs noth
 no carrier registration, arrives from someone the guest knows — and tracks in full, because
 the link is per-guest.
 
-### 6. The invitation link is `/i/{code}`, and it previews
+### 6. An event happens in its own timezone, not the reader's
+
+`startsAt` is an instant, and an instant renders differently everywhere. Until the event
+carried a zone, `Intl.DateTimeFormat` used the _reader's_ — so a party set for 7pm in
+California told a guest in New York it started at 10pm, and email, rendered on a Cloud Run
+container running UTC, told everybody 2am the next day.
+
+The host's browser reports its zone at publish and it is stored on the event, validated
+against the runtime's own zone database — an unparseable zone reaching `Intl` would break the
+invitation for every guest, so it is refused rather than stored.
+
+`formatEventDate` renders in that zone and appends the abbreviation on a rule:
+
+- **`auto`** in the app, where the reader's zone is knowable: the label appears only when it
+  differs, because a local guest does not need to be told their own timezone.
+- **`always`** in email, link previews and the archive, where the reader is unknown and an
+  unlabelled time is a guess.
+
+Events created before this was recorded store null and fall back to the reader's zone, which
+is the old behaviour and no worse than it was.
+
+### 7. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -153,7 +174,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 7. Answers are public, notes are not
+### 8. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -170,7 +191,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 8. Media never touches the app server
+### 9. Media never touches the app server
 
 Uploading is a two-step handshake:
 
