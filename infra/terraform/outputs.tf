@@ -33,8 +33,10 @@ output "runtime_service_account" {
 output "firebase_web_config" {
   description = "NEXT_PUBLIC_* values the image is built with."
   value = {
-    api_key        = data.google_firebase_web_app_config.this.api_key
-    auth_domain    = data.google_firebase_web_app_config.this.auth_domain
+    api_key = data.google_firebase_web_app_config.this.api_key
+    # Baked into the JS bundle at docker build, so changing it needs a rebuild, not
+    # just an env change. See the NEXT_PUBLIC_* trap in the deploy skill.
+    auth_domain    = var.auth_domain != "" ? var.auth_domain : data.google_firebase_web_app_config.this.auth_domain
     project_id     = var.project_id
     storage_bucket = google_storage_bucket.media.name
     app_id         = google_firebase_web_app.this.app_id

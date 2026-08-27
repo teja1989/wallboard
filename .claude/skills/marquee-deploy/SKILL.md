@@ -102,3 +102,20 @@ It runs validate and plan against real state and deploys nothing.
    the revision logs in the console; a boot failure is almost always a missing env var, and
    `serverEnv()` names it.
 4. **Never fix it by clicking in the console.** The next apply reverts it. Fix the Terraform.
+
+## More traps
+
+- **The sign-in handler must be first-party or popups break.** `authDomain` defaults to
+  `<project>.firebaseapp.com`, a different site from ours, so Safari blocks its storage and
+  the popup dies with no fallback path. `AUTH_DOMAIN` points it at `auth.marqueersvp.com`
+  via Firebase Hosting — and the Google OAuth client needs
+  `https://auth.marqueersvp.com/__/auth/handler` in its authorized redirect URIs, or every
+  sign-in ends in `redirect_uri_mismatch` after everything else looks correct.
+- **A `for_each` key may not derive from a sensitive value.** Deciding whether a secret
+  exists by testing the secret makes the _key set_ sensitive, and Terraform rejects the whole
+  plan — not just that expression. Decide presence from an ordinary variable
+  (`email_driver`), look values up by name. This failed a deploy at plan, silently, while the
+  previous revision kept serving.
+- **`min_instances = 0` means every idle period costs a cold start.** Sign-in feels worst
+  because it makes several round trips and any one can hit a booting container. `MIN_INSTANCES`
+  is a repository variable; set it to 1 when someone is actually using the site.

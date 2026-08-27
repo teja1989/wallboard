@@ -72,6 +72,17 @@ variable "google_sign_in" {
   default     = false
 }
 
+variable "auth_domain" {
+  description = <<-EOT
+    The domain that serves the Firebase sign-in handler, e.g. auth.marqueersvp.com.
+    Empty uses <project>.firebaseapp.com, which is a *different site* from ours and so is
+    subject to third-party storage restrictions — the cause of popup sign-in failing.
+    Requires Firebase Hosting with this domain attached. See docs/SETUP.md.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "email_driver" {
   description = "outbox | resend. `outbox` writes mail to Firestore instead of sending it."
   type        = string

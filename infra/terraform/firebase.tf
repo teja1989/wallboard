@@ -81,6 +81,9 @@ resource "google_identity_platform_config" "auth" {
     "${var.project_id}.web.app",
     replace(replace(local.predicted_url, "https://", ""), "http://", ""),
     replace(replace(local.site_url, "https://", ""), "http://", ""),
+    # The custom sign-in handler domain, when one is configured. Firebase refuses to serve
+    # the handler from a domain it has not been told about, so this is not optional.
+    var.auth_domain,
   ]))
 
   depends_on = [

@@ -100,6 +100,79 @@ Credentials.
 Do **not** set `NODE_ENV` yourself anywhere. Next sets it, and pinning it to `development`
 puts a development build of React into a production bundle.
 
+## Making sign-in first-party (Firebase Hosting)
+
+Sign-in currently runs its handler on `quantum-pulsar.firebaseapp.com` while the app is on
+`marqueersvp.com`. Those are different _sites_, so the popup is third-party: Safari blocks
+its storage outright, and Chrome is heading the same way. That is what makes the popup fail
+and what leaves people staring at a spinner.
+
+The fix is to serve the same handler from `auth.marqueersvp.com`. It shares the registrable
+domain with the app, so the browser treats it as first-party.
+
+> The redirect fallback in `auth-provider.tsx` is a mitigation, not a cure — Safari can
+> refuse the redirect flow for the same reason. Do this before real guests see it.
+
+### 1. Enable Firebase Hosting
+
+Firebase Console → **Build → Hosting → Get started**. Accept the defaults and skip the CLI
+walkthrough it offers; nothing is being deployed to Hosting. It exists only to serve the
+auth handler at `/__/auth/*` on a domain we control.
+
+### 2. Attach the domain
+
+Hosting → **Add custom domain** → `auth.marqueersvp.com`.
+
+Firebase gives you either a `TXT` record to prove ownership or two `A` records. Add them in
+Cloudflare with **proxying off** — the orange cloud breaks both verification and the
+certificate, the same trap as the Resend setup above.
+
+Wait for the domain to read **Connected**. The certificate usually takes minutes and can
+take up to 24 hours.
+
+### 3. Tell the Google OAuth client about it
+
+This is the step that is easy to miss, and skipping it produces `redirect_uri_mismatch`
+after everything else looks right.
+
+Google Cloud Console → **APIs & Services → Credentials** → your OAuth 2.0 Client ID →
+**Authorized redirect URIs** → add:
+
+```
+https://auth.marqueersvp.com/__/auth/handler
+```
+
+Leave the existing `https://quantum-pulsar.firebaseapp.com/__/auth/handler` in place so a
+rollback still works.
+
+### 4. Switch the app over
+
+Add a repository **variable** (Settings → Variables → Actions):
+
+| Name          | Value                  |
+| ------------- | ---------------------- |
+| `AUTH_DOMAIN` | `auth.marqueersvp.com` |
+
+Terraform adds it to Firebase's authorized domains — the handler refuses to run on a domain
+it has not been told about — and passes it into the image build.
+
+**It is a `NEXT_PUBLIC_*` value, so it is baked into the JavaScript bundle at docker build.**
+Changing the variable alone does nothing; it takes effect on the next push, which rebuilds.
+
+### 5. Check it
+
+Open the site, sign in with Google, and watch the popup's address bar: it should say
+`auth.marqueersvp.com`, not `quantum-pulsar.firebaseapp.com`. Try it in Safari, which is the
+browser that was failing.
+
+To roll back, clear the `AUTH_DOMAIN` variable and push. The next build falls back to
+`firebaseapp.com`.
+
+### Cost
+
+Hosting's free tier covers this comfortably — the handler is a few kilobytes and nothing
+else is served from it.
+
 ## Sending real email
 
 Until this is done, **nothing is actually sent**. `EMAIL_DRIVER` defaults to `outbox`, which

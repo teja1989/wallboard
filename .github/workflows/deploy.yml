@@ -127,6 +127,10 @@ jobs:
             # Cold starts are the whole cost of scale-to-zero. Set MIN_INSTANCES=1 to keep
             # one warm: sign-in is the worst-hit path, because it makes several round
             # trips and every one can land on a container that is still booting.
+            # Serves the sign-in handler from our own site rather than firebaseapp.com,
+            # which is what stops browsers treating the popup as third-party. Needs
+            # Firebase Hosting set up first — docs/SETUP.md.
+            echo "auth_domain = \"${{ vars.AUTH_DOMAIN }}\""
             echo "min_instances = ${{ vars.MIN_INSTANCES || '0' }}"
             echo "billing_account = \"${{ vars.GCP_BILLING_ACCOUNT }}\""
             echo "budget_alert_emails = \"${{ vars.BUDGET_ALERT_EMAILS }}\""
