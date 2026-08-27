@@ -320,6 +320,24 @@ export default function CreateEventPage() {
       </p>
 
       {/*
+        The account is asked for at publish, which is the right moment — but it should not
+        be a surprise when it arrives, and someone who already has one should be able to
+        start signed in rather than build a draft as a stranger and be stopped at the end.
+        Quiet, below the fold of attention, and gone entirely once they are signed in.
+      */}
+      {!loading && (!actor || isAnonymous) && (
+        <p className="mt-3 text-sm text-[var(--text-muted)]">
+          You will sign in when you send it — one tap with Google.{' '}
+          <Link
+            href="/signin?next=/create"
+            className="underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
+          >
+            Sign in first
+          </Link>
+        </p>
+      )}
+
+      {/*
         Someone who left to fetch a sign-in link comes back to a tab that never held their
         work. Saying so is the difference between trusting the form and retyping into it.
       */}

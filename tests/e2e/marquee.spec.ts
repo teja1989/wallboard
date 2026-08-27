@@ -69,6 +69,14 @@ test.describe('creating an event', () => {
     await expect(page.getByText('The Rooftop')).toBeVisible();
   });
 
+  test('the form says an account is coming, before it asks for one', async ({ page }) => {
+    // The gate is at publish, which is right — but arriving at a form with no hint that an
+    // account is involved makes the ask feel like a trap when it lands.
+    await page.goto('/create');
+    await expect(page.getByText(/you will sign in when you send it/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /sign in first/i })).toBeVisible();
+  });
+
   test('an account is asked for at publish, and the draft survives it', async ({ page }) => {
     const email = uniqueEmail('host');
 
