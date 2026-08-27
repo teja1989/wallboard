@@ -234,10 +234,15 @@ jobs:
 
       # A deploy that answers 200 with our own headers is a deploy that works.
       # A green Terraform apply on its own is not.
+      # Verified against the service's own URL, which always resolves. A custom domain has
+      # its own timeline — DNS at a registrar, then a certificate — and failing the deploy
+      # because that is not finished yet would mark every run red for days and hide a real
+      # failure among them. The revision either serves or it does not; that is this step's
+      # question.
       - name: Smoke the deployment
         if: ${{ !inputs.plan_only }}
         run: |
-          URL="${{ steps.tf.outputs.site_url }}"
+          URL="${{ steps.tf.outputs.service_url }}"
           CODE=000
           for attempt in 1 2 3 4 5 6; do
             CODE="$(curl -s -o /tmp/body -w '%{http_code}' --max-time 30 "$URL/" || echo 000)"
@@ -255,10 +260,36 @@ jobs:
           {
             echo '### Deployed'
             echo ''
-            echo "- **URL**: $URL"
+            echo "- **Serving**: $URL"
             echo "- **Image**: \`${{ steps.build.outputs.image }}\`"
             echo "- **Commit**: \`${GITHUB_SHA}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reported, never fatal: this is a DNS question, not a deploy question.
+      - name: Custom domain
+        if: ${{ !inputs.plan_only && vars.SITE_URL != '' }}
+        working-directory: infra/terraform
+        run: |
+          SITE="${{ steps.tf.outputs.site_url }}"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$SITE/" || echo 000)"
+
+          {
+            echo ''
+            echo "### Custom domain — $SITE"
+            echo ''
+            if [ "$CODE" = "200" ]; then
+              echo "Live and answering."
+            else
+              echo "Not answering yet (HTTP $CODE). Add these records at your registrar,"
+              echo "with proxying **off**, then allow ~15 minutes for the certificate:"
+              echo ''
+              echo '```'
+              terraform output -json domain_dns_records | jq -r '.[]' || echo '(none — mapping not created)'
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          [ "$CODE" = "200" ] || echo "::warning::$SITE is not serving yet — DNS or certificate still pending."
 
       - name: Revision history on failure
         if: ${{ failure() && !inputs.plan_only }}

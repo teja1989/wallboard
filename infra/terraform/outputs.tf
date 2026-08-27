@@ -41,3 +41,21 @@ output "firebase_web_config" {
     google_sign_in = var.google_sign_in
   }
 }
+
+/**
+ * What to put in DNS, straight from the mapping.
+ *
+ * Printed in the deploy summary so nobody has to go and ask gcloud for them — the records
+ * are the one manual step left in getting a domain live, and the gap between "Terraform
+ * says done" and "the site answers" is entirely this list.
+ */
+output "domain_dns_records" {
+  description = "Records to add at the registrar. Empty until a custom domain is configured."
+  value = try(
+    [
+      for record in google_cloud_run_domain_mapping.custom[0].status[0].resource_records :
+      "${record.type}  ${coalesce(record.name, "@")}  ${record.rrdata}"
+    ],
+    [],
+  )
+}
