@@ -1,0 +1,25 @@
+# Marquee.
+#
+# Default to closed. The marketing pages are the only ones that should ever appear
+# in a search result; an event page is a private invitation whose URL was shared
+# with named people, and the app already sends `noindex` on every one of them.
+# This is the same decision made a second time, at the crawl rather than the page.
+
+User-agent: *
+
+# The three public surfaces. `/$` matches the landing page exactly, not everything
+# beneath it.
+Allow: /$
+Allow: /pricing
+Allow: /templates
+
+# Everything else, stated explicitly so the intent survives someone editing the
+# catch-all below.
+Disallow: /e/
+Disallow: /join
+Disallow: /auth/
+Disallow: /api/
+Disallow: /billing/
+Disallow: /unsubscribe
+
+Disallow: /
