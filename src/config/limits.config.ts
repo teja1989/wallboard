@@ -79,6 +79,19 @@ export const IMAGE_VARIANT_IDS = ['preview', 'display'] as const;
  * is a fresh cache key and the browser re-downloads an image it already has. Reusing the
  * same URL for everyone inside the window is what makes browser caching work at all.
  */
+/**
+ * How long an unpublished invitation survives in the browser.
+ *
+ * Signing in with an email link means leaving the site, opening an inbox, and coming back
+ * through a different tab — so anything the host typed before that has to outlive a full
+ * navigation or the sign-in costs them their work. Long enough to find the email, short
+ * enough that a draft from last month does not ambush someone.
+ */
+export const eventDraft = {
+  storageKey: 'marquee.draft.event.v1',
+  ttlMs: 24 * HOUR,
+} as const;
+
 export const mediaUrlCache = {
   /** How long a minted URL is reused. Comfortably inside its own expiry. */
   reuseMs: 45 * 60 * 1000,

@@ -14,6 +14,14 @@ interface SignInPromptProps {
   body?: string;
   /** Rendered inline (inside a wall) rather than as a full page. */
   compact?: boolean;
+  /**
+   * Fired once the account exists and the session is live — only reachable on the Google
+   * path, which keeps the page alive. The email link leaves the site entirely, so anything
+   * that must survive it has to be persisted before the link is sent, not resumed here.
+   */
+  onSignedIn?: () => void;
+  /** Shown under the buttons. Somewhere to reassure a host their draft is safe. */
+  note?: string;
 }
 
 /**
@@ -21,7 +29,13 @@ interface SignInPromptProps {
  * there is one, so a guest who has already joined an event keeps their uid — their
  * membership and anything they posted stay theirs.
  */
-export function SignInPrompt({ title, body, compact = false }: SignInPromptProps) {
+export function SignInPrompt({
+  title,
+  body,
+  compact = false,
+  onSignedIn,
+  note,
+}: SignInPromptProps) {
   const { upgradeWithGoogle, sendEmailLink } = useAuth();
   const { notify } = useToast();
   const [email, setEmail] = useState('');
@@ -35,6 +49,7 @@ export function SignInPrompt({ title, body, compact = false }: SignInPromptProps
     setBusy('google');
     try {
       await upgradeWithGoogle();
+      onSignedIn?.();
     } catch (caught) {
       notify(errorMessage(caught, 'Google sign-in did not complete.'), 'error');
     } finally {
@@ -95,6 +110,8 @@ export function SignInPrompt({ title, body, compact = false }: SignInPromptProps
             Use an email link instead
           </Button>
         )}
+
+        {note && <p className="pt-1 text-xs text-[var(--text-muted)]">{note}</p>}
       </div>
     </>
   );

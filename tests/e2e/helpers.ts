@@ -59,7 +59,7 @@ function toAppSignInLink(oobLink: string, baseUrl: string): string {
  * signed in as the same person.
  */
 export async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/create');
+  await page.goto('/signin');
   const baseUrl = new URL(page.url()).origin;
 
   await page.getByRole('button', { name: /use an email link instead/i }).click();

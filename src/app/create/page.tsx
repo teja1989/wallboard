@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, Copy, Lock, PartyPopper, Share2 } from 'lucide-react';
@@ -23,6 +23,7 @@ import { TextAreaField, TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { canUseExpiryPreset, canUseTemplate } from '@/lib/billing/entitlements';
 import { api, errorMessage } from '@/lib/client/api-client';
+import { clearDraft, loadDraft, saveDraft } from '@/lib/client/event-draft';
 import { formatJoinCode } from '@/lib/codes-format';
 import { cn, fromDateTimeLocalValue } from '@/lib/utils';
 import type { EventPreview } from '@/types/domain';
@@ -44,6 +45,17 @@ const KIND_LABELS: Record<PostKind, string> = {
  *
  * Paid choices are shown, not hidden. A theme nobody can see is a theme nobody upgrades
  * for; a locked one they can see is the whole pitch.
+ *
+ * Anyone can build one; the account is asked for at publish. Hosting genuinely does need
+ * a durable identity — the host alone can delete the event, read private replies and
+ * rotate the code, and an anonymous session lives in browser storage that a cleared cookie
+ * takes with it. But none of that is true of a form nobody has submitted, and demanding
+ * identity before showing anything is a wall in front of an unseen product. Asked at
+ * publish, the same question answers itself: sign in so that only you can change this.
+ *
+ * The uid survives the upgrade — `linkWithCredential` keeps it — so the draft stays the
+ * same person's. The email-link path leaves the site for an inbox, which is why the draft
+ * is persisted before the link is sent and resumed on the way back.
  */
 export default function CreateEventPage() {
   const router = useRouter();
@@ -68,6 +80,10 @@ export default function CreateEventPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ event: EventPreview; joinCode: string } | null>(null);
+  /** Set when publish was pressed without an account: the form yields to the sign-in step. */
+  const [needsAccount, setNeedsAccount] = useState(false);
+  const [restored, setRestored] = useState(false);
+  const resumed = useRef(false);
 
   const occasion = useMemo(() => occasionById(occasionId), [occasionId]);
 
@@ -76,15 +92,6 @@ export default function CreateEventPage() {
   // promising a paywall the visitor will not meet.
   const planId = 'free';
   const lockedTemplateCount = templates.filter((t) => !canUseTemplate(planId, t.id)).length;
-
-  if (!loading && (!actor || isAnonymous)) {
-    return (
-      <SignInPrompt
-        title="Sign in to host"
-        body="An invitation needs someone to send it and someone to answer to, so hosting takes an account. Replying to one never does."
-      />
-    );
-  }
 
   function chooseOccasion(id: string) {
     setOccasionId(id);
@@ -98,44 +105,188 @@ export default function CreateEventPage() {
     );
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  /** The form, in the shape the draft store keeps it. */
+  const draftFields = useMemo(
+    () => ({
+      occasionId,
+      title,
+      hostedBy,
+      description,
+      startsAt,
+      locationName,
+      locationAddress,
+      dressCode,
+      templateId,
+      templateTouched,
+      expiryPresetId,
+      allowedKinds,
+      allowPlusOnes,
+    }),
+    [
+      occasionId,
+      title,
+      hostedBy,
+      description,
+      startsAt,
+      locationName,
+      locationAddress,
+      dressCode,
+      templateId,
+      templateTouched,
+      expiryPresetId,
+      allowedKinds,
+      allowPlusOnes,
+    ],
+  );
+
+  const publish = useCallback(async (fields: typeof draftFields) => {
     setError(null);
     setSubmitting(true);
     try {
       const result = await api.post<{ event: EventPreview; joinCode: string }>(
         '/api/events/create',
         {
-          title,
-          description,
-          occasion: occasionId,
-          hostedBy,
-          templateId,
-          startsAt: fromDateTimeLocalValue(startsAt),
+          title: fields.title,
+          description: fields.description,
+          occasion: fields.occasionId,
+          hostedBy: fields.hostedBy,
+          templateId: fields.templateId,
+          startsAt: fromDateTimeLocalValue(fields.startsAt),
           endsAt: null,
           location:
-            locationName || locationAddress
-              ? { name: locationName, address: locationAddress, url: null }
+            fields.locationName || fields.locationAddress
+              ? { name: fields.locationName, address: fields.locationAddress, url: null }
               : null,
-          dressCode,
+          dressCode: fields.dressCode,
           rsvp: {
             enabled: true,
             deadline: null,
-            allowPlusOnes,
-            maxPartySize: allowPlusOnes ? 2 : 1,
+            allowPlusOnes: fields.allowPlusOnes,
+            maxPartySize: fields.allowPlusOnes ? 2 : 1,
             askNote: false,
             question: null,
           },
-          expiryPresetId,
-          allowedKinds,
+          expiryPresetId: fields.expiryPresetId,
+          allowedKinds: fields.allowedKinds,
         },
       );
+      // Published: the draft has served its purpose and the event is the record now.
+      clearDraft();
       setCreated(result);
     } catch (caught) {
       setError(errorMessage(caught, 'Could not create the invitation.'));
     } finally {
       setSubmitting(false);
     }
+  }, []);
+
+  /**
+   * The gate, at the only point it earns its place. An anonymous host keeps their work:
+   * the draft is written before anything can navigate away, and picked up again below.
+   */
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!actor || isAnonymous) {
+      saveDraft({ ...draftFields, pendingPublish: true });
+      setNeedsAccount(true);
+      return;
+    }
+    void publish(draftFields);
+  }
+
+  /**
+   * Keep the work, continuously.
+   *
+   * Not only for the sign-in trip: a closed tab, a refresh, or a phone that drops the page
+   * to reclaim memory all cost a host everything they had typed. `pendingPublish` stays
+   * false here — this is a draft someone is still writing, and coming back to it later
+   * must never send it on its own.
+   */
+  useEffect(() => {
+    if (created || needsAccount || !title.trim()) return;
+    saveDraft({ ...draftFields, pendingPublish: false });
+  }, [draftFields, created, needsAccount, title]);
+
+  /**
+   * Coming back from an email link, in a new tab, with the form empty.
+   *
+   * Restores what was typed and finishes the job they already asked for — they pressed
+   * publish before being interrupted, so making them press it a second time is asking
+   * twice for one decision. Runs once, and only when there is genuinely a session.
+   */
+  useEffect(() => {
+    if (loading || resumed.current) return;
+    if (!actor || isAnonymous) return;
+
+    resumed.current = true;
+    void (async () => {
+      const draft = loadDraft();
+      if (!draft) return;
+
+      setOccasionId(draft.occasionId);
+      setTitle(draft.title);
+      setHostedBy(draft.hostedBy);
+      setDescription(draft.description);
+      setStartsAt(draft.startsAt);
+      setLocationName(draft.locationName);
+      setLocationAddress(draft.locationAddress);
+      setDressCode(draft.dressCode);
+      setTemplateId(draft.templateId);
+      setTemplateTouched(draft.templateTouched);
+      setExpiryPresetId(draft.expiryPresetId);
+      setAllowedKinds(draft.allowedKinds);
+      setAllowPlusOnes(draft.allowPlusOnes);
+      setNeedsAccount(false);
+      setRestored(true);
+
+      // Only auto-publish what publish was already pressed on. A draft merely left behind
+      // is restored and left alone, so nobody's half-written invitation goes out because
+      // they signed in for some other reason.
+      if (draft.pendingPublish && draft.title.trim() && draft.allowedKinds.length > 0) {
+        await publish({
+          occasionId: draft.occasionId,
+          title: draft.title,
+          hostedBy: draft.hostedBy,
+          description: draft.description,
+          startsAt: draft.startsAt,
+          locationName: draft.locationName,
+          locationAddress: draft.locationAddress,
+          dressCode: draft.dressCode,
+          templateId: draft.templateId,
+          templateTouched: draft.templateTouched,
+          expiryPresetId: draft.expiryPresetId,
+          allowedKinds: draft.allowedKinds,
+          allowPlusOnes: draft.allowPlusOnes,
+        });
+      }
+    })();
+  }, [actor, isAnonymous, loading, publish]);
+
+  /**
+   * The ask, at the moment it makes sense. The host has already built the thing; what is
+   * being requested is a way to keep it theirs, which is a reason rather than a toll.
+   */
+  if (needsAccount) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12 text-center">
+        <button
+          type="button"
+          onClick={() => setNeedsAccount(false)}
+          className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+        >
+          ← Back to editing
+        </button>
+        <SignInPrompt
+          title="Almost there"
+          body={`Sign in and “${title.trim()}” goes out. It takes an account because you are the only one who should be able to change it, delete it, or read what your guests write to you privately.`}
+          note="Your invitation is saved — signing in will not lose it."
+          onSignedIn={() => {
+            setNeedsAccount(false);
+            void publish(draftFields);
+          }}
+        />
+      </main>
+    );
   }
 
   if (created) {
@@ -163,6 +314,19 @@ export default function CreateEventPage() {
       <p className="mt-2 text-[var(--text-secondary)]">
         Only the first two are required. You can change everything later.
       </p>
+
+      {/*
+        Someone who left to fetch a sign-in link comes back to a tab that never held their
+        work. Saying so is the difference between trusting the form and retyping into it.
+      */}
+      {restored && !submitting && (
+        <p
+          role="status"
+          className="mt-4 rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-secondary)]"
+        >
+          Welcome back — we kept what you had written.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-7" noValidate>
         <fieldset>

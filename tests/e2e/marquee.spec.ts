@@ -37,9 +37,12 @@ test.describe('the marketing site', () => {
     await expect(page.getByText(/free while we are in preview/i)).toBeVisible();
   });
 
-  test('hosting requires an account', async ({ page }) => {
+  test('anyone can start an invitation without an account', async ({ page }) => {
+    // The old flow demanded an account before the form. Nobody signs up for a product
+    // they have not seen, so the form is open and the account is asked for at publish.
     await page.goto('/create');
-    await expect(page.getByRole('heading', { name: /sign in to host/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /make an invitation/i })).toBeVisible();
+    await expect(page.getByLabel('What are we calling it?')).toBeEditable();
   });
 });
 
@@ -65,8 +68,55 @@ test.describe('creating an event', () => {
     await expect(page.getByText('The Rooftop')).toBeVisible();
   });
 
-  test('the form refuses an invitation with no name', async ({ page }) => {
+  test('an account is asked for at publish, and the draft survives it', async ({ page }) => {
+    const email = uniqueEmail('host');
+
+    // Build the whole thing with no account at all.
+    await page.goto('/create');
+    await page.getByRole('button', { name: /dinner/i }).click();
+    await page.getByLabel('What are we calling it?').fill('Anonymous rooftop dinner');
+    await page.getByLabel('Hosted by').fill('Someone New');
+    await page.getByRole('button', { name: /send the invitation/i }).click();
+
+    // The gate lands here, and explains itself rather than just refusing.
+    await expect(page.getByRole('heading', { name: /almost there/i })).toBeVisible();
+    await expect(page.getByText(/your invitation is saved/i)).toBeVisible();
+
+    // Signing in leaves the site for an inbox and returns through a different page, which
+    // is exactly the trip the draft has to survive.
+    await signIn(page, email);
+
+    await page.goto('/create');
+    await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.getByRole('button', { name: /open the invitation/i }).click();
+    await expect(page.getByRole('heading', { name: 'Anonymous rooftop dinner' })).toBeVisible();
+    await expect(page.getByText('From Someone New')).toBeVisible();
+  });
+
+  test('a draft nobody published is restored but not sent', async ({ page }) => {
+    // Signing in for some other reason must not fire off a half-written invitation.
+    await page.goto('/create');
+    await page.getByLabel('What are we calling it?').fill('Half a thought');
+
+    // Autosaved as they type, so there is something to restore.
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('marquee.draft.event.v1')))
+      .toContain('Half a thought');
+
     await signIn(page, uniqueEmail('host'));
+    await page.goto('/create');
+
+    // Restored, and pointedly not sent: the form is still a form.
+    await expect(page.getByRole('heading', { name: /make an invitation/i })).toBeVisible();
+    await expect(page.getByLabel('What are we calling it?')).toHaveValue('Half a thought');
+    await expect(page.getByText(/we kept what you had written/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toHaveCount(0);
+  });
+
+  test('the form refuses an invitation with no name', async ({ page }) => {
     await page.goto('/create');
     await expect(page.getByRole('button', { name: /send the invitation/i })).toBeDisabled();
   });
@@ -83,7 +133,6 @@ test.describe('creating an event', () => {
   test('every design is offered while billing is in preview', async ({ page }) => {
     // Billing is off, so nothing is gated — and the page says exactly that rather than
     // dangling a paywall the visitor will never actually meet.
-    await signIn(page, uniqueEmail('host'));
     await page.goto('/create');
     await expect(page.getByRole('button', { name: 'Midnight' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Sunset' })).toBeEnabled();

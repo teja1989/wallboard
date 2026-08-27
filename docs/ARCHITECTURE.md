@@ -13,7 +13,7 @@ Browser ──┬─ Next.js pages (RSC + client components)
 ```
 
 One event, three surfaces — invitation, wall and guest list — served from one page and one
-Firestore document tree. Four ideas carry most of the design.
+Firestore document tree. Five ideas carry most of the design.
 
 ### 1. Writes are server-only; reads can be direct
 
@@ -44,7 +44,27 @@ The server session is authoritative for identity. The client SDK's local state l
 IndexedDB, which a private window, a cleared site, or a different device will not have — so
 `AuthProvider` asks `GET /api/session` on mount before deciding anyone is a guest.
 
-### 3. Answers are public, notes are not
+### 3. The account is asked for at publish, not at the door
+
+Hosting needs a durable identity. The host alone can delete the event, read guests' private
+replies, rotate the join code and download the archive, and an anonymous session lives in
+browser storage that a cleared cookie takes with it — losing a wedding wall permanently
+while guests are still posting to it.
+
+None of that is true of a form nobody has submitted. So `/create` is open, and the account
+is asked for when publish is pressed, where the question answers itself: sign in so that
+only you can change this. The uid survives the upgrade, so the draft stays the same
+person's.
+
+The email-link path leaves the site entirely — inbox, then a different tab — so the draft is
+persisted to `localStorage` as it is typed and resumed on the way back. A draft that publish
+was pressed on finishes the job; one merely left behind is restored and left alone, because
+signing in for some other reason must never send someone's half-written invitation.
+
+Opening that door removed the only sign-in surface the app had, which is what `/signin` is
+for: a host with a new phone needs a way back to invitations they already own.
+
+### 4. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -61,7 +81,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 4. Media never touches the app server
+### 5. Media never touches the app server
 
 Uploading is a two-step handshake:
 

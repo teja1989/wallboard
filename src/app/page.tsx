@@ -75,6 +75,21 @@ export default function LandingPage() {
             Free to start. Your guests never need an account, an app, or a download.
           </p>
 
+          {/*
+            Quiet, and deliberately below the two calls to action: a returning host needs a
+            way back to invitations they already own, but nobody should be asked to sign in
+            before they have seen what the product does.
+          */}
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Made one already?{' '}
+            <Link
+              href="/signin"
+              className="underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
+            >
+              Sign in
+            </Link>
+          </p>
+
           {/* Occasions, as proof this is not a one-use-case product. */}
           <ul className="mt-14 flex flex-wrap gap-2">
             {occasions

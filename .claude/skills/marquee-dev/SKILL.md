@@ -184,6 +184,10 @@ to change one of them.
 - **Canvas encoding is best-effort.** `toBlob` can return null, WebP support is not
   universal, and a huge image can exceed the variant's byte cap. `media-probe.ts` returns
   whatever succeeded and the upload claims only that.
+- **Do not put an auth gate in front of the create form.** It was there once and it is the
+  wall every prospective host hits before seeing anything. The gate belongs at publish;
+  `event-draft.ts` is what makes that survive the email-link round trip. Anything new that
+  needs an account should ask at the moment of commitment, not on arrival.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.
