@@ -4,6 +4,7 @@ import {
   createEvent,
   resetRateLimits,
   signIn,
+  browseCreateAnonymously,
   signInAsGuest,
   signInFromHere,
   uniqueEmail,
@@ -38,12 +39,24 @@ test.describe('the marketing site', () => {
     await expect(page.getByText(/free while we are in preview/i)).toBeVisible();
   });
 
-  test('anyone can start an invitation without an account', async ({ page }) => {
-    // The old flow demanded an account before the form. Nobody signs up for a product
-    // they have not seen, so the form is open and the account is asked for at publish.
+  test('the create page asks for an account, and offers a way past', async ({ page }) => {
+    // An account captured here is the one that comes back. But a wall in front of an unseen
+    // product loses the merely curious, so the escape is stated plainly rather than hidden.
     await page.goto('/create');
-    await expect(page.getByRole('heading', { name: /make an invitation/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+
+    await page.getByRole('button', { name: /have a look around first/i }).click();
     await expect(page.getByLabel('What are we calling it?')).toBeEditable();
+  });
+
+  test('having looked around once, the gate does not return', async ({ page }) => {
+    await page.goto('/create');
+    await page.getByRole('button', { name: /have a look around first/i }).click();
+    await expect(page.getByLabel('What are we calling it?')).toBeVisible();
+
+    // Being asked the same question on every refresh is its own kind of wall.
+    await page.reload();
+    await expect(page.getByLabel('What are we calling it?')).toBeVisible();
   });
 });
 
@@ -69,19 +82,16 @@ test.describe('creating an event', () => {
     await expect(page.getByText('The Rooftop')).toBeVisible();
   });
 
-  test('the form says an account is coming, before it asks for one', async ({ page }) => {
-    // The gate is at publish, which is right — but arriving at a form with no hint that an
-    // account is involved makes the ask feel like a trap when it lands.
-    await page.goto('/create');
+  test('the form says an account is still coming', async ({ page }) => {
+    await browseCreateAnonymously(page);
     await expect(page.getByText(/you will sign in when you send it/i)).toBeVisible();
-    await expect(page.getByRole('link', { name: /sign in first/i })).toBeVisible();
   });
 
   test('an account is asked for at publish, and the draft survives it', async ({ page }) => {
     const email = uniqueEmail('host');
 
-    // Build the whole thing with no account at all.
-    await page.goto('/create');
+    // Build the whole thing with no account at all, past the gate.
+    await browseCreateAnonymously(page);
     await page.getByRole('button', { name: /dinner/i }).click();
     await page.getByLabel('What are we calling it?').fill('Anonymous rooftop dinner');
     await page.getByLabel('Hosted by').fill('Someone New');
@@ -107,7 +117,7 @@ test.describe('creating an event', () => {
 
   test('a draft nobody published is restored but not sent', async ({ page }) => {
     // Signing in for some other reason must not fire off a half-written invitation.
-    await page.goto('/create');
+    await browseCreateAnonymously(page);
     await page.getByLabel('What are we calling it?').fill('Half a thought');
 
     // Autosaved as they type, so there is something to restore.
@@ -126,7 +136,7 @@ test.describe('creating an event', () => {
   });
 
   test('the form refuses an invitation with no name', async ({ page }) => {
-    await page.goto('/create');
+    await browseCreateAnonymously(page);
     await expect(page.getByRole('button', { name: /send the invitation/i })).toBeDisabled();
   });
 
@@ -142,7 +152,7 @@ test.describe('creating an event', () => {
   test('every design is offered while billing is in preview', async ({ page }) => {
     // Billing is off, so nothing is gated — and the page says exactly that rather than
     // dangling a paywall the visitor will never actually meet.
-    await page.goto('/create');
+    await browseCreateAnonymously(page);
     await expect(page.getByRole('button', { name: 'Midnight' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Sunset' })).toBeEnabled();
     await expect(
@@ -294,6 +304,49 @@ test.describe('the wall', () => {
 
     await expect(outsiderPage.getByText(/could not open that invitation/i)).toBeVisible();
     await outsiderPage.context().close();
+  });
+});
+
+test.describe('the account', () => {
+  test('a host finds what they made, on a page that repays signing in', async ({ page }) => {
+    const email = uniqueEmail('host');
+    await signIn(page, email);
+    await createEvent(page, 'Something I made');
+
+    await page.goto('/account');
+    await expect(page.getByRole('heading', { name: /your invitations/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Something I made' })).toBeVisible();
+    await expect(page.getByText(email)).toBeVisible();
+  });
+
+  test('signing out ends the session', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    await page.goto('/account');
+
+    await page.getByRole('button', { name: /sign out/i }).click();
+    await page.waitForURL('/', { timeout: 15_000 });
+
+    // And the page that needs an account asks for one again. Generous, because this is a
+    // cold load that has to settle both the server session and the Firebase SDK before it
+    // knows there is nobody here.
+    await page.goto('/account');
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test('it shows nobody else their events', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    await createEvent(page, 'Private to its host');
+
+    const otherContext = await browser.newContext();
+    const otherPage = await otherContext.newPage();
+    await signIn(otherPage, uniqueEmail('other'));
+    await otherPage.goto('/account');
+
+    await expect(otherPage.getByRole('heading', { name: /your invitations/i })).toBeVisible();
+    await expect(otherPage.getByText('Private to its host')).toHaveCount(0);
+    await otherContext.close();
   });
 });
 

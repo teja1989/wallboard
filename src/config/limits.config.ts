@@ -100,6 +100,17 @@ export const partySizeChoices = [
   { value: 6, label: 'Up to 6' },
 ] as const;
 
+/**
+ * Where "let me look first" is remembered.
+ *
+ * The create flow opens with the sign-in card, because an account captured at the top of
+ * the funnel is the one that comes back — but a wall in front of a product nobody has seen
+ * loses the people who were only curious, and they are the same people. So there is a way
+ * past it, and taking it is remembered for the session: being asked the same question again
+ * on every refresh is its own kind of wall.
+ */
+export const createGate = { browseKey: 'marquee.create.browsing' } as const;
+
 export const eventDraft = {
   storageKey: 'marquee.draft.event.v1',
   ttlMs: 24 * HOUR,
@@ -132,6 +143,12 @@ export const contentLimits = {
   mediaPerPost: 1,
   /** Posts fetched per page on the wall. */
   wallPageSize: 30,
+  /**
+   * How many of a host's own events the account page lists. Generous, because someone who
+   * hosts regularly is the customer worth keeping, and a truncated list is exactly what
+   * makes them think their events are gone.
+   */
+  hostEventPageSize: 50,
 } as const;
 
 /**

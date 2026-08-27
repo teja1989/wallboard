@@ -68,6 +68,13 @@ locals {
         { path = "joinedAt", order = "ASCENDING" },
       ]
     }
+    events_for_host = {
+      collection = "events"
+      fields = [
+        { path = "hostUid", order = "ASCENDING" },
+        { path = "createdAt", order = "DESCENDING" },
+      ]
+    }
     events_by_host_date = {
       collection = "events"
       fields = [

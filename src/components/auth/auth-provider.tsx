@@ -202,7 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (current?.isAnonymous) {
       try {
-        await linkWithPopup(current, provider);
+        const linked = await linkWithPopup(current, provider);
+        await exchangeSession(linked.user);
         return;
       } catch (error) {
         const code = (error as { code?: string }).code;
@@ -211,8 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    await signInWithPopup(auth, provider);
-  }, []);
+    const credential = await signInWithPopup(auth, provider);
+    await exchangeSession(credential.user);
+  }, [exchangeSession]);
 
   const sendEmailLink = useCallback(async (email: string, returnTo?: string) => {
     await sendSignInLinkToEmail(clientAuth(), email, {
@@ -237,28 +239,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(RETURN_TO_STORAGE_KEY, destination);
   }, []);
 
-  const completeEmailLink = useCallback(async (email: string) => {
-    const auth = clientAuth();
-    if (!isSignInWithEmailLink(auth, window.location.href)) {
-      throw new Error('That sign-in link is not valid.');
-    }
-    const current = auth.currentUser;
-    if (current?.isAnonymous) {
-      const credential = EmailAuthProvider.credentialWithLink(email, window.location.href);
-      try {
-        await linkWithCredential(current, credential);
-        window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
-        return;
-      } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code !== 'auth/credential-already-in-use' && code !== 'auth/email-already-in-use') {
-          throw error;
+  /**
+   * Resolves only once there is a session, like `signInAsGuest`.
+   *
+   * Firebase sign-in and the server cookie are two steps, and the second happens in the
+   * token listener. Returning after the first tells the caller they are signed in while
+   * the very next request still goes out unauthenticated — which showed up as an
+   * intermittent 401 creating an event immediately after following a sign-in link, only
+   * under load, which is the worst way for a race to introduce itself.
+   */
+  const completeEmailLink = useCallback(
+    async (email: string) => {
+      const auth = clientAuth();
+      if (!isSignInWithEmailLink(auth, window.location.href)) {
+        throw new Error('That sign-in link is not valid.');
+      }
+      const current = auth.currentUser;
+      if (current?.isAnonymous) {
+        const credential = EmailAuthProvider.credentialWithLink(email, window.location.href);
+        try {
+          const linked = await linkWithCredential(current, credential);
+          window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
+          await exchangeSession(linked.user);
+          return;
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== 'auth/credential-already-in-use' && code !== 'auth/email-already-in-use') {
+            throw error;
+          }
         }
       }
-    }
-    await signInWithEmailLink(auth, email, window.location.href);
-    window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
-  }, []);
+      const credential = await signInWithEmailLink(auth, email, window.location.href);
+      window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
+      await exchangeSession(credential.user);
+    },
+    [exchangeSession],
+  );
 
   const signOut = useCallback(async () => {
     await api.delete('/api/session').catch(() => undefined);

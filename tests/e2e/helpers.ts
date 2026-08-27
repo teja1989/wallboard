@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
  * Test helpers.
@@ -83,6 +83,26 @@ export async function signIn(page: Page, email: string): Promise<void> {
  * where they were. Navigating anywhere by hand afterwards would hide exactly the bug this
  * is here to catch — the link used to always land on the home page.
  */
+/**
+ * Past the create page's sign-in card, without an account.
+ *
+ * The gate is deliberate — an account asked for at the top of the funnel is the one that
+ * comes back — and so is the way past it. Tests that exercise the form itself take the
+ * escape, exactly as a curious visitor would.
+ */
+export async function browseCreateAnonymously(page: Page): Promise<void> {
+  await page.goto('/create');
+
+  const form = page.getByLabel('What are we calling it?');
+  const escape = page.getByRole('button', { name: /have a look around first/i });
+
+  // Whichever settles first: a signed-in visitor, or one who has already taken the escape
+  // this session, never sees the gate at all.
+  await expect(form.or(escape)).toBeVisible();
+  if (!(await form.isVisible())) await escape.click();
+  await expect(form).toBeVisible();
+}
+
 export async function signInFromHere(page: Page, email: string): Promise<void> {
   const baseUrl = new URL(page.url()).origin;
 

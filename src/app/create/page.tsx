@@ -13,6 +13,7 @@ import {
   expiryPresets,
   occasionById,
   occasions,
+  createGate,
   partySizeChoices,
   type PostKind,
 } from '@/config';
@@ -87,7 +88,32 @@ export default function CreateEventPage() {
   /** Set when publish was pressed without an account: the form yields to the sign-in step. */
   const [needsAccount, setNeedsAccount] = useState(false);
   const [restored, setRestored] = useState(false);
+  /** Whether they chose to look around before signing in. Session-scoped. */
+  const [browsing, setBrowsing] = useState(false);
   const resumed = useRef(false);
+
+  // Read after mount, never during render: sessionStorage does not exist on the server, and
+  // reading it in an initialiser would hydrate to a different tree than the server sent.
+  useEffect(() => {
+    // In an async callback, not the effect body: a synchronous setState during an effect
+    // cascades renders, and the lint rule that says so has caught real bugs here already.
+    void (async () => {
+      try {
+        if (window.sessionStorage.getItem(createGate.browseKey) === 'yes') setBrowsing(true);
+      } catch {
+        // Storage denied. They are asked once more, which is the harmless direction.
+      }
+    })();
+  }, []);
+
+  const lookAround = useCallback(() => {
+    setBrowsing(true);
+    try {
+      window.sessionStorage.setItem(createGate.browseKey, 'yes');
+    } catch {
+      // As above.
+    }
+  }, []);
 
   const occasion = useMemo(() => occasionById(occasionId), [occasionId]);
 
@@ -267,8 +293,58 @@ export default function CreateEventPage() {
   }, [actor, isAnonymous, loading, publish]);
 
   /**
-   * The ask, at the moment it makes sense. The host has already built the thing; what is
-   * being requested is a way to keep it theirs, which is a reason rather than a toll.
+   * The front door.
+   *
+   * An account asked for here is the one that comes back — the whole point of having one is
+   * that a host finds their invitations again on another device, and that only works if the
+   * account exists. With Google it is a single tap and the page never leaves, so the cost of
+   * asking early is now small enough to be worth the retention.
+   *
+   * But a wall in front of an unseen product loses the merely curious, and the merely
+   * curious are the same people. So there is a way past, stated plainly rather than hidden,
+   * and the form behind it works exactly as it did — the account is simply asked for again
+   * at publish, where it is no longer optional.
+   */
+  // Nothing decides until identity has: rendering the form first and replacing it with the
+  // sign-in card a moment later shows someone the thing they wanted and then takes it away.
+  if (loading) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 text-center">
+        <p className="text-sm text-[var(--text-muted)]">One moment…</p>
+      </main>
+    );
+  }
+
+  const signedIn = actor && !isAnonymous;
+  if (!signedIn && !browsing && !created) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12 text-center">
+        <Link
+          href="/"
+          className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+        >
+          ← {brand.name}
+        </Link>
+        <SignInPrompt
+          title="Make an invitation"
+          body="Sign in so your invitation is yours — to edit, to see replies on, and to find again on any device."
+          returnTo="/create"
+          onSignedIn={() => undefined}
+        />
+        <button
+          type="button"
+          onClick={lookAround}
+          className="mx-auto mt-6 text-sm text-[var(--text-muted)] underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
+        >
+          Have a look around first
+        </button>
+      </main>
+    );
+  }
+
+  /**
+   * The ask, at the moment it stops being optional. The host has already built the thing;
+   * what is being requested is a way to keep it theirs, which is a reason rather than a toll.
    */
   if (needsAccount) {
     return (

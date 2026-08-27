@@ -288,6 +288,27 @@ async function countActiveEventsForHost(uid: string): Promise<number> {
   return snapshot.data().count;
 }
 
+/**
+ * The events someone hosts, newest first.
+ *
+ * The whole reason an account exists: a host who comes back on a different device has to
+ * find what they already made. Without this there is nothing to return to, and "sign in"
+ * asks for a commitment the product never repays.
+ *
+ * Ordered by creation rather than by event date, because a host looking for one they made
+ * is thinking about when they made it, and half of these have no date at all.
+ */
+export async function listEventsForHost(uid: string, limit: number): Promise<EventDoc[]> {
+  const snapshot = await db()
+    .collection(collections.events)
+    .where('hostUid', '==', uid)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
+
+  return snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<EventDoc, 'id'>), id: doc.id }));
+}
+
 /** Resolves a plaintext code to its event, or null. Never reveals which half failed. */
 export async function findEventByCode(code: string): Promise<EventDoc | null> {
   const codeHash = hashJoinCode(code, serverConfig().joinCodePepper);
