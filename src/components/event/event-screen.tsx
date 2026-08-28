@@ -197,6 +197,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
               adults={rsvp.adults}
               childGuests={rsvp.children}
               onAnswered={onAnswered}
+              // Somebody who has just replied — including somebody who cannot come — is one
+              // tap from the wall rather than at the end of the road.
+              onOpenWall={() => setSection('wall')}
             />
             {isAnonymous && (
               <SignInPrompt

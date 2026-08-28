@@ -11,6 +11,7 @@ import {
   type RsvpStatus,
 } from '@/config';
 import { Button } from '@/components/ui/button';
+import { RsvpConfirmed } from '@/components/event/rsvp-confirmed';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { cn, formatDateOnly } from '@/lib/utils';
@@ -24,6 +25,8 @@ interface RsvpCardProps {
   /** Not `children`: React reserves that prop name for nested elements. */
   childGuests: number;
   onAnswered: () => void;
+  /** Where the confirmation sends someone who wants to say something. */
+  onOpenWall: () => void;
 }
 
 /**
@@ -34,11 +37,26 @@ interface RsvpCardProps {
  * and the note only appear after "Going" is chosen — asking how many people are coming
  * before someone has said they are coming is the wrong order.
  */
-export function RsvpCard({ event, status, adults, childGuests, onAnswered }: RsvpCardProps) {
+export function RsvpCard({
+  event,
+  status,
+  adults,
+  childGuests,
+  onAnswered,
+  onOpenWall,
+}: RsvpCardProps) {
   const { notify } = useToast();
   const occasion = occasionById(event.occasion);
 
   const [choice, setChoice] = useState<RsvpStatus>(status);
+  /**
+   * Whether the form is showing rather than the confirmation.
+   *
+   * A guest who has answered gets the confirmation by default, including on a second visit —
+   * they are coming back for the date and the address, not for radio buttons they already
+   * used. Changing the reply reopens this.
+   */
+  const [editing, setEditing] = useState(false);
   const [adultCount, setAdultCount] = useState(adults);
   const [childCount, setChildCount] = useState(childGuests);
   const [note, setNote] = useState('');
@@ -66,10 +84,9 @@ export function RsvpCard({ event, status, adults, childGuests, onAnswered }: Rsv
         note,
         answer,
       });
-      notify(
-        next === 'yes' ? 'Wonderful — you are on the list.' : 'Thanks for letting us know.',
-        'success',
-      );
+      // No toast. What used to be the entire reward for replying is now a panel that says
+      // the same thing and then does something with the moment.
+      setEditing(false);
       onAnswered();
     } catch (caught) {
       setChoice(status);
@@ -80,6 +97,18 @@ export function RsvpCard({ event, status, adults, childGuests, onAnswered }: Rsv
   }
 
   if (!event.rsvp.enabled) return null;
+
+  if (hasReplied && !editing) {
+    return (
+      <RsvpConfirmed
+        event={event}
+        status={status}
+        partySize={adults + childGuests}
+        onChange={() => setEditing(true)}
+        onOpenWall={onOpenWall}
+      />
+    );
+  }
 
   if (deadlinePassed && !hasReplied) {
     return (

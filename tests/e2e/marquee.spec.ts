@@ -607,7 +607,8 @@ test.describe('the invitation and RSVP', () => {
     await guestPage.getByRole('radio', { name: 'Going' }).click();
     await guestPage.getByRole('button', { name: /i'll be there/i }).click();
 
-    await expect(guestPage.getByText(/you are on the list/i)).toBeVisible();
+    // The reply lands on a panel that does something with the moment, not a toast.
+    await expect(guestPage.getByRole('heading', { name: /you're going/i })).toBeVisible();
 
     // The host sees the reply on the guest list without reloading anything by hand.
     await page.goto(`/e/${eventId}`);
@@ -631,9 +632,20 @@ test.describe('the invitation and RSVP', () => {
     await guestPage.getByRole('button', { name: /open it/i }).click();
 
     await guestPage.getByRole('radio', { name: /can't make it/i }).click();
-    await expect(guestPage.getByText(/thanks for letting us know/i)).toBeVisible();
+    await expect(guestPage.getByRole('heading', { name: /thanks for saying/i })).toBeVisible();
     // No party size prompt appears for someone who is not coming.
     await expect(guestPage.getByText(/how many of you/i)).toHaveCount(0);
+
+    // Nor is it a dead end. Not being able to come is not the same as having nothing to say,
+    // and for a birthday it is frequently the opposite.
+    await expect(
+      guestPage.getByRole('button', { name: /leave them a message anyway/i }),
+    ).toBeVisible();
+    // And the confirmation does not offer a calendar entry for a thing they just said they
+    // cannot attend. Scoped to the panel: the invitation above it has its own, which is
+    // correct — somebody may still want the date without being able to come.
+    const declined = guestPage.getByRole('region', { name: /thanks for saying/i });
+    await expect(declined.getByRole('button', { name: /add to calendar/i })).toHaveCount(0);
 
     await guestContext.close();
   });
@@ -642,12 +654,63 @@ test.describe('the invitation and RSVP', () => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Changing minds');
 
+    // The host is already attending their own event, so they land on the confirmation rather
+    // than on radio buttons — which is the point of it.
     await page.goto(`/e/${eventId}`);
-    await page.getByRole('radio', { name: /maybe/i }).click();
-    await expect(page.getByText(/thanks for letting us know/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /you're going/i })).toBeVisible({
+      timeout: 20_000,
+    });
 
+    await page.getByRole('button', { name: /change my reply/i }).click();
+    await page.getByRole('radio', { name: /maybe/i }).click();
+    await expect(page.getByRole('heading', { name: /marked as maybe/i })).toBeVisible();
+
+    // A returning guest gets the confirmation, not the radio buttons they already used.
     await page.reload();
-    await expect(page.getByText('Maybe').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /marked as maybe/i })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Changing it is always one quiet tap away — a reply is not a contract.
+    await page.getByRole('button', { name: /change my reply/i }).click();
+    await expect(page.getByRole('radio', { name: 'Going' })).toBeVisible();
+    await page.getByRole('radio', { name: 'Going' }).click();
+    // "Update my reply", not "I'll be there" — the button knows they have answered before.
+    await page.getByRole('button', { name: /update my reply/i }).click();
+    await expect(page.getByRole('heading', { name: /you're going/i })).toBeVisible();
+  });
+
+  /**
+   * The instant after "yes" is the highest intent anyone has in this product. It used to be
+   * spent on a toast that faded, leaving the same three buttons on screen.
+   */
+  test('saying yes offers the date and a way in, not a fading toast', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { joinCode } = await createEvent(page, 'What happens next');
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await expect(guestPage.getByRole('heading', { name: 'What happens next' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await guestPage.getByRole('radio', { name: 'Going' }).click();
+    await guestPage.getByRole('button', { name: /i'll be there/i }).click();
+
+    const confirmed = guestPage.getByRole('region', { name: /you're going/i });
+    await expect(confirmed).toBeVisible();
+    // The thing that actually makes somebody turn up.
+    await expect(confirmed.getByRole('button', { name: /add to calendar/i })).toBeVisible();
+    // The host counts as attending their own event, so this guest is not the first.
+    await expect(confirmed.getByText(/other person is coming|others are coming/i)).toBeVisible();
+
+    await confirmed.getByRole('button', { name: /say hello on the wall/i }).click();
+    await expect(guestPage.getByRole('button', { name: 'Wall', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await guestContext.close();
   });
 
   test('a guest says who is coming, not just how many', async ({ browser, page }) => {
@@ -668,7 +731,7 @@ test.describe('the invitation and RSVP', () => {
     await guestPage.getByRole('button', { name: /one more adults/i }).click();
     await guestPage.getByRole('button', { name: /one more children/i }).click();
     await guestPage.getByRole('button', { name: /i'll be there/i }).click();
-    await expect(guestPage.getByText(/you are on the list/i)).toBeVisible();
+    await expect(guestPage.getByRole('heading', { name: /you're going/i })).toBeVisible();
 
     // The host sees the breakdown, not a bare number.
     await page.goto(`/e/${eventId}`);

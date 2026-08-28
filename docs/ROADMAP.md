@@ -117,6 +117,28 @@ line saying plainly that nothing shared that way can be tracked. The email can b
 sandboxed frame before it goes anywhere, labelled with what it does and does not prove. Send
 controls appear only when they have something to do.
 
+### What happens after somebody replies — shipped
+
+The reply was the end of the road: a toast, and the same three buttons still sitting there.
+That is the wrong place to stop, because the instant after "yes" is the highest intent anyone
+has in this product — they have just committed to being somewhere, and the next thing in their
+head is when is it, what do I do, is anyone else going.
+
+It answers those now: the date, straight into their calendar; whether anybody else is coming;
+and a way into the wall, worded by occasion. Nothing is sold there — they have just done what
+was asked.
+
+**A "no" is not a dead end either**, and this is the part most invitation products miss.
+Someone who cannot come to a fortieth still wants to say something to the person having it, so
+declining offers the wall too — "leave them a message anyway" — while pointedly not offering a
+calendar entry for an event they have just said they cannot attend.
+
+A returning guest gets the confirmation rather than radio buttons they already used, and
+changing the answer stays one quiet tap away: a reply is not a contract.
+
+`postCreated` and `rsvpYes` are already counted, so whether this actually moves replies into
+participation is measurable without adding anything.
+
 ### Payments
 
 The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,
