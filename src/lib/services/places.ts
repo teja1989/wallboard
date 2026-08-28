@@ -141,13 +141,33 @@ export async function placeDetails(
 }
 
 /**
+ * Maps already drawn, keyed by coordinate.
+ *
+ * On `globalThis` for the same reason the Firestore handles are: module scope is reset by
+ * hot reload, and a cache that empties on every edit is not a cache.
+ */
+const mapCache: Map<string, { bytes: ArrayBuffer; at: number }> =
+  (globalThis as { __marqueeMapCache?: Map<string, { bytes: ArrayBuffer; at: number }> })
+    .__marqueeMapCache ??
+  ((
+    globalThis as { __marqueeMapCache?: Map<string, { bytes: ArrayBuffer; at: number }> }
+  ).__marqueeMapCache = new Map());
+
+/**
  * A static map of the venue, fetched with our key and handed on as bytes.
  *
- * Proxied for the same reason as everything else here — a static map URL carries the key in
- * plain sight — and cached hard, because a venue does not move and the alternative is
- * paying for one render per guest who opens the invitation.
+ * Proxied because a static map URL carries the key in plain sight, and cached *here* rather
+ * than only in the response headers: `Cache-Control` stops one browser fetching twice, but
+ * a hundred guests are a hundred browsers, and without this a shared invitation cost one
+ * Google render per guest. Cached this side, it is one per venue.
  */
 export async function staticMap(lat: number, lng: number): Promise<ArrayBuffer> {
+  // Six decimal places is roughly a tenth of a metre — far finer than the map's own zoom,
+  // so two guests looking at the same venue always share an entry.
+  const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  const hit = mapCache.get(key);
+  if (hit && Date.now() - hit.at < placesConfig.mapCache.ttlMs) return hit.bytes;
+
   const { map } = placesConfig;
   const url = new URL(placesConfig.staticMapUrl);
   url.searchParams.set('center', `${lat},${lng}`);
@@ -162,5 +182,16 @@ export async function staticMap(lat: number, lng: number): Promise<ArrayBuffer> 
     console.error('[places] static map failed', response.status);
     throw new ApiError('bad_gateway', 'Could not draw the map.');
   }
-  return response.arrayBuffer();
+
+  const bytes = await response.arrayBuffer();
+
+  // Oldest out first. A plain Map iterates in insertion order, so the first key is the
+  // least recently added — enough for a cache whose miss costs one cheap request.
+  if (mapCache.size >= placesConfig.mapCache.maxEntries) {
+    const oldest = mapCache.keys().next().value;
+    if (oldest !== undefined) mapCache.delete(oldest);
+  }
+  mapCache.set(key, { bytes, at: Date.now() });
+
+  return bytes;
 }

@@ -55,6 +55,20 @@ export const placesConfig = {
 
   /** A session token older than this is stale; Google expires them around the same mark. */
   sessionMaxAgeMs: 3 * MINUTE,
+
+  /**
+   * Maps held in the process, not just in each guest's browser.
+   *
+   * `Cache-Control` alone only stops *one* browser fetching twice — a hundred guests are a
+   * hundred browsers, so a shared invitation would have cost one Google render per guest.
+   * That is the term that scales with the guest list rather than with events created, which
+   * is exactly the wrong shape. An instance-local cache collapses it back to roughly one
+   * render per venue.
+   *
+   * Bounded because the alternative is a process that grows with every event it has ever
+   * drawn, and lost on a cold start, which is fine: the cost of a miss is one cheap call.
+   */
+  mapCache: { maxEntries: 200, ttlMs: 12 * (HOUR / 1000) * 1000 },
 } as const;
 
 /** Copy. Every string a host reads lives here. */
