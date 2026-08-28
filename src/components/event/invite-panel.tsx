@@ -4,6 +4,7 @@ import { Check, Copy, Loader2, Mail, Send, Share2, Trash2 } from 'lucide-react';
 import { deliveryCopy, emailConfig, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { EmailPreview } from '@/components/event/email-preview';
 import { GuestEntry } from '@/components/event/guest-entry';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { invitationPath } from '@/lib/codes-format';
@@ -196,27 +197,33 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
             </Button>
           </div>
 
-          {emailable.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                loading={busy === 'send'}
-                disabled={unsent.length === 0}
-                onClick={() => send('invitation')}
-              >
-                <Mail className="size-4" aria-hidden />
-                Email {unsent.length} unsent
-              </Button>
-              <Button
-                variant="soft"
-                size="sm"
-                loading={busy === 'remind'}
-                disabled={sent.length === 0}
-                onClick={() => send('reminder')}
-              >
-                <Send className="size-4" aria-hidden />
-                Nudge non-repliers
-              </Button>
+          {/*
+            Each control appears only when it has something to do, rather than sitting there
+            greyed out. "Email 0 unsent" was a send button offered before there was anybody to
+            send to — it read as the primary action of the panel while being permanently
+            disabled, which puts the tool's suggested order (send, then decide who) backwards
+            from the real one.
+          */}
+          {(unsent.length > 0 || sent.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {unsent.length > 0 && (
+                <Button size="sm" loading={busy === 'send'} onClick={() => send('invitation')}>
+                  <Mail className="size-4" aria-hidden />
+                  Email {unsent.length} {unsent.length === 1 ? 'person' : 'people'}
+                </Button>
+              )}
+              {sent.length > 0 && (
+                <Button
+                  variant="soft"
+                  size="sm"
+                  loading={busy === 'remind'}
+                  onClick={() => send('reminder')}
+                >
+                  <Send className="size-4" aria-hidden />
+                  Nudge non-repliers
+                </Button>
+              )}
+              <EmailPreview eventId={eventId} />
             </div>
           )}
 

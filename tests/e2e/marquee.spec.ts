@@ -169,6 +169,79 @@ test.describe('creating an event', () => {
  * key at all — which is also what a deploy that has not been given one looks like. If this
  * ever degrades into an error or a dead affordance, hosts cannot say where the party is.
  */
+/**
+ * The preview.
+ *
+ * There was none. A host chose a design from a swatch, typed a title, a date and a venue, and
+ * pressed publish having never seen the card — their first sight of their own invitation came
+ * after it existed and had a code attached.
+ */
+test.describe('previewing the invitation', () => {
+  /**
+   * Both placements are in the DOM at once and CSS decides which one shows — a media query
+   * resolved in JavaScript would hydrate to a different tree than the server sent. So the
+   * assertions below name the *visible* one rather than either.
+   */
+  const visiblePreview = 'section[aria-label="Invitation preview"]:visible';
+
+  test('shows the real card, and it follows what the host types', async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await browseCreateAnonymously(page);
+
+    const preview = page.locator(visiblePreview);
+    await expect(preview).toBeVisible();
+
+    await page.getByLabel('What are we calling it?').fill("Ada's 40th");
+    await page.getByLabel('Hosted by').fill('Grace');
+
+    // The same component the guest gets, so what is on screen is what will send.
+    await expect(preview.getByText("Ada's 40th")).toBeVisible();
+    await expect(preview.getByText('From Grace')).toBeVisible();
+    // The occasion's own copy, from the real component — proof this is the card and not a
+    // sketch of one.
+    await expect(preview.getByText(/has not set a date yet/i)).toBeVisible();
+  });
+
+  test('is reachable on a phone, above the button that commits', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await browseCreateAnonymously(page);
+
+    await page.getByLabel('What are we calling it?').fill('Rooftop thing');
+
+    // Collapsed by default — there is no room to show the card and the form at once.
+    const toggle = page.getByRole('button', { name: /preview what your guests will see/i });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(page.locator(visiblePreview).getByText('Rooftop thing')).toBeVisible();
+  });
+
+  test('cannot be tabbed into, so it never steals a half-finished draft', async ({ page }) => {
+    // It is a picture of an invitation, not one. Its directions link and add-to-calendar
+    // button would otherwise be reachable and would navigate away mid-form.
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await browseCreateAnonymously(page);
+
+    await page.getByLabel('What are we calling it?').fill('Tab test');
+    await page.getByLabel(/where is it/i).fill('14 Bridge Street');
+
+    // The card renders, and the subtree carrying it is `inert` — which is what stops a
+    // browser focusing or clicking anything inside it.
+    const preview = page.locator(visiblePreview);
+    await expect(preview.getByText('14 Bridge Street')).toBeVisible();
+    await expect(preview.locator('[inert]')).toHaveCount(1);
+
+    // Asserted by behaviour rather than by role. Playwright's role queries read the DOM, so
+    // they still find elements a browser has made inert — the honest check is that focus
+    // cannot get there, which is what a keyboard user actually experiences.
+    const focusedInsidePreview = await preview.evaluate((node) => {
+      const link = node.querySelector('a');
+      link?.focus();
+      return node.contains(document.activeElement);
+    });
+    expect(focusedInsidePreview).toBe(false);
+  });
+});
+
 test.describe('the address field', () => {
   test('takes a typed address with no lookup configured', async ({ page }) => {
     await browseCreateAnonymously(page);
@@ -645,11 +718,14 @@ test.describe('inviting people', () => {
     await expect(page.getByText('Not sent')).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /email 1 unsent/i }).click();
+    await page.getByRole('button', { name: /email 1 person/i }).click();
     await expect(page.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-    // The invitation goes once; that is what the nudge button is for.
-    await expect(page.getByRole('button', { name: /email 0 unsent/i })).toBeDisabled();
+    // The invitation goes once; that is what the nudge button is for. The send control is
+    // gone rather than greyed out — a disabled button offering to email nobody read as the
+    // panel's primary action while being permanently dead.
+    await expect(page.getByRole('button', { name: /^email \d+ (person|people)$/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /nudge non-repliers/i })).toBeVisible();
   });
 
   /**
@@ -673,7 +749,7 @@ test.describe('inviting people', () => {
     await expect(page.getByText('+14155550161')).toBeVisible();
 
     // Nobody can be emailed, so the email buttons have nothing to offer.
-    await expect(page.getByRole('button', { name: /email .* unsent/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^email \d+ (person|people)$/i })).toHaveCount(0);
     // But the host can still send it themselves, which is the whole point.
     await expect(page.getByRole('button', { name: /copy every message/i })).toBeEnabled();
   });
@@ -739,6 +815,58 @@ test.describe('inviting people', () => {
     // A member sees who replied. Adding people and reading delivery status is the host's.
     await expect(guestPage.getByRole('region', { name: /add your guests/i })).toHaveCount(0);
     await guestContext.close();
+  });
+
+  test('the host can read the email before it goes to anybody', async ({ page }) => {
+    // `renderEmail` builds the HTML that lands in forty inboxes and there was no way to look
+    // at it — the product asked people to send something they had never read.
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Read it first');
+
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Priya Sharma');
+    await form.getByLabel(/phone or email/i).fill(uniqueEmail('guest'));
+    await form.getByRole('button', { name: /^add/i }).click();
+    await expect(page.getByText('Priya Sharma')).toBeVisible();
+
+    await page.getByRole('button', { name: /see what guests receive/i }).click();
+
+    // Sandboxed, so it cannot reach the page it is embedded in.
+    const preview = page.frameLocator('iframe[title="The invitation email"]');
+    await expect(preview.getByText('Read it first')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('iframe[title="The invitation email"]')).toHaveAttribute(
+      'sandbox',
+      '',
+    );
+
+    // Says what it does and does not prove, rather than implying deliverability.
+    await expect(page.getByText(/spam folder.*guest/i)).toBeVisible();
+  });
+
+  test('the email preview is host-only', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId, joinCode } = await createEvent(page, 'Private preview');
+
+    // A signed-in member, not an anonymous one: an anonymous visitor is turned away at
+    // identity with a 401 and never reaches the permission at all, so testing that would
+    // prove nothing about who is allowed to see this.
+    const memberContext = await browser.newContext();
+    const memberPage = await memberContext.newPage();
+    await signIn(memberPage, uniqueEmail('member'));
+    await memberPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await memberPage.waitForURL(`**/e/${eventId}`, { timeout: 20_000 });
+
+    // Through the page, not `request`: `page.request` is a separate context that does not
+    // carry the session cookie, so it would answer 401 for everyone and prove nothing.
+    // The rendered HTML carries a working invitation link, so it is as sensitive as the code.
+    const status = await memberPage.evaluate(async (id) => {
+      const response = await fetch(`/api/events/${id}/email-preview`, {
+        credentials: 'same-origin',
+      });
+      return response.status;
+    }, eventId);
+    expect(status).toBe(403);
+    await memberContext.close();
   });
 
   /**

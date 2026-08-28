@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useRouter } from 'next/navigation';
 import { AddressField } from '@/components/create/address-field';
 import Link from 'next/link';
-import { Check, Copy, Lock, PartyPopper, Share2 } from 'lucide-react';
+import { Check, Copy, Lock, PartyPopper, Share2, Users } from 'lucide-react';
 import {
   POST_KINDS,
   brand,
@@ -21,6 +21,7 @@ import {
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { Button } from '@/components/ui/button';
+import { InvitationPreview } from '@/components/create/invitation-preview';
 import { TemplatePicker } from '@/components/event/template-picker';
 import { TextAreaField, TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -161,6 +162,49 @@ export default function CreateEventPage() {
   // billing is off, plus any promo running today. Asked rather than assumed, because a form
   // that greys out a theme the server would have accepted is worse than no lock at all.
   const planId = useMemo(() => grantedPlanForNewEvent(occasionId), [occasionId]);
+
+  /**
+   * The same fields, shaped the way the real invitation component wants them, so the preview
+   * is the actual card rather than a drawing of one. Rebuilt on every keystroke, which is
+   * cheap: it is a plain object and the component below it is pure.
+   */
+  const previewDraft = useMemo(
+    () => ({
+      occasionId,
+      title,
+      hostedBy,
+      description,
+      startsAt: fromDateTimeLocalValue(startsAt),
+      timeZone: venueZone ?? browserTimeZone(),
+      locationName,
+      locationAddress,
+      placeId,
+      lat: latLng?.lat ?? null,
+      lng: latLng?.lng ?? null,
+      dressCode,
+      templateId,
+      maxPartySize,
+      allowedKinds,
+      planId,
+    }),
+    [
+      occasionId,
+      title,
+      hostedBy,
+      description,
+      startsAt,
+      venueZone,
+      locationName,
+      locationAddress,
+      placeId,
+      latLng,
+      dressCode,
+      templateId,
+      maxPartySize,
+      allowedKinds,
+      planId,
+    ],
+  );
   const lockedTemplateCount = templates.filter((t) => !canUseTemplate(planId, t.id)).length;
 
   function chooseOccasion(id: string) {
@@ -436,306 +480,332 @@ export default function CreateEventPage() {
         code={created.joinCode}
         onCopied={() => notify('Copied', 'success')}
         onOpen={() => router.push(`/e/${created.event.id}`)}
+        // Straight to the guest list, which is the next thing a host actually needs to do.
+        onAddGuests={() => router.push(`/e/${created.event.id}?tab=guests`)}
       />
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-6 py-10">
-      <Link
-        href="/"
-        className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-      >
-        ← {brand.name}
-      </Link>
+    // One column until there is room for two. The wider track is not a bigger form — it is
+    // the form at the same width with the preview alongside it.
+    <main className="mx-auto w-full max-w-lg px-6 py-10 lg:max-w-5xl">
+      <div className="lg:grid lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-start lg:gap-12">
+        <div className="flex min-h-dvh flex-col lg:min-h-0">
+          <Link
+            href="/"
+            className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+          >
+            ← {brand.name}
+          </Link>
 
-      <h1 className="text-3xl font-semibold tracking-tight">Make an invitation</h1>
-      <p className="mt-2 text-[var(--text-secondary)]">
-        Only the first two are required. You can change everything later.
-      </p>
+          <h1 className="text-3xl font-semibold tracking-tight">Make an invitation</h1>
+          <p className="mt-2 text-[var(--text-secondary)]">
+            Only the first two are required. You can change everything later.
+          </p>
 
-      {/*
+          {/*
         The account is asked for at publish, which is the right moment — but it should not
         be a surprise when it arrives, and someone who already has one should be able to
         start signed in rather than build a draft as a stranger and be stopped at the end.
         Quiet, below the fold of attention, and gone entirely once they are signed in.
       */}
-      {!loading && (!actor || isAnonymous) && (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
-          You will sign in when you send it — one tap with Google.{' '}
-          <Link
-            href="/signin?next=/create"
-            className="underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
-          >
-            Sign in first
-          </Link>
-        </p>
-      )}
+          {!loading && (!actor || isAnonymous) && (
+            <p className="mt-3 text-sm text-[var(--text-muted)]">
+              You will sign in when you send it — one tap with Google.{' '}
+              <Link
+                href="/signin?next=/create"
+                className="underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
+              >
+                Sign in first
+              </Link>
+            </p>
+          )}
 
-      {/*
+          {/*
         Someone who left to fetch a sign-in link comes back to a tab that never held their
         work. Saying so is the difference between trusting the form and retyping into it.
       */}
-      {restored && !submitting && (
-        <p
-          role="status"
-          className="mt-4 rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-secondary)]"
-        >
-          Welcome back — we kept what you had written.
-        </p>
-      )}
+          {restored && !submitting && (
+            <p
+              role="status"
+              className="mt-4 rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-secondary)]"
+            >
+              Welcome back — we kept what you had written.
+            </p>
+          )}
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-7" noValidate>
-        <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            What is the occasion?
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {occasions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => chooseOccasion(option.id)}
-                aria-pressed={occasionId === option.id}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3.5 py-2 text-sm font-medium transition-all duration-200',
-                  occasionId === option.id
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                    : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]',
-                )}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-7" noValidate>
+            <fieldset>
+              <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+                What is the occasion?
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {occasions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => chooseOccasion(option.id)}
+                    aria-pressed={occasionId === option.id}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3.5 py-2 text-sm font-medium transition-all duration-200',
+                      occasionId === option.id
+                        ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                        : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]',
+                    )}
+                  >
+                    <span aria-hidden>{option.glyph}</span>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <TextField
+              label="What are we calling it?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={occasion.titlePlaceholder}
+              maxLength={contentLimits.eventTitleMaxLength}
+              required
+            />
+
+            <TextField
+              label="Hosted by"
+              hint="Leave blank to use your name."
+              value={hostedBy}
+              onChange={(e) => setHostedBy(e.target.value)}
+              placeholder="Priya & Sam"
+              maxLength={contentLimits.hostedByMaxLength}
+            />
+
+            <TextAreaField
+              label="A note for your guests"
+              hint="Optional."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Drinks from seven, dinner at eight."
+              maxLength={contentLimits.eventDescriptionMaxLength}
+              rows={3}
+            />
+
+            <div>
+              <label
+                htmlFor="starts-at"
+                className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]"
               >
-                <span aria-hidden>{option.glyph}</span>
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+                When is it?
+              </label>
+              <input
+                id="starts-at"
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-3 transition-colors focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] focus:outline-none"
+              />
+              <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                Optional — you can send a save-the-date without one.
+                {startsAt && shownTimeZone && (
+                  // Named rather than assumed. Guests are shown this time in *your* zone, so a
+                  // host setting up a party while travelling can catch a wrong zone here rather
+                  // than after two hundred people have the wrong hour.
+                  <>
+                    {' '}
+                    Times are in{' '}
+                    <span className="text-[var(--text-secondary)]">{shownTimeZone}</span>.
+                  </>
+                )}
+              </p>
+            </div>
 
-        <TextField
-          label="What are we calling it?"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={occasion.titlePlaceholder}
-          maxLength={contentLimits.eventTitleMaxLength}
-          required
-        />
+            <div className="space-y-4">
+              <TextField
+                label="Where?"
+                value={locationName}
+                onChange={(e) => setLocationName(e.target.value)}
+                placeholder="The Rooftop, or just: ours"
+                maxLength={contentLimits.locationNameMaxLength}
+              />
+              <AddressField
+                address={locationAddress}
+                onAddressChange={(value) => {
+                  setLocationAddress(value);
+                  // Typing over a chosen place makes the coordinates stale, and stale
+                  // coordinates draw a map of the wrong building.
+                  setPlaceId(null);
+                  setLatLng(null);
+                  setVenueZone(null);
+                }}
+                onPlaceChosen={(place) => {
+                  setLocationAddress(place.address);
+                  // Only fill the venue name if the host has not written their own; "ours" is
+                  // a better name for a back garden than whatever Google calls the street.
+                  if (!locationName && place.name) setLocationName(place.name);
+                  setPlaceId(place.placeId);
+                  setLatLng(
+                    place.lat !== null && place.lng !== null
+                      ? { lat: place.lat, lng: place.lng }
+                      : null,
+                  );
+                  setVenueZone(place.timeZone);
+                }}
+              />
+            </div>
 
-        <TextField
-          label="Hosted by"
-          hint="Leave blank to use your name."
-          value={hostedBy}
-          onChange={(e) => setHostedBy(e.target.value)}
-          placeholder="Priya & Sam"
-          maxLength={contentLimits.hostedByMaxLength}
-        />
-
-        <TextAreaField
-          label="A note for your guests"
-          hint="Optional."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Drinks from seven, dinner at eight."
-          maxLength={contentLimits.eventDescriptionMaxLength}
-          rows={3}
-        />
-
-        <div>
-          <label
-            htmlFor="starts-at"
-            className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]"
-          >
-            When is it?
-          </label>
-          <input
-            id="starts-at"
-            type="datetime-local"
-            value={startsAt}
-            onChange={(e) => setStartsAt(e.target.value)}
-            className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-3 transition-colors focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] focus:outline-none"
-          />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-            Optional — you can send a save-the-date without one.
-            {startsAt && shownTimeZone && (
-              // Named rather than assumed. Guests are shown this time in *your* zone, so a
-              // host setting up a party while travelling can catch a wrong zone here rather
-              // than after two hundred people have the wrong hour.
-              <>
-                {' '}
-                Times are in <span className="text-[var(--text-secondary)]">{shownTimeZone}</span>.
-              </>
+            {occasion.asksDressCode && (
+              <TextField
+                label="Dress code"
+                hint="Optional."
+                value={dressCode}
+                onChange={(e) => setDressCode(e.target.value)}
+                placeholder="Whatever makes you happy"
+                maxLength={contentLimits.dressCodeMaxLength}
+              />
             )}
-          </p>
+
+            <fieldset>
+              <legend className="mb-3 block text-sm font-medium text-[var(--text-secondary)]">
+                Pick a design
+              </legend>
+              <TemplatePicker
+                occasionId={occasionId}
+                value={templateId}
+                planId={planId}
+                canUse={(id) => canUseTemplate(planId, id)}
+                onChange={(id) => {
+                  setTemplateId(id);
+                  setTemplateTouched(true);
+                }}
+              />
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                {lockedTemplateCount > 0
+                  ? `${lockedTemplateCount} more designs come with a paid plan. `
+                  : 'Every design is available while we are in preview. '}
+                <Link href="/templates" className="underline underline-offset-2">
+                  Browse them all
+                </Link>
+                .
+              </p>
+            </fieldset>
+
+            <fieldset>
+              <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+                Can guests bring anyone?
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {partySizeChoices.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setMaxPartySize(value)}
+                    aria-pressed={maxPartySize === value}
+                    className={cn(
+                      'rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
+                      maxPartySize === value
+                        ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                        : 'bg-[var(--surface-sunken)] text-[var(--text-muted)] hover:bg-[var(--accent-soft)]',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Guests say how many adults and children are coming, so you get a headcount you can
+                actually cater for.
+              </p>
+            </fieldset>
+
+            <fieldset>
+              <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+                What can guests post to the wall?
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {POST_KINDS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => toggleKind(kind)}
+                    aria-pressed={allowedKinds.includes(kind)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
+                      allowedKinds.includes(kind)
+                        ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                        : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
+                    )}
+                  >
+                    {allowedKinds.includes(kind) && <Check className="size-3.5" aria-hidden />}
+                    {KIND_LABELS[kind]}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+                How long should the wall stay up afterwards?
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {expiryPresets.map((preset) => {
+                  const locked = !canUseExpiryPreset(planId, preset.id);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={locked}
+                      onClick={() => setExpiryPresetId(preset.id)}
+                      aria-pressed={expiryPresetId === preset.id}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
+                        expiryPresetId === preset.id
+                          ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                          : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]',
+                        locked && 'cursor-not-allowed opacity-45 hover:bg-[var(--surface-sunken)]',
+                      )}
+                    >
+                      {locked && <Lock className="size-3" aria-hidden />}
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {/*
+          The narrow placement. There is no room on a phone to show the card and the form at
+          once, so it collapses — and it sits here, immediately above the button, because the
+          moment before committing is when somebody actually wants to look at what they made.
+          Hidden on wide screens, where the sticky column beside the form has it covered.
+        */}
+            <InvitationPreview draft={previewDraft} collapsible className="lg:hidden" />
+
+            {error && (
+              <p role="alert" className="text-sm text-[var(--danger)]">
+                {error}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              loading={submitting}
+              disabled={!title.trim() || allowedKinds.length === 0}
+            >
+              {occasion.inviteVerb}
+            </Button>
+          </form>
         </div>
 
-        <div className="space-y-4">
-          <TextField
-            label="Where?"
-            value={locationName}
-            onChange={(e) => setLocationName(e.target.value)}
-            placeholder="The Rooftop, or just: ours"
-            maxLength={contentLimits.locationNameMaxLength}
-          />
-          <AddressField
-            address={locationAddress}
-            onAddressChange={(value) => {
-              setLocationAddress(value);
-              // Typing over a chosen place makes the coordinates stale, and stale
-              // coordinates draw a map of the wrong building.
-              setPlaceId(null);
-              setLatLng(null);
-              setVenueZone(null);
-            }}
-            onPlaceChosen={(place) => {
-              setLocationAddress(place.address);
-              // Only fill the venue name if the host has not written their own; "ours" is
-              // a better name for a back garden than whatever Google calls the street.
-              if (!locationName && place.name) setLocationName(place.name);
-              setPlaceId(place.placeId);
-              setLatLng(
-                place.lat !== null && place.lng !== null
-                  ? { lat: place.lat, lng: place.lng }
-                  : null,
-              );
-              setVenueZone(place.timeZone);
-            }}
-          />
-        </div>
-
-        {occasion.asksDressCode && (
-          <TextField
-            label="Dress code"
-            hint="Optional."
-            value={dressCode}
-            onChange={(e) => setDressCode(e.target.value)}
-            placeholder="Whatever makes you happy"
-            maxLength={contentLimits.dressCodeMaxLength}
-          />
-        )}
-
-        <fieldset>
-          <legend className="mb-3 block text-sm font-medium text-[var(--text-secondary)]">
-            Pick a design
-          </legend>
-          <TemplatePicker
-            occasionId={occasionId}
-            value={templateId}
-            planId={planId}
-            canUse={(id) => canUseTemplate(planId, id)}
-            onChange={(id) => {
-              setTemplateId(id);
-              setTemplateTouched(true);
-            }}
-          />
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
-            {lockedTemplateCount > 0
-              ? `${lockedTemplateCount} more designs come with a paid plan. `
-              : 'Every design is available while we are in preview. '}
-            <Link href="/templates" className="underline underline-offset-2">
-              Browse them all
-            </Link>
-            .
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            Can guests bring anyone?
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {partySizeChoices.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMaxPartySize(value)}
-                aria-pressed={maxPartySize === value}
-                className={cn(
-                  'rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
-                  maxPartySize === value
-                    ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
-                    : 'bg-[var(--surface-sunken)] text-[var(--text-muted)] hover:bg-[var(--accent-soft)]',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-[var(--text-muted)]">
-            Guests say how many adults and children are coming, so you get a headcount you can
-            actually cater for.
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            What can guests post to the wall?
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {POST_KINDS.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => toggleKind(kind)}
-                aria-pressed={allowedKinds.includes(kind)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
-                  allowedKinds.includes(kind)
-                    ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
-                    : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
-                )}
-              >
-                {allowedKinds.includes(kind) && <Check className="size-3.5" aria-hidden />}
-                {KIND_LABELS[kind]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-            How long should the wall stay up afterwards?
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {expiryPresets.map((preset) => {
-              const locked = !canUseExpiryPreset(planId, preset.id);
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => setExpiryPresetId(preset.id)}
-                  aria-pressed={expiryPresetId === preset.id}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
-                    expiryPresetId === preset.id
-                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                      : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]',
-                    locked && 'cursor-not-allowed opacity-45 hover:bg-[var(--surface-sunken)]',
-                  )}
-                >
-                  {locked && <Lock className="size-3" aria-hidden />}
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        {error && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        )}
-
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          loading={submitting}
-          disabled={!title.trim() || allowedKinds.length === 0}
-        >
-          {occasion.inviteVerb}
-        </Button>
-      </form>
+        {/*
+          The wide placement: beside the form and sticky, so it stays in view as the fields
+          scroll past it. This is where the design picker stops being a guess.
+        */}
+        <InvitationPreview
+          draft={previewDraft}
+          className="hidden lg:sticky lg:top-10 lg:block lg:self-start"
+        />
+      </div>
     </main>
   );
 }
@@ -745,13 +815,15 @@ interface CreatedPanelProps {
   code: string;
   onCopied: () => void;
   onOpen: () => void;
+  /** The primary action: the guest list, which is where the tracked path starts. */
+  onAddGuests: () => void;
 }
 
 /**
  * The code is shown once, here. Re-reading it later is a separate audited call from inside
  * the event, so it never turns up in a payload someone could stumble across.
  */
-function CreatedPanel({ title, code, onCopied, onOpen }: CreatedPanelProps) {
+function CreatedPanel({ title, code, onCopied, onOpen, onAddGuests }: CreatedPanelProps) {
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
   // The invitation link, not the event URL: `/e/{id}` turns away everyone who is not
   // already a member, which is every person this gets shared with.
@@ -780,13 +852,43 @@ function CreatedPanel({ title, code, onCopied, onOpen }: CreatedPanelProps) {
 
       <h1 className="text-3xl font-semibold tracking-tight">Your invitation is ready</h1>
       <p className="mt-2 text-[var(--text-secondary)]">
-        Send the link, or read the code out. Either gets your guests in.
+        Add the people you are inviting and everyone gets their own link — so you can see who opened
+        it and who has not.
       </p>
 
-      <div className="card mt-8 p-8">
-        <p className="code-display text-4xl font-semibold">{formatJoinCode(code)}</p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <Button variant="soft" size="sm" onClick={() => copy('code')}>
+      {/*
+        The primary action is the guest list, and it was not.
+
+        This screen used to offer a code and "Share the link" and never mention guests at all,
+        so the product's own default path was: create, copy a code, paste it somewhere. Every
+        host who followed it gave up per-guest links, delivery status, reminders and any way to
+        answer "did Priya see this?" — which is to say the entire reason to use this rather
+        than Evite. The tracked path was opt-in, two navigations deep, on a tab inside a page
+        they had not opened.
+
+        The code stays, because reading one out is genuinely the right move for a small party.
+        It is just no longer the road most travelled.
+      */}
+      <Button size="lg" className="mt-8 w-full" onClick={onAddGuests}>
+        <Users className="size-4" aria-hidden />
+        Add your guests
+      </Button>
+
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-3 text-sm text-[var(--text-secondary)] underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
+      >
+        Or just look at it first
+      </button>
+
+      <div className="mt-8 border-t border-[var(--border-subtle)] pt-6">
+        <p className="text-sm text-[var(--text-secondary)]">
+          In a hurry? Read this code out instead — anyone who has it can get in.
+        </p>
+        <p className="code-display mt-3 text-2xl font-semibold">{formatJoinCode(code)}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => copy('code')}>
             {copied === 'code' ? (
               <Check className="size-4" aria-hidden />
             ) : (
@@ -794,20 +896,16 @@ function CreatedPanel({ title, code, onCopied, onOpen }: CreatedPanelProps) {
             )}
             {copied === 'code' ? 'Copied' : 'Copy code'}
           </Button>
-          <Button variant="soft" size="sm" onClick={share}>
+          <Button variant="ghost" size="sm" onClick={share}>
             <Share2 className="size-4" aria-hidden />
             Share the link
           </Button>
         </div>
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          A shared code has no name attached, so nothing sent this way can be tracked. You can find
+          the code again in the host panel any time.
+        </p>
       </div>
-
-      <Button size="lg" className="mt-6 w-full" onClick={onOpen}>
-        Open the invitation
-      </Button>
-
-      <p className="mt-4 text-sm text-[var(--text-muted)]">
-        You can find the code again in the host panel, any time.
-      </p>
     </main>
   );
 }

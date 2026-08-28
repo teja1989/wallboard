@@ -93,6 +93,30 @@ Not yet: an "upgrade viewed" counter, which is the one moment in the funnel that
 in the browser and would need a client beacon. Deliberately deferred — it is new write surface
 for one ratio, and the five server-side moments answer most of the question.
 
+### Build, preview, invite, send — shipped
+
+The create flow had two holes that between them defeated the product's own differentiator.
+
+**There was no preview of anything.** A host chose a design from a swatch, typed a title, a
+date and a venue, and pressed publish having never seen the card — first sight of their own
+invitation came after it existed and had a code attached. And they never saw the _email_:
+`renderEmail` builds the HTML that lands in forty inboxes with no way to read it first.
+
+**The screen after publish never mentioned guests.** It offered a code and "Share the link",
+so the default path was create → copy a code → paste it somewhere — and every host who took it
+gave up per-guest links, delivery status, reminders and any way to answer "did Priya see
+this?". The tracked path was opt-in, two navigations deep, on a tab inside a page they had not
+opened. On that tab sat a permanently disabled "Email 0 unsent", offering to send before there
+was anybody to send to.
+
+Now: the real `Invitation` component renders live as the host types — reused rather than
+reimplemented, so preview and reality cannot drift — sticky beside the form on a wide screen
+and collapsible directly above the publish button on a phone. "Add your guests" is the primary
+action after publishing, landing on the Guests tab via `?tab=`; the code stays, demoted, with a
+line saying plainly that nothing shared that way can be tracked. The email can be read in a
+sandboxed frame before it goes anywhere, labelled with what it does and does not prove. Send
+controls appear only when they have something to do.
+
 ### Payments
 
 The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,

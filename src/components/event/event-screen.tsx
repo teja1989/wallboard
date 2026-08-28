@@ -62,7 +62,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       setDetail(next);
       setLoadError(null);
       // Only chosen once; after that the visitor's own navigation wins.
-      setSection((current) => current ?? openingSection(next));
+      setSection((current) => current ?? requestedSection() ?? openingSection(next));
     } catch (caught) {
       setLoadError(errorMessage(caught, 'This invitation could not be opened.'));
     }
@@ -326,6 +326,23 @@ export function EventScreen({ eventId }: { eventId: string }) {
 }
 
 /** Which section to show on first load. See the note on the component. */
+/**
+ * A section named in the URL, as `?tab=guests`.
+ *
+ * How the create flow hands a host straight to their guest list after publishing, rather
+ * than dropping them on the invitation and hoping they find the tab. Read once, and only as
+ * a starting point — every navigation after it is the visitor's.
+ *
+ * Read from `window` rather than `useSearchParams` deliberately: this runs inside a callback
+ * after data loads, not during render, and the hook would opt the whole page into a
+ * suspense boundary for a value that is wanted exactly once.
+ */
+function requestedSection(): Section | null {
+  if (typeof window === 'undefined') return null;
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  return tab === 'invite' || tab === 'wall' || tab === 'guests' ? tab : null;
+}
+
 function openingSection(detail: EventResponse): Section {
   const { event } = detail;
 

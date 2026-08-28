@@ -645,6 +645,39 @@ async function main() {
   });
   check('a member cannot send', memberSends.status === 403);
 
+  // --- reading the email before sending it ------------------------------------
+  const emailPreview = await call(host.session, `/api/events/${eventId}/email-preview`);
+  check('the host can read the email first', emailPreview.status === 200);
+  check(
+    'and it is the real message, with a working link in it',
+    (emailPreview.payload?.data?.html ?? '').includes(rotated.payload.data.code),
+    'the preview should carry the actual join code, not a placeholder',
+  );
+  check(
+    'the subject comes with it',
+    typeof emailPreview.payload?.data?.subject === 'string' &&
+      emailPreview.payload.data.subject.length > 0,
+  );
+
+  const reminderPreview = await call(
+    host.session,
+    `/api/events/${eventId}/email-preview?kind=reminder`,
+  );
+  check('the reminder can be read too', reminderPreview.payload?.data?.kind === 'reminder');
+
+  const nonsenseKind = await call(
+    host.session,
+    `/api/events/${eventId}/email-preview?kind=whatever`,
+  );
+  check(
+    'an unknown kind falls back rather than erroring',
+    nonsenseKind.payload?.data?.kind === 'invitation',
+  );
+
+  // It renders a working invitation link, so it is as sensitive as the code itself.
+  const memberPreview = await call(member.session, `/api/events/${eventId}/email-preview`);
+  check('a member cannot read the email preview', memberPreview.status === 403);
+
   // --- the funnel ------------------------------------------------------------
   // Counters are aggregate and server-written. Nothing here can be forged by a client, and
   // nothing here names a guest.
