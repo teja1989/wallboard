@@ -227,6 +227,22 @@ to change one of them.
   run: `kill $(ps -eo pid,args | grep '[n]ext-server' | awk '{print $1}')`, rebuild, restart.
   A `pkill -f "next start"` matches the shell running it and kills your own session.
 
+- **Never add an `overrides` entry to quiet `npm audit` without checking who declares that
+  package.** An override is an explicit instruction, so npm applies it and prints nothing —
+  `npm ls` marks the result "overridden", never "invalid". A `"gaxios": "^7.1.4"` override
+  added in the first commit forced gaxios 7 onto `gcp-metadata@6`, which reads
+  `res.headers['metadata-flavor']`; in gaxios 6 that is a plain object and in v7 it is a
+  WHATWG `Headers`, so the read returned `undefined` and every credential fetch died with
+  "incorrect Metadata-Flavor header ... got no header". That took out photo upload, the
+  wall's signed image URLs, the archive and delete — all of Cloud Storage — in production
+  only. Nothing local sees it: the emulator storage driver needs no credentials, so the
+  emulators, the smoke suite and CI are all green while production has no file storage at all.
+
+  `tests/unit/dependencies.test.ts` now fails on any package resolving a dependency outside
+  its declared range. If it goes red, read the names — the fix is almost always deleting an
+  `overrides` entry, not adding one. The advisory those four overrides silenced was a `uuid`
+  bounds check in v3/v5/v6 when `buf` is passed; nothing here calls uuid at all.
+
 - **A provider's `name` claim will overwrite a chosen display name.** Google sends one on
   every token, so `displayNameChosen` on the user document is what stops the next session
   mint from undoing a rename. `src/lib/authz/display-name.ts` holds the precedence; keep it

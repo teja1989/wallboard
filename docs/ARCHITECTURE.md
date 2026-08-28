@@ -384,17 +384,18 @@ their wall back intact.
 
 ## Where things live
 
-| Path                | Holds                                               |
-| ------------------- | --------------------------------------------------- |
-| `src/config/*`      | every tunable — limits, flags, roles, tokens, env   |
-| `src/lib/authz/`    | `can()` policy engine, session resolution           |
-| `src/lib/services/` | events, posts, cleanup — logic shared across routes |
-| `src/lib/storage/`  | the adapter and its two drivers                     |
-| `src/lib/calendar/` | the `.ics` builder, shared by the browser and email |
-| `src/app/api/`      | route handlers; thin, they orchestrate services     |
-| `src/components/`   | UI, grouped by area                                 |
-| `src/proxy.ts`      | security headers and the CSP nonce                  |
-| `firestore.rules`   | the boundary a browser cannot cross                 |
+| Path                | Holds                                                  |
+| ------------------- | ------------------------------------------------------ |
+| `src/config/*`      | every tunable — limits, flags, roles, tokens, env      |
+| `src/lib/authz/`    | `can()` policy engine, session resolution              |
+| `src/lib/services/` | events, posts, cleanup — logic shared across routes    |
+| `src/lib/storage/`  | the adapter and its two drivers                        |
+| `src/lib/calendar/` | the `.ics` builder, shared by the browser and email    |
+| `src/lib/storage/`  | see also `batch.ts` — bounded, retried object deletion |
+| `src/app/api/`      | route handlers; thin, they orchestrate services        |
+| `src/components/`   | UI, grouped by area                                    |
+| `src/proxy.ts`      | security headers and the CSP nonce                     |
+| `firestore.rules`   | the boundary a browser cannot cross                    |
 
 ## Deliberate omissions
 
