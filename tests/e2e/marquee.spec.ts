@@ -1373,6 +1373,37 @@ test.describe('how it is going', () => {
   });
 });
 
+/**
+ * The mark is the only organic distribution this product has, and it rendered on nothing at
+ * all for months — `showBranding` read an entitlement that the preview plan happens to grant,
+ * so being generous switched the growth loop off. Nothing failed; it was simply absent.
+ *
+ * Absence is exactly what a test suite does not notice on its own, which is why this asserts
+ * presence on a real invitation rather than trusting the unit test alone.
+ */
+test.describe('made with Marquee', () => {
+  test('is on a real invitation, and is a link', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { joinCode } = await createEvent(page, 'Attribution test');
+
+    // Seen as a guest sees it — the audience the mark exists for.
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await expect(guestPage.getByRole('heading', { name: 'Attribution test' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // A link, not a footnote: as static text it asked a guest to remember a name and go and
+    // search for it later, which is not a conversion path.
+    const mark = guestPage.getByRole('link', { name: /made with marquee/i });
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveAttribute('href', /./);
+
+    await guestContext.close();
+  });
+});
+
 test.describe('the no-ads promise', () => {
   test('is on the landing page, with a reason', async ({ page }) => {
     await page.goto('/');

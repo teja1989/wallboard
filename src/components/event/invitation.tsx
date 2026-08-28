@@ -1,7 +1,14 @@
 'use client';
 import { CalendarDays, Clock, MapPin, Shirt } from 'lucide-react';
-import { brand, directionsUrl, occasionById, placesConfig, templateById } from '@/config';
-import { entitlementsFor } from '@/lib/billing/entitlements';
+import {
+  appConfig,
+  brand,
+  directionsUrl,
+  occasionById,
+  placesConfig,
+  templateById,
+} from '@/config';
+import { showsAttribution } from '@/lib/billing/entitlements';
 import { AddToCalendar } from '@/components/event/add-to-calendar';
 import { invitationLayouts } from '@/components/event/layouts';
 import { formatCountdownToEvent, formatEventDate } from '@/lib/utils';
@@ -22,7 +29,7 @@ export function Invitation({ event }: { event: EventDoc }) {
   const occasion = occasionById(event.occasion);
   const template = templateById(event.templateId);
   const Layout = invitationLayouts[template.layout];
-  const showBranding = !entitlementsFor(event.plan).removeBranding;
+  const showBranding = showsAttribution(event.plan);
 
   const details = (
     <dl className="space-y-3">
@@ -108,8 +115,24 @@ export function Invitation({ event }: { event: EventDoc }) {
     </dl>
   );
 
+  /*
+    A link, not a line of text.
+
+    The mark is the whole growth loop: this invitation is in front of ten to two hundred
+    people who demonstrably attend events, and a few of them will host something themselves.
+    As static text it asked every one of them to remember a name and go and type it into a
+    search engine later, which is not a conversion path — it is a footnote.
+
+    Opens in the same tab: a guest reading an invitation is not mid-task the way somebody
+    typing a join code is, and stealing a tab from them is worse than losing the click.
+  */
   const attribution = showBranding ? (
-    <p className="mt-7 text-xs opacity-60">{brand.attribution}</p>
+    <a
+      href={appConfig.siteUrl}
+      className="mt-7 inline-block text-xs underline-offset-4 opacity-60 transition-opacity hover:underline hover:opacity-100"
+    >
+      {brand.attribution}
+    </a>
   ) : null;
 
   return (

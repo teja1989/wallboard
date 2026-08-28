@@ -138,3 +138,31 @@ export function cheapestPlanReaching(
 export function isPreviewPricing(): boolean {
   return !isEnabled('billing');
 }
+
+/**
+ * Whether an invitation carries "Made with Marquee".
+ *
+ * This existed as a bare `!entitlementsFor(event.plan).removeBranding` and was, in practice,
+ * **always false**. While billing is off `planForNewEvent()` stamps every event
+ * `previewPlanId` — `pro` — and `pro` includes `removeBranding`. So being maximally generous
+ * during the preview silently switched off the only organic distribution this product has:
+ * the mark rendered on no invitation at all, for months.
+ *
+ * Both halves were individually right. Together they were the worst pairing available — give
+ * the whole product away *and* get no reach in exchange for it. The fix is to decouple the
+ * mark from the plan while nobody is paying, rather than to make the preview less generous.
+ *
+ * **On the invariant this appears to break.** Everything else in this file refuses to widen
+ * what an event may do from global state read at render time — that rule exists because
+ * deriving entitlements from today's flags meant flipping billing would have retroactively
+ * downgraded every live event. This is the opposite shape and is safe for two reasons: an
+ * attribution is a cost to the host rather than a capability, so nothing here can take away
+ * something an event was promised; and the direction the flag moves is benign. When billing
+ * turns on, a preview-era `pro` event *loses* the mark. It can never gain one on an event
+ * whose host paid to be rid of it, because a paid plan carries `removeBranding` and
+ * `isPreviewPricing()` is false by then.
+ */
+export function showsAttribution(planId: string): boolean {
+  if (isPreviewPricing()) return true;
+  return !entitlementsFor(planId).removeBranding;
+}

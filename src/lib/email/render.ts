@@ -133,7 +133,12 @@ function shell({ event, preview, bodyHtml, ctaLabel, ctaUrl, unsubscribeUrl }: S
       </td></tr>
 
       <tr><td style="padding:20px 32px 28px 32px;border-top:1px solid #eee6e1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#a1938c;">
-        Sent with ${escapeHtml(brand.name)} on behalf of ${escapeHtml(event.hostedBy)}.
+        <!--
+          The name links out. This footer is the highest-volume surface the product has —
+          it lands in every invited inbox — and as plain text it asked each reader to
+          remember a name and search for it later, which nobody does.
+        -->
+        Sent with <a href="${escapeHtml(appConfig.siteUrl)}" style="color:#a1938c;">${escapeHtml(brand.name)}</a> on behalf of ${escapeHtml(event.hostedBy)}.
         ${unsubscribeUrl ? `<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:#a1938c;">Stop receiving emails about this event</a>.` : ''}
       </td></tr>
 

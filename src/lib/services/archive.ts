@@ -1,7 +1,7 @@
 import 'server-only';
 import { ZipArchive } from 'archiver';
 import { Readable } from 'node:stream';
-import { brand, collections, occasionById, templateById } from '@/config';
+import { appConfig, brand, collections, occasionById, templateById } from '@/config';
 import { db } from '@/lib/firebase/admin';
 import { storage } from '@/lib/storage';
 import { StorageSweepError } from '@/lib/storage/batch';
@@ -144,6 +144,7 @@ function renderReadme(event: EventDoc, postCount: number): string {
 ${'='.repeat(event.title.length)}
 
 An archive of everything posted to this wall, exported ${readmeDate()} from ${brand.name}.
+${appConfig.siteUrl}
 
   index.html   Open this first — every post, in order, with the photos and video.
   media/       The original files, at the quality they were uploaded.
@@ -256,7 +257,12 @@ function renderIndexHtml(event: EventDoc, posts: PostDoc[]): string {
 ${cards || '<p class="meta">Nothing was posted to this wall.</p>'}
   </main>
 
-  <footer>Exported ${readmeDate()} from ${escapeHtml(brand.name)}.</footer>
+  <!--
+    Linked, because this file outlives everything else we make. A host keeps the archive, and
+    opens it again with people who were there — so it is the one artefact that is still being
+    looked at long after the wall has gone.
+  -->
+  <footer>Exported ${readmeDate()} from <a href="${escapeHtml(appConfig.siteUrl)}">${escapeHtml(brand.name)}</a>.</footer>
 </body>
 </html>`;
 }
