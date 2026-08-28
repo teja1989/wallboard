@@ -24,7 +24,11 @@ import { Button } from '@/components/ui/button';
 import { TemplatePicker } from '@/components/event/template-picker';
 import { TextAreaField, TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
-import { canUseExpiryPreset, canUseTemplate } from '@/lib/billing/entitlements';
+import {
+  canUseExpiryPreset,
+  canUseTemplate,
+  grantedPlanForNewEvent,
+} from '@/lib/billing/entitlements';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/client/event-draft';
 import { formatJoinCode, invitationPath } from '@/lib/codes-format';
@@ -153,10 +157,10 @@ export default function CreateEventPage() {
 
   const occasion = useMemo(() => occasionById(occasionId), [occasionId]);
 
-  // Every event starts on the free plan; the picker greys out what that does not include.
-  // While billing is off nothing is actually locked, so the copy below adapts rather than
-  // promising a paywall the visitor will not meet.
-  const planId = 'free';
+  // What a new event of this occasion would actually be created on — preview pricing while
+  // billing is off, plus any promo running today. Asked rather than assumed, because a form
+  // that greys out a theme the server would have accepted is worse than no lock at all.
+  const planId = useMemo(() => grantedPlanForNewEvent(occasionId), [occasionId]);
   const lockedTemplateCount = templates.filter((t) => !canUseTemplate(planId, t.id)).length;
 
   function chooseOccasion(id: string) {

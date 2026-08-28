@@ -1,5 +1,7 @@
 import {
   absoluteMaxEventLifetimeMs,
+  activePromo,
+  bestPlan,
   eventCeilings,
   expiryPresets,
   isEnabled,
@@ -23,21 +25,54 @@ import {
  */
 
 /**
- * The plan an event actually runs on.
+ * The plan an event actually runs on: the one stamped on it, and nothing else.
  *
- * While billing is off, everything runs on the preview plan. That is a product decision,
- * not a shortcut: gating an unproven product behind a paywall measures nothing except how
- * quickly people leave, and it would make every entitlement check untested in practice.
- * This way the gates are exercised on every request from day one, and switching billing on
- * is a flag rather than a migration.
+ * **It used to consult the global billing flag**, returning `previewPlanId` for every event
+ * while billing was off. That read plausibly and was a dated landmine. Every event in the
+ * database is stamped `free` — `planForNewEvent()` wrote the host's account plan — and was
+ * merely *behaving* as pro. The instant `features.billing` flipped true, every live event
+ * would have dropped to 25 guests and a seven-day wall and lost `archiveDownload`: hosts
+ * mid-event watching their wall shorten and their photos become unkeepable, with no
+ * migration and no warning.
+ *
+ * The generalisation is worth stating, because it is the same mistake promos invite: **what
+ * an event is allowed to do is a fact recorded when it was created, not a rule evaluated
+ * now.** Preview pricing, a promotional window and a paid upgrade are all decided at
+ * creation and written down. Global state may change what the *next* event is granted; it
+ * may never change what an existing one was promised.
+ *
+ * An unrecognised plan resolves to `free` via `planById`, so corrupt data costs the platform
+ * nothing rather than handing out a Pro account.
  */
 export function effectivePlanId(storedPlanId: string): PlanId {
-  if (!isEnabled('billing')) return previewPlanId;
   return planById(storedPlanId).id;
 }
 
 export function entitlementsFor(planId: string): Entitlements {
   return clampToCeilings(planById(effectivePlanId(planId)).entitlements);
+}
+
+/**
+ * What the create form should show as available, before an event exists to ask about.
+ *
+ * The form used to hardcode `free` and rely on `effectivePlanId()` widening it at read time.
+ * With that override gone the form would grey out every premium theme while the server
+ * happily accepted them — a UI that disagrees with its own server, which is the exact failure
+ * invariant 6 exists to prevent.
+ *
+ * So it resolves the same grants `planForNewEvent()` does, minus the one it cannot know from
+ * the browser: the host's own subscription. That asymmetry is deliberate and safe in the only
+ * direction that matters — the server takes the *most generous* of account plan, preview and
+ * promo, so this can under-offer but never offer something creation would then refuse.
+ */
+export function grantedPlanForNewEvent(occasionId: string, now: number = Date.now()): PlanId {
+  let planId: PlanId = 'free';
+  if (!isEnabled('billing')) planId = bestPlan(planId, previewPlanId);
+
+  const promo = activePromo(occasionId, now);
+  if (promo) planId = bestPlan(planId, promo.grantsPlanId);
+
+  return planId;
 }
 
 /**

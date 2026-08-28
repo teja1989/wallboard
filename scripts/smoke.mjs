@@ -215,6 +215,16 @@ async function main() {
   const joinCode = created.payload?.data?.joinCode;
   check('event returns a join code once', typeof joinCode === 'string' && joinCode.length === 8);
 
+  // The plan is written onto the event at creation, not derived from global state when read.
+  // Before this, every event was stamped `free` and merely behaved as pro, so turning billing
+  // on would have downgraded every live event and revoked its archive mid-event.
+  const stamped = await call(host.session, `/api/events/${eventId}`);
+  check(
+    'the event is stamped with the plan it was granted, not free',
+    stamped.payload?.data?.event?.plan === 'pro',
+    JSON.stringify(stamped.payload?.data?.event?.plan),
+  );
+
   const anonCreate = await call(guest.session, '/api/events/create', {
     method: 'POST',
     body: { title: 'Nope', occasion: 'party', expiryPresetId: '24h' },

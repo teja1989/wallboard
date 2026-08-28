@@ -99,10 +99,12 @@ bypasses.
 3. Gate the UI with the same call, and _show_ the locked thing rather than hiding it.
 4. `tests/unit/config.test.ts` already asserts no plan loses an entitlement as price rises.
 
-While `features.billing` is off, `effectivePlanId()` returns `previewPlanId` for every
-event, so nothing is actually gated. That is deliberate — see the note in
-`entitlements.ts` — but it means **your gate will not appear to work in development**
-unless you stub `isEnabled`, the way `tests/unit/entitlements.test.ts` does.
+While `features.billing` is off, new events are **created on** `previewPlanId`, so nothing
+is gated in practice. Note where that happens: `planForNewEvent()` grants it once and writes
+it to the event. `effectivePlanId()` just reads the stamp — it does not widen anything, and
+it must not start to. So **your gate will not appear to work in development**, because the
+event genuinely is on the top plan; test it by passing a lower plan directly, the way
+`tests/unit/entitlements.test.ts` does, rather than by stubbing a flag.
 
 ### Adding an occasion
 
@@ -226,6 +228,19 @@ to change one of them.
   says so instead of inventing failures. Nothing guards `npm run test:e2e`, so before an e2e
   run: `kill $(ps -eo pid,args | grep '[n]ext-server' | awk '{print $1}')`, rebuild, restart.
   A `pkill -f "next start"` matches the shell running it and kills your own session.
+
+- **Entitlements are stamped on the event, never derived from global state at read time.**
+  `effectivePlanId()` returns the plan written on the event and nothing else; the grants —
+  the host's subscription, preview pricing while `features.billing` is off, and any promo —
+  are all resolved once by `planForNewEvent()` and written down. It used to apply preview
+  pricing at read time, which meant flipping the billing flag would have downgraded every
+  live event and revoked its archive mid-event.
+
+  So: if you find yourself widening what an event may do based on something true _today_,
+  stop. Change what the next event is granted instead. The create form asks
+  `grantedPlanForNewEvent()` for the same reason — a form that greys out a theme the server
+  would accept is a UI disagreeing with its own server. And run `npm run backfill:plans`
+  before turning billing on.
 
 - **Never add an `overrides` entry to quiet `npm audit` without checking who declares that
   package.** An override is an explicit instruction, so npm applies it and prints nothing —

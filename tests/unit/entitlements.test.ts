@@ -8,6 +8,7 @@ import {
   cheapestPlanWith,
   effectivePlanId,
   entitlementsFor,
+  grantedPlanForNewEvent,
   isPreviewPricing,
 } from '@/lib/billing/entitlements';
 import { upgradeForFlag, upgradeForLimit } from '@/lib/billing/upgrade';
@@ -33,20 +34,54 @@ async function withBilling(enabled: boolean, run: () => void | Promise<void>) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('while billing is off', () => {
-  it('runs every event on the preview plan, whatever it was created as', async () => {
-    await withBilling(false, () => {
-      expect(effectivePlanId('free')).toBe(previewPlanId);
-      expect(effectivePlanId('event')).toBe(previewPlanId);
-    });
+/**
+ * The rule these tests exist to hold.
+ *
+ * What an event may do is decided when it is created and written onto it. It is never
+ * re-derived from whatever is true today.
+ *
+ * `effectivePlanId()` used to return `previewPlanId` for every event while billing was off,
+ * which read plausibly and was a dated landmine: every event in the database is stamped with
+ * the host's account plan — `free` for almost everyone — and was merely *behaving* as pro.
+ * Flipping `features.billing` would have dropped every live event to 25 guests and a
+ * seven-day wall and revoked `archiveDownload`, mid-event, with no migration.
+ *
+ * Preview pricing is granted at creation now, by `planForNewEvent()`.
+ */
+describe('the plan an event runs on', () => {
+  it('does not change when billing is switched on underneath it', async () => {
+    // The regression. This fails against the old implementation, which is the point of it.
+    await withBilling(false, () => expect(effectivePlanId('pro')).toBe('pro'));
+    await withBilling(true, () => expect(effectivePlanId('pro')).toBe('pro'));
   });
 
+  it('is the stamp, not the global flag, in either direction', async () => {
+    for (const billing of [false, true]) {
+      await withBilling(billing, () => {
+        expect(effectivePlanId('free')).toBe('free');
+        expect(effectivePlanId('event')).toBe('event');
+      });
+    }
+  });
+});
+
+describe('while billing is off', () => {
   it('says so, so the pricing page can be honest about it', async () => {
     await withBilling(false, () => expect(isPreviewPricing()).toBe(true));
   });
 
-  it('lets a free event use a premium theme', async () => {
-    await withBilling(false, () => expect(canUseTemplate('free', 'midnight')).toBe(true));
+  it('creates new events on the preview plan, so nothing is locked in practice', async () => {
+    // The grant moved from read time to creation time; this is where it lives now.
+    await withBilling(false, () => {
+      expect(grantedPlanForNewEvent('party')).toBe(previewPlanId);
+      expect(canUseTemplate(grantedPlanForNewEvent('party'), 'midnight')).toBe(true);
+    });
+  });
+
+  it('never offers the create form something creation would refuse', async () => {
+    // The form cannot see the host's subscription, so it may under-offer. It must never
+    // over-offer: the server takes the most generous of account plan, preview and promo.
+    await withBilling(true, () => expect(grantedPlanForNewEvent('party')).toBe('free'));
   });
 });
 

@@ -28,7 +28,7 @@ export const POST = route(async (request) => {
   await limitByUser('createEventPerUser', actor.uid);
 
   const input = await parseBody(request, createEventSchema);
-  const { event, joinCode } = await createEvent(actor, input);
+  const { event, joinCode, promoId } = await createEvent(actor, input);
 
   await recordAudit(
     actor,
@@ -37,7 +37,15 @@ export const POST = route(async (request) => {
       targetType: 'event',
       targetId: event.id,
       eventId: event.id,
-      metadata: { title: event.title, expiresAt: event.expiresAt },
+      // The plan and any promo behind it are recorded here because this is the only moment
+      // they are decided. A promo whose events cannot be identified afterwards is a cost with
+      // no way of finding out whether it bought anything.
+      metadata: {
+        title: event.title,
+        expiresAt: event.expiresAt,
+        plan: event.plan,
+        ...(promoId ? { promoId } : {}),
+      },
     },
     requestContext(request),
   );

@@ -23,7 +23,8 @@
     "grant": "NODE_OPTIONS=--conditions=react-server tsx scripts/grant-role.ts",
     "cleanup": "NODE_OPTIONS=--conditions=react-server tsx scripts/run-cleanup.ts",
     "smoke": "node scripts/smoke.mjs",
-    "walkthrough": "node scripts/walkthrough.mjs"
+    "walkthrough": "node scripts/walkthrough.mjs",
+    "backfill:plans": "node scripts/backfill-event-plans.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",

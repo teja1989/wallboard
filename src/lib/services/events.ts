@@ -2,12 +2,15 @@ import 'server-only';
 import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import {
   absoluteMaxEventLifetimeMs,
+  activePromo,
+  bestPlan,
   collections,
   defaultTemplateId,
   docIds,
   expiryPresets,
   isEnabled,
   occasionById,
+  previewPlanId,
   serverConfig,
   type TemplateId,
   type ExpiryPresetId,
@@ -34,16 +37,43 @@ export function expiryMsFor(presetId: string): number {
 }
 
 /**
- * Which plan a new event runs on.
+ * Which plan a new event is created on — and, because that answer is written onto the event
+ * and never recomputed, the only place the question is ever asked.
  *
- * Today every event starts on the host's own plan. When per-event unlocks go live this is
- * where a purchased upgrade gets attached, so the rest of the system needs no change.
+ * Three things can raise it, and all three are resolved here, once:
+ *
+ *  - the host's own subscription, so a Pro subscriber's events start on Pro;
+ *  - **preview pricing**, which grants everyone the preview plan while billing is off. This
+ *    used to be applied at read time by `effectivePlanId()`, which meant turning billing on
+ *    would have silently downgraded every event ever created. Granting it here instead makes
+ *    it a fact on the document, so flipping the flag changes only what happens next;
+ *  - **an active promo**, on the same terms and for the same reason.
+ *
+ * Always the most generous of the three: a promo must never quietly downgrade a subscriber
+ * who is already paying for more than it grants.
+ *
+ * The promo id comes back with the plan so the caller can record it. A promo whose events
+ * cannot be told apart afterwards is a cost with no way to find out whether it worked.
  */
-export async function planForNewEvent(actor: Actor): Promise<PlanId> {
-  // A Pro subscriber's events start on Pro; everyone else starts free and upgrades the one
-  // event they care about.
+export async function planForNewEvent(
+  actor: Actor,
+  occasionId: string,
+): Promise<{ planId: PlanId; promoId: string | null }> {
   const { accountPlan } = await import('@/lib/services/billing');
-  return accountPlan(actor.uid);
+  let planId = await accountPlan(actor.uid);
+
+  // Nothing is being charged yet, so everything is granted the preview plan. Gating an
+  // unproven product measures nothing except how quickly people leave.
+  if (!isEnabled('billing')) planId = bestPlan(planId, previewPlanId);
+
+  const promo = activePromo(occasionId);
+  if (promo) planId = bestPlan(planId, promo.grantsPlanId);
+
+  // Named only when it actually changed the outcome — a promo that granted less than the
+  // host already had did not cause this event, and recording it would make the numbers lie.
+  const promoId = promo && promo.grantsPlanId === planId ? promo.id : null;
+
+  return { planId, promoId };
 }
 
 /**
@@ -182,6 +212,8 @@ async function reserveJoinCode(
 export interface CreatedEvent {
   event: EventDoc;
   joinCode: string;
+  /** The promo that decided this event's plan, if one did. For the audit trail. */
+  promoId: string | null;
 }
 
 /**
@@ -198,7 +230,7 @@ export function assertWhoCanPostAllowed(whoCanPost: 'members' | 'anyone'): void 
 export async function createEvent(actor: Actor, input: CreateEventInput): Promise<CreatedEvent> {
   assertWhoCanPostAllowed(input.whoCanPost);
 
-  const plan = await planForNewEvent(actor);
+  const { planId: plan, promoId } = await planForNewEvent(actor, input.occasion);
   const entitlements = entitlementsFor(plan);
   assertPlanAllows(plan, {
     templateId: input.templateId,
@@ -276,7 +308,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     return code;
   });
 
-  return { event: { ...document, id: reference.id }, joinCode };
+  return { event: { ...document, id: reference.id }, joinCode, promoId };
 }
 
 async function countActiveEventsForHost(uid: string): Promise<number> {

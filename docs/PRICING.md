@@ -76,10 +76,46 @@ Two ratios matter more than traffic:
    This is where the hybrid access model either pays off or costs us, and it is the number
    to check before loosening `allowAnonymousPosting`.
 
+## What an event is allowed to do is decided once, at creation
+
+The plan on `events/{id}.plan` is the answer, and it is never recomputed. `planForNewEvent()`
+resolves the most generous of three things — the host's subscription, preview pricing while
+`features.billing` is off, and any active promo — and writes it down.
+
+This used to work the other way round: `effectivePlanId()` returned the preview plan for every
+event at read time while billing was off. It read plausibly and was a dated landmine. Every
+event in the database was stamped `free` and merely _behaving_ as pro, so switching billing on
+would have dropped every live event to 25 guests and a seven-day wall and revoked
+`archiveDownload` — mid-event, with no migration and no warning.
+
+The rule that replaced it is worth stating plainly, because promos and paid upgrades both
+depend on it: **what an event may do is a fact recorded when it was created, not a rule
+evaluated now.** Global state may change what the _next_ event is granted. It may never change
+what an existing one was promised.
+
+### Promotional windows
+
+`src/config/promos.config.ts` holds them, and the table ships empty. A promo raises the plan a
+new event is stamped with, for a window, optionally scoped to particular occasions — and it
+grants at creation only. Events created inside the window keep what they were given, for good;
+events after it do not. Anything that reached back and changed live events would be the same
+landmine wearing a friendlier name.
+
+A promo also has **real costs**, unlike a discount on software: granting `event` means 5 GB for
+30 days for every event created in the window, whether or not the host returns. The window
+length is the only thing bounding that, so keep it short. The promo id is written to the audit
+log at creation, so it is possible to answer afterwards whether it bought anything.
+
 ## Turning billing on
 
-The gates are already written and tested; the switch is `features.billing`. What is missing
-is only the payment path:
+The gates are already written and tested; the switch is `features.billing`.
+
+**First, run the backfill.** `npm run backfill:plans` stamps every event created before the
+change with the plan it has actually been running on. It is dry by default, idempotent, and
+only ever moves an event up. Skipping it means every pre-existing event drops to `free` the
+moment the flag flips.
+
+Then the payment path:
 
 1. Stripe Checkout for the one-off; Stripe Billing for the subscription.
 2. A webhook that sets `events/{id}.plan` on a successful one-off payment, and a plan field
