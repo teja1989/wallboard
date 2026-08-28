@@ -1,5 +1,6 @@
 import { appConfig, isEnabled, planById } from '@/config';
 import { recordAudit } from '@/lib/audit';
+import { recordFunnel } from '@/lib/services/funnel';
 import { billingGateway } from '@/lib/billing/gateway';
 import { requireEvent } from '@/lib/services/events';
 import {
@@ -62,6 +63,11 @@ export const POST = route(async (request) => {
     successUrl: `${returnTo}?upgraded=1`,
     cancelUrl: returnTo,
   });
+
+  // Only for a per-event upgrade — a subscription is not an event's funnel and counting it
+  // against one would attribute a host's whole year to whichever invitation they happened to
+  // be looking at.
+  if (eventId) await recordFunnel(eventId, 'checkoutStarted');
 
   await recordAudit(
     actor,

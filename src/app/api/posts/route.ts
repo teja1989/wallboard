@@ -2,6 +2,7 @@ import { can } from '@/lib/authz/policy';
 import { eventAuthzContext } from '@/lib/authz/event-context';
 import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
+import { recordFunnel } from '@/lib/services/funnel';
 import { requireLiveEvent } from '@/lib/services/events';
 import { createPost, resolveMedia } from '@/lib/services/posts';
 import { ApiError, limitByUser, ok, parseBody, requireActor, route } from '@/lib/server/api';
@@ -31,6 +32,9 @@ export const POST = route(async (request) => {
 
   await limitByUser('createPostPerUser', actor.uid);
   const post = await createPost(actor, event, input);
+
+  // The moment a replier becomes a participant, which is the ratio the wall lives or dies on.
+  await recordFunnel(event.id, 'postCreated');
 
   await recordAudit(
     actor,

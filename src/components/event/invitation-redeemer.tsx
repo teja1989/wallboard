@@ -61,11 +61,15 @@ export function InvitationRedeemer({
    * our analytics.
    */
   useEffect(() => {
-    if (!eventId || !guestToken || beaconed.current) return;
+    // Fired with or without a token. A token attributes the view to one guest; without one it
+    // still counts toward "somebody opened this", which is the first ratio in the funnel and
+    // the denominator for the rest. Most real invitations are shared rather than sent, so
+    // counting only the attributable opens would have read low by exactly the wrong amount.
+    if (!eventId || beaconed.current) return;
     beaconed.current = true;
     void (async () => {
       await api
-        .post(`/api/events/${eventId}/invites/view`, { token: guestToken })
+        .post(`/api/events/${eventId}/invites/view`, guestToken ? { token: guestToken } : {})
         .catch(() => undefined);
     })();
   }, [eventId, guestToken]);

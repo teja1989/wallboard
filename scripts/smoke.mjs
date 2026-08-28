@@ -645,6 +645,43 @@ async function main() {
   });
   check('a member cannot send', memberSends.status === 403);
 
+  // --- the funnel ------------------------------------------------------------
+  // Counters are aggregate and server-written. Nothing here can be forged by a client, and
+  // nothing here names a guest.
+  const funnel = await call(host.session, `/api/events/${eventId}/funnel`);
+  check('the host can read the funnel', funnel.status === 200, JSON.stringify(funnel.payload));
+
+  const totals = (funnel.payload?.data?.days ?? []).reduce((sum, day) => {
+    for (const [name, value] of Object.entries(day.counts ?? {})) {
+      sum[name] = (sum[name] ?? 0) + value;
+    }
+    return sum;
+  }, {});
+
+  check('invitations sent are counted', totals.inviteSent >= 2, JSON.stringify(totals));
+  check('replies are counted', totals.rsvpAnswered >= 1, JSON.stringify(totals));
+  check('a yes is counted separately from a reply', totals.rsvpYes >= 1, JSON.stringify(totals));
+  check('posts are counted', totals.postCreated >= 1, JSON.stringify(totals));
+  check(
+    'the counters carry no identifiers, only sums',
+    (funnel.payload?.data?.days ?? []).every((day) =>
+      Object.values(day.counts ?? {}).every((value) => typeof value === 'number'),
+    ),
+  );
+
+  const memberFunnel = await call(member.session, `/api/events/${eventId}/funnel`);
+  check('a member cannot read the funnel', memberFunnel.status === 403);
+
+  // A genuine stranger, not `outsider` — they joined with the rotated code further up and are
+  // a member by now, which would have made this assert the member case twice over.
+  const stranger = await signUp(`stranger-${stamp}@example.com`);
+  const strangerFunnel = await call(stranger.session, `/api/events/${eventId}/funnel`);
+  check(
+    'a non-member is not even told the event exists',
+    strangerFunnel.status === 404,
+    `status ${strangerFunnel.status}`,
+  );
+
   // --- add to calendar ------------------------------------------------------
   // The link in an email, which has to work with no session and no JavaScript — the reader
   // is not a member yet, which is precisely why they were sent an invitation.
@@ -745,6 +782,22 @@ async function main() {
   const seen = (afterBeacon.payload?.data?.invitees ?? []).find((i) => i.id === tracked.id);
   check('the guest now reads as seen', seen?.status === 'seen', JSON.stringify(seen));
   check('and the view was counted once', seen?.viewCount === 1);
+
+  // An invitation pasted into a group chat carries the code and no token. That open still
+  // counts toward the funnel — it is most of them — but it must not be attributed to anybody.
+  const anonymousOpen = await call(newSession(), `/api/events/${eventId}/invites/view`, {
+    method: 'POST',
+    body: {},
+  });
+  check('an open with no token is accepted', anonymousOpen.status === 200);
+
+  const afterAnonymous = await call(host.session, `/api/events/${eventId}/invites`);
+  const stillOne = (afterAnonymous.payload?.data?.invitees ?? []).find((i) => i.id === tracked.id);
+  check(
+    'and is attributed to nobody',
+    stillOne?.viewCount === 1,
+    JSON.stringify(stillOne?.viewCount),
+  );
   check('and the first view was stamped', typeof seen?.firstViewedAt === 'number');
 
   const again = await call(guest.session, `/api/events/${eventId}/invites/view`, {

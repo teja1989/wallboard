@@ -218,7 +218,31 @@ files a development event holds and fell over on the fifteen hundred a real wedd
 taking the whole delete down with it and leaving the host with nothing deleted and no
 explanation.
 
-### 10. The invitation link is `/i/{code}`, and it previews
+### 10. Measurement counts, and does not profile
+
+Every number in the business case was a guess until this existed, and no decision about
+pricing or gifting can be evidence-based without it. What it is not is an analytics product.
+
+**Sums, not rows.** One document per event per day — `events/{id}/funnel/{YYYY-MM-DD}` —
+holding integers and nothing else. There is deliberately no visitor id, no session and no
+path, so there is no way to reconstruct what any one guest did. That is a design constraint
+rather than a policy: a table that could be de-anonymised would need qualifying every time the
+product says content disappears, and sums need no qualification. It is also why there is no
+consent banner and no third-party script.
+
+**Written only by route handlers**, so no browser can inflate a host's numbers, and
+best-effort, because measuring an RSVP must never be able to stop one. Per day rather than one
+document per event because a single Firestore document takes roughly one sustained write per
+second and invitations get opened in bursts.
+
+The counters are denied to clients in both directions by `firestore.rules` — writes because
+they are forgeable otherwise, reads because how a guest list is behaving is the host's
+business. `GET /api/events/{id}/funnel` is the only door, and a stranger gets a 404 rather
+than a 403 so an event's existence is not confirmed to someone who is not in it.
+
+Deleted with the event, by both the sweep and the delete, like everything else here.
+
+### 11. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -240,7 +264,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 11. Answers are public, notes are not
+### 12. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -257,7 +281,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 12. Media never touches the app server
+### 13. Media never touches the app server
 
 Uploading is a two-step handshake:
 

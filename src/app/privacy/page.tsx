@@ -90,6 +90,10 @@ export default function PrivacyPage() {
         </p>
       </Clause>
 
+      <Clause heading="How we measure whether it works">
+        <p>{legalConfig.measurement}</p>
+      </Clause>
+
       <Clause heading="Who else can see it">
         <p>Only the companies that make the product run:</p>
         <ul className="ml-5 list-disc space-y-2">

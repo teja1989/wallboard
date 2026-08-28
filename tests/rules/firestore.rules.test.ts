@@ -80,6 +80,12 @@ beforeEach(async () => {
       name: 'Guest',
       status: 'sent',
     });
+    await setDoc(doc(db, 'events', EVENT_ID, 'funnel', '2026-08-28'), {
+      day: '2026-08-28',
+      inviteSent: 40,
+      invitationOpened: 31,
+      rsvpAnswered: 22,
+    });
     await setDoc(doc(db, 'mailOutbox', 'msg-1'), {
       to: 'guest@example.com',
       subject: 'You are invited',
@@ -309,6 +315,45 @@ describe('RSVP answers on the guest list', () => {
 
   it('stay invisible to non-members', async () => {
     await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'members', 'member-uid')));
+  });
+});
+
+/**
+ * Funnel counters.
+ *
+ * They hold nothing but integers — no visitor id, no session, nothing that could name a
+ * person. They are still shut, in both directions.
+ *
+ * Writes because every one of them is fired from a route handler, so a browser that could
+ * increment them could only be lying. Reads because "thirty-one people opened this and
+ * twenty-two replied" is the host's business: a guest able to read it learns how the rest of
+ * the guest list is behaving, and the host reads it through an authorised API call like every
+ * other host-facing number here.
+ */
+describe('the funnel counters', () => {
+  it('cannot be read by a member', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'funnel', '2026-08-28')));
+  });
+
+  it('cannot be read by the host they describe', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'funnel', '2026-08-28')));
+  });
+
+  it('cannot be read by an outsider or enumerated', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'funnel', '2026-08-28')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'funnel')));
+  });
+
+  it('cannot be inflated by anyone', async () => {
+    // A host who could write their own numbers would be measuring their own opinion.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(doc(host, 'events', EVENT_ID, 'funnel', '2026-08-28'), { invitationOpened: 9999 }),
+    );
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'funnel', '2026-08-29'), { rsvpYes: 1 }),
+    );
   });
 });
 

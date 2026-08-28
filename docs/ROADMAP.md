@@ -78,6 +78,21 @@ sat in the same scroll as the thing they must never touch by accident.
   opening the event. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the ordering that makes a
   storage failure safe.
 
+### Knowing whether any of it works — shipped
+
+First-party, server-side, aggregate. Counters per event per day for invitations sent, opened,
+replied to, said yes to, posted, and taken to checkout. No third-party script, no pixel, no
+per-visitor row, and nothing that outlives the event. `GET /api/events/{id}/funnel` is the
+host-only read; `docs/ARCHITECTURE.md` has the design.
+
+This blocks the interesting decisions rather than following them. Where a paywall belongs and
+whether guests will click a gift link are both empirical questions, and until now every number
+in this document was a model rather than an observation.
+
+Not yet: an "upgrade viewed" counter, which is the one moment in the funnel that only exists
+in the browser and would need a client beacon. Deliberately deferred — it is new write surface
+for one ratio, and the five server-side moments answer most of the question.
+
 ### Payments
 
 The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,

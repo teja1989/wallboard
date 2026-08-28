@@ -1,3 +1,4 @@
+export * from './analytics.config';
 export * from './app.config';
 export * from './billing.config';
 export * from './branding.config';

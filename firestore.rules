@@ -76,6 +76,20 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Aggregate funnel counters, one document per day. Server-only in both directions.
+      //
+      // Writes, obviously: a client that could increment its own counters could tell the host
+      // whatever story it liked, and every one of these is fired from a route handler so none
+      // of them needs to come from a browser.
+      //
+      // Reads too, which is less obvious — they are only sums. But "how many people opened
+      // this and did not reply" is the host's business and nobody else's, and a guest able to
+      // read it learns how the guest list is behaving. Anyone entitled to it goes through an
+      // authorised API call, as with every other host-facing read here.
+      match /funnel/{dayKey} {
+        allow read, write: if false;
+      }
+
       // The live wall. Removed and quarantined posts stay invisible to members.
       match /posts/{postId} {
         allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();

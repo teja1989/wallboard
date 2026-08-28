@@ -2,6 +2,7 @@ import { can } from '@/lib/authz/policy';
 import { eventAuthzContext } from '@/lib/authz/event-context';
 import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
+import { recordFunnelAll } from '@/lib/services/funnel';
 import { requireEvent } from '@/lib/services/events';
 import { sendRsvpConfirmation } from '@/lib/services/invites';
 import { markReplied } from '@/lib/services/delivery';
@@ -56,6 +57,13 @@ export const POST = route(async (request, { params }: Params) => {
       (error: unknown) => console.error('[rsvp] confirmation email failed', error),
     );
   }
+
+  // Both the reply and, separately, the yes. Attendance and engagement are different
+  // questions and a funnel that conflates them cannot answer either.
+  await recordFunnelAll(
+    event.id,
+    outcome.status === 'yes' ? ['rsvpAnswered', 'rsvpYes'] : ['rsvpAnswered'],
+  );
 
   await recordAudit(
     actor,

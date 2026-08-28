@@ -2,6 +2,7 @@ import { collections } from '@/config';
 import { assertCan } from '@/lib/authz/policy';
 import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
+import { recordFunnel } from '@/lib/services/funnel';
 import { db } from '@/lib/firebase/admin';
 import { eventRef, requireEvent } from '@/lib/services/events';
 import { normalizeEmail, sendToInvitees } from '@/lib/services/invites';
@@ -53,6 +54,12 @@ export const POST = route(async (request, { params }: Params) => {
   // have is gathered here rather than trusted from the request.
   const replied = kind === 'reminder' ? await repliedAddresses(id) : new Set<string>();
   const summary = await sendToInvitees(event, kind, replied);
+
+  // One per message actually sent, so the denominator matches what left the building rather
+  // than what the host pressed the button for. Reminders count too: an invitation that only
+  // landed on the second attempt still had to be sent twice, and hiding that would flatter
+  // the open rate.
+  await recordFunnel(id, 'inviteSent', { by: summary.sent });
 
   await recordAudit(
     actor,

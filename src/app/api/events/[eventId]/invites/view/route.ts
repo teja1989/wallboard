@@ -1,5 +1,6 @@
 import { findInviteeByToken } from '@/lib/services/invites';
 import { recordView } from '@/lib/services/delivery';
+import { recordFunnel } from '@/lib/services/funnel';
 import { requireEvent } from '@/lib/services/events';
 import { limitByIp, ok, parseBody, route } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
@@ -11,7 +12,9 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ eventId: string }> };
 
-const viewSchema = z.object({ token: guestTokenSchema });
+// The token is optional: a link pasted into a group chat carries the code and nothing else,
+// and that open is still an open.
+const viewSchema = z.object({ token: guestTokenSchema.optional() });
 
 /**
  * "Someone actually looked at this."
@@ -39,8 +42,19 @@ export const POST = route(async (request, { params }: Params) => {
   const { token } = await parseBody(request, viewSchema);
 
   await requireEvent(id);
-  const invitee = await findInviteeByToken(id, token);
 
+  /*
+    The open is counted whether or not the link named anybody.
+
+    An invitation shared into a group chat carries the bare code, so most real opens arrive
+    with no token at all. Counting only the attributable ones would have made "how many people
+    look at an invitation" — the first ratio in the funnel and the denominator for the rest —
+    read low by whatever fraction of hosts share a link rather than send one, which is most of
+    them. The aggregate says nothing about who: it is one integer per event per day.
+  */
+  await recordFunnel(id, 'invitationOpened');
+
+  const invitee = token ? await findInviteeByToken(id, token) : null;
   if (invitee) {
     await recordView(id, invitee, requestContext(request).userAgent);
   }

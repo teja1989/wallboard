@@ -29,6 +29,21 @@ export const legalConfig = {
    */
   governingLaw: '',
 
+  /**
+   * How the product measures itself, stated plainly because the honest version is short.
+   *
+   * There is no third-party analytics, no advertising pixel, and no per-visitor record. What
+   * exists is a set of counters per event per day — how many invitations went out, how many
+   * were opened, how many replied — held with the event and deleted with it. Sums cannot be
+   * traced back to a person, which is why this needs no consent banner and why the claim
+   * above can be made without qualification.
+   */
+  measurement:
+    'We keep simple counts for each event — how many invitations were sent, opened and ' +
+    'replied to — so we can tell whether the product works. They are totals only: no ' +
+    'tracking pixels, no third-party analytics, and nothing that identifies you or records ' +
+    'what any one person did. They are deleted with the event.',
+
   /** Sub-processors. Anyone who can see user data has to be named. */
   processors: [
     {
