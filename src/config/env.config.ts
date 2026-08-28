@@ -74,6 +74,15 @@ const serverEnvSchema = z.object({
   EMAIL_FROM_ADDRESS: z.string().email().default('invitations@marqueersvp.com'),
 
   /**
+   * Address lookup. Optional: with no key the address field stays a plain text box, which
+   * is what a deploy that has not been given one should get rather than a broken search.
+   *
+   * Server-side only — never a NEXT_PUBLIC_. A key in the bundle is a key on someone
+   * else's bill.
+   */
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
+
+  /**
    * Payments. Defaults to `mock` so a deploy that forgets its keys cannot half-take real
    * money — the mock checkout refuses to run outside development.
    */

@@ -73,6 +73,16 @@ export interface EventLocation {
   address: string;
   /** A maps link the host pasted. Validated to http(s) before it is stored. */
   url: string | null;
+  /**
+   * Set when the host picked a place rather than typing one.
+   *
+   * `placeId` makes a directions link open the actual venue instead of a text search that
+   * might land on a different branch of the same name; the coordinates draw the map and,
+   * more usefully, tell us which timezone the event is actually in.
+   */
+  placeId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface RsvpSettings {

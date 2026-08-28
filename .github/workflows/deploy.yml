@@ -138,6 +138,10 @@ jobs:
             # key writes invitations to Firestore rather than failing to start.
             echo "email_driver = \"${{ vars.EMAIL_DRIVER || 'outbox' }}\""
             echo "email_from_address = \"${{ vars.EMAIL_FROM_ADDRESS || 'invitations@marqueersvp.com' }}\""
+            # Address lookup. Server-side key; `places_enabled` decides whether the secret
+            # exists at all, because presence must not be derived from a sensitive value.
+            echo "places_enabled = ${{ vars.PLACES_ENABLED || 'false' }}"
+            echo "google_maps_api_key = \"${{ secrets.GOOGLE_MAPS_API_KEY }}\""
             echo "resend_api_key = \"${{ secrets.RESEND_API_KEY }}\""
           } > infra/terraform/ci.auto.tfvars
           # Everything except the secrets, which this step writes but must not print.

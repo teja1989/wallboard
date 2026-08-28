@@ -72,6 +72,28 @@ variable "google_sign_in" {
   default     = false
 }
 
+variable "places_enabled" {
+  description = <<-EOT
+    Whether to create the Places key secret. A plain boolean rather than testing the key
+    itself: a for_each key derived from a sensitive value makes Terraform reject the whole
+    plan, which is how a deploy failed silently once already.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "google_maps_api_key" {
+  description = <<-EOT
+    Places API key for address lookup. Server-side only — it is never a NEXT_PUBLIC_ value,
+    because a key in the JavaScript bundle is a key on somebody else's bill. Empty leaves
+    the address field as a plain text box, which is the correct behaviour for a deploy that
+    has not been given one.
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "auth_domain" {
   description = <<-EOT
     The domain that serves the Firebase sign-in handler, e.g. auth.marqueersvp.com.

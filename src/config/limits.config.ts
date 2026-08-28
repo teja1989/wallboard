@@ -226,6 +226,9 @@ export const rateLimits = {
   // Generous: this fires once per guest per visit, and a wedding opens in bursts as a
   // group chat reads the link. Tight enough that link tokens cannot be brute-forced.
   viewBeaconPerIp: { limit: 120, windowMs: 10 * MINUTE },
+  // The one route in the app that costs money per call. Generous enough for someone
+  // typing an address a few times, tight enough that a loop cannot run up a bill.
+  placesSearchPerUser: { limit: 100, windowMs: HOUR },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof rateLimits;

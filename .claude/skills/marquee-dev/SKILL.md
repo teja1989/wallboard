@@ -257,6 +257,15 @@ to change one of them.
 - **`npm run walkthrough` is the fastest way to see a whole event.** It creates one, invites,
   sends, opens it as a guest, and prints every link instead of tearing down. Use it before
   reaching for the UI to reproduce something.
+- **The Places key is server-side, always.** `/api/places/*` proxies every call. A
+  referrer-restricted browser key is public the moment it ships, because a referrer is a
+  header anyone can type — and this is the one route in the app that costs money per call.
+- **Autocomplete is billed per session, not per request.** Generate a session token, pass it
+  to every suggestion call _and_ the details lookup that ends it. Dropping it is roughly a
+  tenfold cost increase on identical typing.
+- **A chosen place sets the event's timezone.** Resolved offline from the coordinates in
+  `src/lib/geo.ts`, falling back to the host's browser. `timeZoneAt` must never throw — a
+  thrown zone stops a host publishing at all.
 - **Private RSVP data lives in `rsvpNotes/`, not on the member document.** Firestore rules
   cannot restrict a single field, so a note addressed to the host would otherwise be
   readable by every other guest.

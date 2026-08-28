@@ -50,13 +50,21 @@ locals {
    * Only created when actually in use: an empty Secret Manager version would make Cloud Run
    * fail to start, which is worse than the feature staying switched off.
    */
-  supplied_secret_names = var.email_driver == "resend" ? ["RESEND_API_KEY"] : []
+  supplied_secret_names = concat(
+    var.email_driver == "resend" ? ["RESEND_API_KEY"] : [],
+    # Same rule as above: presence is decided by a plain variable, never by inspecting the
+    # secret. `!= ""` on a sensitive value would poison the whole for_each.
+    var.places_enabled ? ["GOOGLE_MAPS_API_KEY"] : [],
+  )
 
   secret_names = concat(keys(local.generated_secrets), local.supplied_secret_names)
 
   # Every value, including ones not currently in `secret_names`. Looked up by name, so an
   # unused empty string is never written anywhere.
-  secret_values = merge(local.generated_secrets, { RESEND_API_KEY = var.resend_api_key })
+  secret_values = merge(local.generated_secrets, {
+    RESEND_API_KEY      = var.resend_api_key
+    GOOGLE_MAPS_API_KEY = var.google_maps_api_key
+  })
 }
 
 resource "google_secret_manager_secret" "this" {

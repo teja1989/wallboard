@@ -152,7 +152,31 @@ invitation for every guest, so it is refused rather than stored.
 Events created before this was recorded store null and fall back to the reader's zone, which
 is the old behaviour and no worse than it was.
 
-### 7. The invitation link is `/i/{code}`, and it previews
+### 7. The venue is looked up through us, never from the browser
+
+Address autocomplete is optional and entirely server-proxied. The obvious build loads
+Google's JavaScript and talks to Places from the page with a referrer-restricted key — but a
+referrer is a request header, so that key is public the moment it ships and the bill is
+public with it. Proxying through `/api/places/*` keeps it in Secret Manager, allows a
+per-user rate limit on the one route in the app that costs money per call, and needs no CSP
+change and no Google script in the page.
+
+Autocomplete is billed by _session_ — a run of keystrokes plus the details lookup that ends
+it — so a session token is generated per search and passed through both calls. Without it
+every keystroke is its own charge.
+
+**The field is a text box first and a search second.** Half of real events happen somewhere
+Google has never heard of, so whatever the host types is kept whether or not anything is
+found; choosing a suggestion only adds coordinates. With no key configured the field is
+exactly the plain input it always was, discovered from the route answering 404 rather than
+from a build-time flag that could disagree with the server holding the key.
+
+Picking a place gives the event the **venue's own timezone**, resolved offline from the
+coordinates rather than through Google's Time Zone API — one fewer API to enable and one
+fewer thing to fail while somebody is publishing. It beats the host's browser zone, which is
+the fallback: someone in London booking a wedding in Goa means Goa.
+
+### 8. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -174,7 +198,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 8. Answers are public, notes are not
+### 9. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -191,7 +215,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 9. Media never touches the app server
+### 10. Media never touches the app server
 
 Uploading is a two-step handshake:
 

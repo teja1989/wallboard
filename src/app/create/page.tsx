@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { AddressField } from '@/components/create/address-field';
 import Link from 'next/link';
 import { Check, Copy, Lock, PartyPopper, Share2 } from 'lucide-react';
 import {
@@ -87,6 +88,15 @@ export default function CreateEventPage() {
   const [shownTimeZone, setShownTimeZone] = useState<string | null>(null);
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  /**
+   * The venue's own timezone, when a place was chosen.
+   *
+   * Beats the host's browser: someone in London booking a wedding in Goa means Goa, and
+   * their laptop has no way to know that.
+   */
+  const [venueZone, setVenueZone] = useState<string | null>(null);
   const [dressCode, setDressCode] = useState('');
   const [templateId, setTemplateId] = useState<string>(
     occasionById(defaultOccasionId).defaultTemplateId,
@@ -195,51 +205,65 @@ export default function CreateEventPage() {
     ],
   );
 
-  const publish = useCallback(async (fields: typeof draftFields) => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const result = await api.post<{ event: EventPreview; joinCode: string }>(
-        '/api/events/create',
-        {
-          title: fields.title,
-          description: fields.description,
-          occasion: fields.occasionId,
-          hostedBy: fields.hostedBy,
-          templateId: fields.templateId,
-          startsAt: fromDateTimeLocalValue(fields.startsAt),
-          endsAt: null,
-          // The time the host typed is the time in the zone they typed it in. Recording
-          // that is what stops a guest a state away being told the wrong hour — and what
-          // stops the emailed invitation, rendered on a server running UTC, telling
-          // everybody the wrong hour.
-          timeZone: browserTimeZone(),
-          location:
-            fields.locationName || fields.locationAddress
-              ? { name: fields.locationName, address: fields.locationAddress, url: null }
-              : null,
-          dressCode: fields.dressCode,
-          rsvp: {
-            enabled: true,
-            deadline: null,
-            allowPlusOnes: fields.maxPartySize > 1,
-            maxPartySize: fields.maxPartySize,
-            askNote: false,
-            question: null,
+  const publish = useCallback(
+    async (fields: typeof draftFields) => {
+      setError(null);
+      setSubmitting(true);
+      try {
+        const result = await api.post<{ event: EventPreview; joinCode: string }>(
+          '/api/events/create',
+          {
+            title: fields.title,
+            description: fields.description,
+            occasion: fields.occasionId,
+            hostedBy: fields.hostedBy,
+            templateId: fields.templateId,
+            startsAt: fromDateTimeLocalValue(fields.startsAt),
+            endsAt: null,
+            // The time the host typed is the time in the zone they typed it in. Recording
+            // that is what stops a guest a state away being told the wrong hour — and what
+            // stops the emailed invitation, rendered on a server running UTC, telling
+            // everybody the wrong hour.
+            // The venue's zone when we know it, the host's browser otherwise.
+            timeZone: venueZone ?? browserTimeZone(),
+            location:
+              fields.locationName || fields.locationAddress
+                ? {
+                    name: fields.locationName,
+                    address: fields.locationAddress,
+                    url: null,
+                    placeId,
+                    lat: latLng?.lat ?? null,
+                    lng: latLng?.lng ?? null,
+                  }
+                : null,
+            dressCode: fields.dressCode,
+            rsvp: {
+              enabled: true,
+              deadline: null,
+              allowPlusOnes: fields.maxPartySize > 1,
+              maxPartySize: fields.maxPartySize,
+              askNote: false,
+              question: null,
+            },
+            expiryPresetId: fields.expiryPresetId,
+            allowedKinds: fields.allowedKinds,
           },
-          expiryPresetId: fields.expiryPresetId,
-          allowedKinds: fields.allowedKinds,
-        },
-      );
-      // Published: the draft has served its purpose and the event is the record now.
-      clearDraft();
-      setCreated(result);
-    } catch (caught) {
-      setError(errorMessage(caught, 'Could not create the invitation.'));
-    } finally {
-      setSubmitting(false);
-    }
-  }, []);
+        );
+        // Published: the draft has served its purpose and the event is the record now.
+        clearDraft();
+        setCreated(result);
+      } catch (caught) {
+        setError(errorMessage(caught, 'Could not create the invitation.'));
+      } finally {
+        setSubmitting(false);
+      }
+      // The chosen place is read from the closure, so it has to be a dependency: without
+      // these, publishing after picking a venue would send the coordinates from whenever this
+      // callback was last built, which is to say none.
+    },
+    [placeId, latLng, venueZone],
+  );
 
   /**
    * The gate, at the only point it earns its place. An anonymous host keeps their work:
@@ -547,13 +571,29 @@ export default function CreateEventPage() {
             placeholder="The Rooftop, or just: ours"
             maxLength={contentLimits.locationNameMaxLength}
           />
-          <TextField
-            label="Address"
-            hint="Optional."
-            value={locationAddress}
-            onChange={(e) => setLocationAddress(e.target.value)}
-            placeholder="14 Bridge Street"
-            maxLength={contentLimits.locationAddressMaxLength}
+          <AddressField
+            address={locationAddress}
+            onAddressChange={(value) => {
+              setLocationAddress(value);
+              // Typing over a chosen place makes the coordinates stale, and stale
+              // coordinates draw a map of the wrong building.
+              setPlaceId(null);
+              setLatLng(null);
+              setVenueZone(null);
+            }}
+            onPlaceChosen={(place) => {
+              setLocationAddress(place.address);
+              // Only fill the venue name if the host has not written their own; "ours" is
+              // a better name for a back garden than whatever Google calls the street.
+              if (!locationName && place.name) setLocationName(place.name);
+              setPlaceId(place.placeId);
+              setLatLng(
+                place.lat !== null && place.lng !== null
+                  ? { lat: place.lat, lng: place.lng }
+                  : null,
+              );
+              setVenueZone(place.timeZone);
+            }}
           />
         </div>
 

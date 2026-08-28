@@ -5,6 +5,7 @@ import {
   contentLimits,
   defaultTemplateId,
   emailConfig,
+  placesConfig,
   templates,
   expiryPresets,
   joinCodeConfig,
@@ -84,6 +85,11 @@ const locationSchema = z
     name: cleanText(contentLimits.locationNameMaxLength).default(''),
     address: cleanText(contentLimits.locationAddressMaxLength).default(''),
     url: externalUrl.default(null),
+    // Present only when the host chose a suggestion. Bounded to a real globe so a bad
+    // coordinate cannot reach the map proxy or the timezone lookup.
+    placeId: z.string().trim().max(256).nullish(),
+    lat: z.number().min(-90).max(90).nullish(),
+    lng: z.number().min(-180).max(180).nullish(),
   })
   .nullable()
   .default(null);
@@ -277,6 +283,31 @@ export type RsvpInput = z.infer<typeof rsvpSchema>;
 export const guestTokenSchema = z
   .string()
   .regex(/^[0-9a-f]{16,64}$/, 'That is not a valid invitation link.');
+
+/**
+ * Address lookup.
+ *
+ * The session token ties a run of keystrokes and the final details call into one billable
+ * unit. Shape-checked rather than trusted: it goes straight to Google in a request we pay
+ * for.
+ */
+const placeSessionToken = z.string().regex(/^[0-9a-f-]{16,64}$/, 'Bad search session.');
+
+export const placeQuerySchema = z.object({
+  query: z.string().trim().min(placesConfig.minQueryLength).max(200),
+  sessionToken: placeSessionToken,
+});
+
+export const placeDetailsSchema = z.object({
+  placeId: z.string().trim().min(1).max(256),
+  sessionToken: placeSessionToken,
+});
+
+/** Coordinates arrive as query strings, so they are coerced and bounded to a real globe. */
+export const mapCoordsSchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
 
 export const addInviteesSchema = z.object({
   invitees: z

@@ -44,6 +44,10 @@ export function serverConfig() {
       fromAddress: env.EMAIL_FROM_ADDRESS,
     },
     resendApiKey: env.RESEND_API_KEY,
+    places: {
+      apiKey: env.GOOGLE_MAPS_API_KEY,
+      enabled: Boolean(env.GOOGLE_MAPS_API_KEY),
+    },
     billing: {
       driver: env.BILLING_DRIVER,
     },

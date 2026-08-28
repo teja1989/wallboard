@@ -8,6 +8,7 @@ export * from './auth.config';
 export * from './legal.config';
 export * from './limits.config';
 export * from './occasions.config';
+export * from './places.config';
 export * from './plans.config';
 export * from './roles.config';
 export * from './templates.config';

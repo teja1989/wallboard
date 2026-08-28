@@ -173,6 +173,47 @@ To roll back, clear the `AUTH_DOMAIN` variable and push. The next build falls ba
 Hosting's free tier covers this comfortably — the handler is a few kilobytes and nothing
 else is served from it.
 
+## Address lookup (optional)
+
+Without a key the address field is a plain text box — which is the right behaviour, not a
+degraded one. Turn this on for autocomplete, a map on the invitation, one-tap directions,
+and the venue's own timezone.
+
+### 1. A key
+
+Google Cloud Console → **APIs & Services → Library** → enable **Places API (New)** and
+**Maps Static API**. Then **Credentials → Create credentials → API key**.
+
+Restrict it under **API restrictions** to those two APIs. Leave **Application restrictions**
+as _None_: the key is only ever used from our server, never a browser, so a referrer or IP
+restriction would either do nothing or break it.
+
+> Never make this a `NEXT_PUBLIC_` value. A key in the JavaScript bundle is a key on
+> somebody else's bill, and a referrer restriction does not fix that — a referrer is a
+> request header, and a header is a thing anyone can type.
+
+### 2. Switch it on
+
+| Where                          | Name                  | Value   |
+| ------------------------------ | --------------------- | ------- |
+| Settings → Secrets → Actions   | `GOOGLE_MAPS_API_KEY` | the key |
+| Settings → Variables → Actions | `PLACES_ENABLED`      | `true`  |
+
+Both are needed. `PLACES_ENABLED` decides whether the Secret Manager entry exists at all,
+and it is a separate plain variable on purpose: deciding that by looking at the key would
+make a `for_each` key derive from a sensitive value, which Terraform rejects for the entire
+plan. That is not hypothetical — it failed a deploy silently once already.
+
+### What it costs
+
+Autocomplete is billed per **session**, not per keystroke: a run of typing plus the lookup
+that ends it, tied together by a session token we generate and pass through. That is roughly
+a tenfold difference against the naive implementation. One event created is one session,
+around $0.017.
+
+The static map is fetched through our own route and cached for a day, so a venue is drawn
+once rather than once per guest who opens the invitation.
+
 ## Sending real email
 
 Until this is done, **nothing is actually sent**. `EMAIL_DRIVER` defaults to `outbox`, which

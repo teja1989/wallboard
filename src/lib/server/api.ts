@@ -22,7 +22,9 @@ export type ApiErrorCode =
   | 'conflict'
   | 'gone'
   | 'rate_limited'
-  | 'server_error';
+  | 'server_error'
+  /** An upstream we depend on failed. Distinct from our own break: retrying may work. */
+  | 'bad_gateway';
 
 const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   bad_request: 400,
@@ -33,6 +35,7 @@ const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   gone: 410,
   rate_limited: 429,
   server_error: 500,
+  bad_gateway: 502,
 };
 
 export class ApiError extends Error {

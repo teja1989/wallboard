@@ -161,6 +161,55 @@ test.describe('creating an event', () => {
   });
 });
 
+/**
+ * The address field has to be a text box first.
+ *
+ * Half of real events happen somewhere Google has never heard of, and CI runs with no API
+ * key at all — which is also what a deploy that has not been given one looks like. If this
+ * ever degrades into an error or a dead affordance, hosts cannot say where the party is.
+ */
+test.describe('the address field', () => {
+  test('takes a typed address with no lookup configured', async ({ page }) => {
+    await browseCreateAnonymously(page);
+
+    const address = page.getByLabel(/where is it/i);
+    await address.fill('The back garden, 14 Bridge Street');
+    await expect(address).toHaveValue('The back garden, 14 Bridge Street');
+
+    // No suggestions, no error, and nothing blocking the rest of the form.
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(page.getByText(/unavailable|error|failed/i)).toHaveCount(0);
+  });
+
+  test('an address survives all the way onto the invitation', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    await page.goto('/create');
+
+    await page.getByLabel('What are we calling it?').fill('Address journey');
+    await page.getByLabel('Where?').fill('The back garden');
+    await page.getByLabel(/where is it/i).fill('14 Bridge Street');
+    await page.getByRole('button', { name: /send the invitation/i }).click();
+
+    await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole('button', { name: /open the invitation/i }).click();
+
+    await expect(page.getByText('14 Bridge Street')).toBeVisible({ timeout: 15_000 });
+    // A typed address gets directions but no map — a map of the wrong street is worse
+    // than none.
+    await expect(page.getByRole('link', { name: /get directions/i })).toBeVisible();
+  });
+
+  test('the map proxy refuses coordinates that are not on Earth', async ({ page }) => {
+    // It is a public route reachable from any invitation, so its input is bounded.
+    for (const query of ['lat=91&lng=0', 'lat=0&lng=181', 'lat=nope&lng=0']) {
+      const response = await page.request.get(`/api/places/map?${query}`);
+      expect(response.status()).toBe(404);
+    }
+  });
+});
+
 test.describe('joining', () => {
   test('a wrong code is refused with an explanation', async ({ page }) => {
     await signInAsGuest(page);

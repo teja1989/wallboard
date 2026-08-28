@@ -1,6 +1,6 @@
 'use client';
 import { CalendarDays, Clock, MapPin, Shirt } from 'lucide-react';
-import { brand, occasionById, templateById } from '@/config';
+import { brand, directionsUrl, occasionById, placesConfig, templateById } from '@/config';
 import { entitlementsFor } from '@/lib/billing/entitlements';
 import { invitationLayouts } from '@/components/event/layouts';
 import { formatCountdownToEvent, formatEventDate } from '@/lib/utils';
@@ -43,16 +43,47 @@ export function Invitation({ event }: { event: EventDoc }) {
           {event.location.address && (
             <span className="block opacity-80">{event.location.address}</span>
           )}
-          {event.location.url && (
+          {/*
+            One tap to navigate, built from the place id when there is one so it opens the
+            actual venue rather than a text search that might find a different branch of the
+            same name. Falls back to whatever link the host pasted.
+          */}
+          {(event.location.address || event.location.url) && (
             <a
-              href={event.location.url}
+              href={
+                event.location.address
+                  ? directionsUrl(
+                      [event.location.name, event.location.address].filter(Boolean).join(', '),
+                      event.location.placeId ?? null,
+                    )
+                  : (event.location.url as string)
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1 inline-block underline underline-offset-2"
               style={{ color: 'inherit' }}
             >
-              Open in maps
+              Get directions
             </a>
+          )}
+
+          {/*
+            Drawn through our own route, because a static map URL carries the API key and an
+            invitation is a public link. Absent when the host typed an address rather than
+            picking one — most events happen somewhere unfindable, and no map is better than
+            a map of the wrong street.
+          */}
+          {typeof event.location.lat === 'number' && typeof event.location.lng === 'number' && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/places/map?lat=${event.location.lat}&lng=${event.location.lng}`}
+              alt=""
+              loading="lazy"
+              width={placesConfig.map.width}
+              height={placesConfig.map.height}
+              className="mt-3 block w-full rounded-[var(--radius-card)] border border-black/5 object-cover"
+              style={{ aspectRatio: `${placesConfig.map.width} / ${placesConfig.map.height}` }}
+            />
           )}
         </Detail>
       )}
