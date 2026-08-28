@@ -71,6 +71,16 @@ export function SiteFooter() {
           <Link href="/account" className="transition-colors hover:text-[var(--text-primary)]">
             Your account
           </Link>
+          {/*
+            Not decoration. Google's OAuth review fetches the privacy policy and expects to
+            reach it from the homepage, and sign-in stays limited to test users until it can.
+          */}
+          <Link href="/privacy" className="transition-colors hover:text-[var(--text-primary)]">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-[var(--text-primary)]">
+            Terms
+          </Link>
           <a
             href={`mailto:${brand.supportEmail}`}
             className="transition-colors hover:text-[var(--text-primary)]"

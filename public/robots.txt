@@ -7,11 +7,17 @@
 
 User-agent: *
 
-# The three public surfaces. `/$` matches the landing page exactly, not everything
+# The public surfaces. `/$` matches the landing page exactly, not everything
 # beneath it.
 Allow: /$
 Allow: /pricing
 Allow: /templates
+
+# The legal pages have to be fetchable. Google's OAuth review reads the privacy
+# policy before it will let the app serve anyone outside the test-user list, and a
+# policy behind a Disallow is a policy that fails review — while looking fine to us.
+Allow: /privacy
+Allow: /terms
 
 # Everything else, stated explicitly so the intent survives someone editing the
 # catch-all below.

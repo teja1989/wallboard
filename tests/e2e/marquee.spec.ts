@@ -665,6 +665,43 @@ test.describe('inviting people', () => {
   });
 });
 
+/**
+ * These pages are load-bearing beyond being polite.
+ *
+ * Google's OAuth review fetches the privacy policy before it will let the app serve anyone
+ * outside its test-user list. If they stop resolving, or fall behind a Disallow, production
+ * sign-in silently stops working for everybody who is not already on that list — and the
+ * symptom shows up nowhere near the cause.
+ */
+test.describe('the legal pages', () => {
+  test('both resolve and reach each other', async ({ page }) => {
+    await page.goto('/privacy');
+    await expect(page.getByRole('heading', { name: 'Privacy', level: 1 })).toBeVisible();
+    await page.getByRole('link', { name: /terms of service/i }).click();
+    await expect(page.getByRole('heading', { name: /terms of service/i, level: 1 })).toBeVisible();
+  });
+
+  test('are reachable from the homepage, which is where a reviewer starts', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('contentinfo').getByRole('link', { name: 'Privacy' }).click();
+    await expect(page.getByRole('heading', { name: 'Privacy', level: 1 })).toBeVisible();
+  });
+
+  test('are indexable, unlike the rest of the app', async ({ page }) => {
+    // Everything else sends noindex on purpose; a policy nobody can crawl fails review.
+    const response = await page.goto('/privacy');
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('meta[name="robots"][content*="noindex"]')).toHaveCount(0);
+  });
+
+  test('robots.txt lets a crawler reach them', async ({ page }) => {
+    const response = await page.goto('/robots.txt');
+    const body = (await response?.text()) ?? '';
+    expect(body).toContain('Allow: /privacy');
+    expect(body).toContain('Allow: /terms');
+  });
+});
+
 test.describe('the archive and deletion', () => {
   test('the host downloads everything as a zip', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
@@ -720,7 +757,7 @@ test.describe('accessibility and theming', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    for (const path of ['/', '/pricing', '/templates', '/join', '/create']) {
+    for (const path of ['/', '/pricing', '/templates', '/join', '/create', '/privacy', '/terms']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     }
