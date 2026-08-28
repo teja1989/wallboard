@@ -242,6 +242,29 @@ than a 403 so an event's existence is not confirmed to someone who is not in it.
 
 Deleted with the event, by both the sweep and the delete, like everything else here.
 
+**The funnel counts conversions; the tally counts current state.** They answer different
+questions and neither substitutes for the other. `rsvpAnswered` and `rsvpYes` fire on a guest's
+_first_ reply only — a change of mind is not a second conversion, and counting reply actions
+made the "what fraction of guests reply" ratio creep above the truth in proportion to how much
+people fiddled with their answer, with nothing about the number looking wrong. Who is actually
+coming is `event.rsvpTally`, maintained transactionally, and that is what any headcount reads.
+
+**Sums are not people, and the wording has to keep saying so.** `invitationOpened` goes up on
+every load, so one guest checking the address three times is three, and a link forwarded into a
+group chat produces opens with no invitation behind them — it can legitimately exceed
+`inviteSent`. So the host's own summary above the guest list is built from the invitee list
+(`firstViewedAt`, `repliedAt`) rather than from the funnel: those are per-person and
+authoritative. Rendering "31 of 40 guests looked" off a sum would be a confident lie, and the
+host chasing the nine who supposedly had not would be chasing nobody.
+
+That split decides where each number belongs. Per event, the invitee list wins and the funnel
+adds nothing. Across events it is the only thing that can answer "do guests, in general, do
+this" — which is what `/admin/funnel` reads, behind `admin:accessConsole`. That rollup reads
+each event's counters directly rather than running a collection-group query: one extra read per
+event, capped, on a page an owner opens occasionally, in exchange for needing no
+collection-group index. A missing index is invisible locally — the emulator answers queries
+production refuses — and this repo has already shipped a 500 that way.
+
 **The one counter with a business question attached** is `giftLinkClicked`. Over
 `invitationOpened` it says whether guests on an invitation have any purchase intent at all,
 which is the assumption every gifting feature rests on. It is measured with links and nothing

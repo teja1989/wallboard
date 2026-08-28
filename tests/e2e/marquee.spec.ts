@@ -1341,6 +1341,38 @@ test.describe('the plan', () => {
  * was true from the first commit while being said nowhere a customer could read it. These
  * assert it reaches the two pages a prospective host actually looks at.
  */
+/**
+ * The four-number summary above the guest list. Counts of **people**, from the invitee list —
+ * never the funnel, which counts sums and would report one guest looking three times as three.
+ */
+test.describe('how it is going', () => {
+  test('summarises the guest list in people, not in opens', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Progress test');
+
+    await page.goto(`/e/${eventId}?tab=guests`);
+    const form = page.getByRole('region', { name: /add your guests/i });
+    await expect(form).toBeVisible({ timeout: 20_000 });
+
+    // Nothing to report before anybody is invited — an empty summary over an empty list is
+    // a widget telling a host they have not started yet.
+    await expect(page.getByRole('region', { name: /how it is going/i })).toHaveCount(0);
+
+    await form.getByLabel('Name').fill('Priya Sharma');
+    await form.getByLabel(/phone or email/i).fill(uniqueEmail('guest'));
+    await form.getByRole('button', { name: /^add/i }).click();
+
+    const progress = page.getByRole('region', { name: /how it is going/i });
+    await expect(progress).toBeVisible({ timeout: 15_000 });
+    await expect(progress.getByText('On the list')).toBeVisible();
+    await expect(progress.getByText('Seen it')).toBeVisible();
+
+    // Added but not sent, so exactly one on the list and nothing further along. The nudge
+    // line stays away until there is a gap worth closing.
+    await expect(progress.getByText(/still waiting on/i)).toHaveCount(0);
+  });
+});
+
 test.describe('the no-ads promise', () => {
   test('is on the landing page, with a reason', async ({ page }) => {
     await page.goto('/');

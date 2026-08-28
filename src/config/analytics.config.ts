@@ -32,11 +32,32 @@
 export const FUNNEL_EVENTS = [
   /** An invitation was emailed. The denominator for everything downstream. */
   'inviteSent',
-  /** Somebody opened an invitation — after hydration, so scanners do not count. */
+  /**
+   * An invitation was opened — after hydration, so scanners do not count.
+   *
+   * **Opens, not openers.** One guest who looks three times is three, and a link shared into
+   * a group chat produces opens with no invitation behind them at all, so this can legitimately
+   * exceed `inviteSent`. Both facts follow from counting sums rather than people, which is the
+   * design and not a defect — but it means this must never be rendered as "31 of 40 guests
+   * looked". How many *people* have seen it is per-guest and authoritative on the invitee list
+   * (`firstViewedAt`), which is what the host's own summary reads.
+   */
   'invitationOpened',
-  /** A guest answered, either way. "No" is a reply and belongs in the numerator. */
+  /**
+   * A guest replied for the first time. "No" is a reply and belongs in the numerator.
+   *
+   * First replies only — a change of mind is not a second conversion. See the long note in
+   * the RSVP route for why counting reply *actions* quietly corrupts every ratio built on it.
+   */
   'rsvpAnswered',
-  /** …and said yes. Separately, because attendance and engagement are different questions. */
+  /**
+   * …and that first reply was yes. Separately, because attendance and engagement are
+   * different questions.
+   *
+   * Not "ever said yes": a guest who warms up from maybe to yes is not counted here, because
+   * counting that correctly needs a history the member document does not keep. Attendance is
+   * `event.rsvpTally.attending`, which is transactional and always current.
+   */
   'rsvpYes',
   /** Something reached the wall. The moment a replier becomes a participant. */
   'postCreated',
@@ -88,3 +109,82 @@ export const analyticsConfig = {
 export function funnelDayKey(at: number = Date.now()): string {
   return new Date(at).toISOString().slice(0, 10);
 }
+
+/**
+ * The ratios that decide things, and what each one decides.
+ *
+ * Written down as a table rather than computed ad hoc in a component, because the point of
+ * this is that a number has a *consequence*. A dashboard of counters nobody has attached a
+ * decision to is a dashboard nobody reads twice — and every one of these was named in the
+ * business plan as the thing that would settle an argument.
+ */
+export interface FunnelRatio {
+  id: string;
+  label: string;
+  numerator: FunnelEvent;
+  denominator: FunnelEvent;
+  /** The question this answers. Shown under the number, because that is the whole point. */
+  decides: string;
+  /**
+   * Whether exceeding 100% is meaningful rather than a bug.
+   *
+   * True for anything measured against `inviteSent`: a link forwarded into a group chat is an
+   * open with no invitation behind it, so opens can legitimately outrun sends. Rendering that
+   * as a clamped 100% would hide the most interesting thing the number can say.
+   */
+  canExceedOne?: boolean;
+}
+
+export const funnelRatios: readonly FunnelRatio[] = [
+  {
+    id: 'reach',
+    label: 'Opened, per invitation sent',
+    numerator: 'invitationOpened',
+    denominator: 'inviteSent',
+    decides: 'Whether email is worth it at all, or whether hosts are really sharing links.',
+    canExceedOne: true,
+  },
+  {
+    id: 'reply',
+    label: 'Replied, per opened',
+    numerator: 'rsvpAnswered',
+    denominator: 'invitationOpened',
+    decides: 'Whether the invitation asks clearly enough. The core product ratio.',
+  },
+  {
+    id: 'participate',
+    label: 'Posted, per reply',
+    numerator: 'postCreated',
+    denominator: 'rsvpAnswered',
+    decides: 'Whether a replier ever becomes a participant — the case for the wall.',
+  },
+  {
+    id: 'gift',
+    label: 'Tapped a gift list, per opened',
+    numerator: 'giftLinkClicked',
+    denominator: 'invitationOpened',
+    decides:
+      'Whether guests have any purchase intent on an invitation. Cash gifting is not built until this is real.',
+  },
+  {
+    id: 'upgrade',
+    label: 'Reached checkout, per invitation sent',
+    numerator: 'checkoutStarted',
+    denominator: 'inviteSent',
+    decides: 'Where the money question starts being answerable.',
+    canExceedOne: true,
+  },
+];
+
+/**
+ * How many recent events a rollup reads.
+ *
+ * Bounded on purpose. The rollup reads each event's counters directly rather than running a
+ * collection-group query, which costs one read per event — fine on a page only an owner opens,
+ * and it needs no collection-group index. That matters more than the read count here: this
+ * repo has already shipped a production 500 from a missing index that every local test passed,
+ * because the emulator answers queries no index could serve. When volume makes N+1 the wrong
+ * trade, the replacement is a collection-group query on `day` plus an index in **both**
+ * `firestore.indexes.json` and `infra/terraform/firestore.tf`.
+ */
+export const funnelRollupEventLimit = 200;

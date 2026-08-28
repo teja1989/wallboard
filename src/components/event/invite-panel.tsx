@@ -5,17 +5,20 @@ import { deliveryCopy, emailConfig, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { EmailPreview } from '@/components/event/email-preview';
+import { InviteProgress } from '@/components/event/invite-progress';
 import { GuestEntry } from '@/components/event/guest-entry';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { invitationPath } from '@/lib/codes-format';
 import { type Contact } from '@/lib/contacts';
 import { cn, formatRelativeTime } from '@/lib/utils';
-import type { DeliveryState, InviteeDoc } from '@/types/domain';
+import type { DeliveryState, InviteeDoc, RsvpTally } from '@/types/domain';
 
 interface InvitePanelProps {
   eventId: string;
   eventTitle: string;
   hostedBy: string;
+  /** Who is coming, transactionally maintained — never re-derived from the funnel. */
+  tally: RsvpTally;
   onSent: () => void;
 }
 
@@ -43,7 +46,7 @@ function toneOf(state: DeliveryState) {
  * and it is why the host can send the invitation themselves — from their own phone, in the
  * thread they already talk to that person in — without losing any of the tracking.
  */
-export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePanelProps) {
+export function InvitePanel({ eventId, eventTitle, hostedBy, tally, onSent }: InvitePanelProps) {
   const { notify } = useToast();
   const [invitees, setInvitees] = useState<InviteeDoc[] | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -183,6 +186,13 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
         </p>
       ) : (
         <>
+          {/*
+            Above the relay panel and the list, because "how is this going" is the question a
+            host opens this tab to answer. Derived from the list already in hand, so it costs
+            nothing to draw.
+          */}
+          <InviteProgress invitees={invitees} tally={tally} />
+
           <div className="card space-y-3 p-5">
             <div>
               <h3 className="flex items-center gap-2 font-semibold">

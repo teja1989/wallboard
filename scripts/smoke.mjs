@@ -128,6 +128,35 @@ async function signUp(email) {
   return { session, actor: result.payload.data.actor };
 }
 
+/**
+ * The same account twice.
+ *
+ * Most of this suite makes a fresh address per run, but the owner's is fixed by config —
+ * `OWNER_EMAILS` names one address and that is the one that gets the role. So the second run
+ * would collide on sign-up, and falling back to a password sign-in is what makes the owner
+ * assertions re-runnable rather than green exactly once.
+ */
+async function signUpOrIn(email) {
+  let idToken;
+  try {
+    ({ idToken } = await authRequest('accounts:signUp', {
+      email,
+      password: 'smoke-password-123',
+      returnSecureToken: true,
+    }));
+  } catch {
+    ({ idToken } = await authRequest('accounts:signInWithPassword', {
+      email,
+      password: 'smoke-password-123',
+      returnSecureToken: true,
+    }));
+  }
+  const session = newSession();
+  const result = await call(session, '/api/session', { method: 'POST', body: { idToken } });
+  if (result.status !== 200) throw new Error(`Session exchange failed: ${JSON.stringify(result)}`);
+  return { session, actor: result.payload.data.actor };
+}
+
 /** A code-only visitor. */
 async function signInAnonymously() {
   const { idToken } = await authRequest('accounts:signUp', { returnSecureToken: true });
@@ -692,9 +721,31 @@ async function main() {
   }, {});
 
   check('invitations sent are counted', totals.inviteSent >= 2, JSON.stringify(totals));
-  check('replies are counted', totals.rsvpAnswered >= 1, JSON.stringify(totals));
-  check('a yes is counted separately from a reply', totals.rsvpYes >= 1, JSON.stringify(totals));
   check('posts are counted', totals.postCreated >= 1, JSON.stringify(totals));
+
+  /*
+    Exactly two, and that is the assertion rather than "at least one".
+
+    Three replies landed on this event above: the guest said yes, the member said maybe, and
+    the member then changed to no. The change must not count — a funnel that counts reply
+    *actions* is one whose "what fraction of guests reply" ratio creeps above the truth in
+    proportion to how much people fiddle with their answer, and nothing about the number looks
+    wrong while it happens. A `>=` here would have passed against the bug.
+  */
+  check(
+    'a first reply is counted, and a change of mind is not',
+    totals.rsvpAnswered === 2,
+    JSON.stringify(totals),
+  );
+  check(
+    'the yes is counted separately, and only on a first reply',
+    totals.rsvpYes === 1,
+    JSON.stringify(totals),
+  );
+  check(
+    'the tally, not the funnel, is what knows who is actually coming',
+    stamped.payload?.data?.event?.rsvpTally !== undefined,
+  );
   check(
     'the counters carry no identifiers, only sums',
     (funnel.payload?.data?.days ?? []).every((day) =>
@@ -714,6 +765,70 @@ async function main() {
     strangerFunnel.status === 404,
     `status ${strangerFunnel.status}`,
   );
+
+  // --- the rollup across every event ----------------------------------------
+  // Seven counters were being written and nothing read them. This is the read path, and the
+  // permission on it: `admin:*` is platform-only by construction, so hosting a hundred events
+  // grants nothing here.
+  const hostRollup = await call(host.session, '/api/admin/funnel');
+  check(
+    'an ordinary host cannot read the rollup',
+    hostRollup.status === 403,
+    `status ${hostRollup.status}`,
+  );
+
+  const guestRollup = await call(guest.session, '/api/admin/funnel');
+  check(
+    'nor can a code-only visitor',
+    guestRollup.status === 401 || guestRollup.status === 403,
+    `status ${guestRollup.status}`,
+  );
+
+  /*
+    The positive path needs the address the *server* calls an owner, and this script reads its
+    own environment rather than the server's.
+
+    In CI they are the same thing — one job-level `env:` block feeds both — so this just works.
+    Locally the server reads `.env.local` and this process does not, so running
+    `npm run smoke` bare leaves this unset and the check is skipped, and running it with a
+    different value than `.env.local` holds produces a confusing "role is user" failure that
+    looks like broken authorization and is really a mismatched address. Locally:
+
+      OWNER_EMAILS=$(grep OWNER_EMAILS .env.local | cut -d= -f2) npm run smoke
+
+    Skipped rather than guessed when unset: an assertion that signed up the wrong address
+    would "pass" by being refused, which is the worst kind of green.
+  */
+  const ownerEmail = (process.env.OWNER_EMAILS ?? '').split(',')[0]?.trim();
+  if (ownerEmail) {
+    const owner = await signUpOrIn(ownerEmail);
+    check(
+      'the configured owner gets the owner role',
+      owner.actor?.role === 'owner',
+      JSON.stringify(owner.actor?.role),
+    );
+
+    const rollup = await call(owner.session, '/api/admin/funnel');
+    check('the owner reads the rollup', rollup.status === 200, JSON.stringify(rollup.payload));
+    check(
+      'it sums across events rather than naming one',
+      typeof rollup.payload?.data?.events === 'number' &&
+        rollup.payload?.data?.totals !== undefined,
+      JSON.stringify(rollup.payload?.data),
+    );
+    check(
+      'the totals are integers and nothing else — no ids, no paths',
+      Object.values(rollup.payload?.data?.totals ?? {}).every((v) => typeof v === 'number'),
+      JSON.stringify(rollup.payload?.data?.totals),
+    );
+    check(
+      'the rollup has picked up this run',
+      (rollup.payload?.data?.totals?.rsvpAnswered ?? 0) >= 2,
+      JSON.stringify(rollup.payload?.data?.totals),
+    );
+  } else {
+    console.log('  SKIP  owner rollup (OWNER_EMAILS not set in this environment)');
+  }
 
   // --- the gift list --------------------------------------------------------
   // The whole point of this feature is one number — do guests click? — so the read path,

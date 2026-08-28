@@ -321,6 +321,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   eventId={eventId}
                   eventTitle={event.title}
                   hostedBy={event.hostedBy || event.hostName}
+                  tally={event.rsvpTally}
                   onSent={loadEvent}
                 />
                 {/*

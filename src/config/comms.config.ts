@@ -159,3 +159,32 @@ export const relayCopy = {
   copiedAll: 'All the messages copied',
   noContact: 'No phone or email — you can still copy their link.',
 } as const;
+
+/**
+ * The four-number summary at the top of the guest list.
+ *
+ * Every one of these counts **people**, and the wording has to keep saying so. The funnel
+ * beside it counts sums — one guest opening an invitation three times is three opens — so a
+ * label like "31 opened" would invite exactly the wrong reading. "Seen it" is a count of
+ * guests with a `firstViewedAt`, and that is the promise the words have to keep.
+ */
+export const inviteProgressCopy = {
+  heading: 'How it is going',
+
+  invited: 'On the list',
+  sent: 'Sent',
+  seen: 'Seen it',
+  replied: 'Replied',
+
+  /** Heads, not replies: a family of four is four. Straight off the event's own tally. */
+  attending: (people: number) => (people === 1 ? '1 person coming' : `${people} people coming`),
+
+  /**
+   * Said only when there is something to do about it.
+   *
+   * "Nobody has replied" an hour after sending is normal and reads as failure; a host who is
+   * told their party is going badly before it has started is a host who closes the tab.
+   */
+  waitingOn: (people: number) =>
+    people === 1 ? 'Still waiting on 1 person.' : `Still waiting on ${people} people.`,
+} as const;

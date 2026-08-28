@@ -58,12 +58,34 @@ export const POST = route(async (request, { params }: Params) => {
     );
   }
 
-  // Both the reply and, separately, the yes. Attendance and engagement are different
-  // questions and a funnel that conflates them cannot answer either.
-  await recordFunnelAll(
-    event.id,
-    outcome.status === 'yes' ? ['rsvpAnswered', 'rsvpYes'] : ['rsvpAnswered'],
-  );
+  /*
+    Only a *first* reply is counted, and that is the whole distinction between these two
+    numbers and the tally beside them.
+
+    This used to fire on every reply, changes included, so a guest who said maybe and later
+    yes incremented `rsvpAnswered` twice. That makes it a count of reply *actions*, which is
+    not a thing anybody wants to divide by opens: the "what fraction of guests reply" ratio
+    would creep above the truth in proportion to how much people fiddled with their answer,
+    and nothing about the number would look wrong.
+
+    So the split is: **the funnel counts conversions, the tally counts current state.**
+    `rsvpAnswered` and `rsvpYes` mean "on their first reply, this many people answered, and
+    this many of those said yes" — monotonic, never double-counted, safe as a denominator.
+    Who is actually coming right now is `event.rsvpTally`, which is transactional and
+    authoritative, and is what any headcount must read instead of this.
+
+    `rsvpYes` is therefore first-reply-yes rather than ever-said-yes. Ever-said-yes cannot be
+    counted correctly without a record of whether this guest has said it before — the member
+    document holds only their current answer — and a naive check would double-count anyone
+    who went yes, no, yes. Undercounting a later change of heart is the cheaper error, and
+    the tally already reports the truth about attendance.
+  */
+  if (!outcome.changed) {
+    await recordFunnelAll(
+      event.id,
+      outcome.status === 'yes' ? ['rsvpAnswered', 'rsvpYes'] : ['rsvpAnswered'],
+    );
+  }
 
   await recordAudit(
     actor,

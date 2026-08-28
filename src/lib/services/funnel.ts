@@ -1,6 +1,13 @@
 import 'server-only';
 import { FieldValue } from 'firebase-admin/firestore';
-import { analyticsConfig, collections, funnelDayKey, type FunnelEvent } from '@/config';
+import {
+  analyticsConfig,
+  collections,
+  funnelDayKey,
+  funnelRollupEventLimit,
+  type FunnelEvent,
+} from '@/config';
+import { db } from '@/lib/firebase/admin';
 import { eventRef } from '@/lib/services/events';
 
 /**
@@ -95,6 +102,61 @@ export interface FunnelDay {
  * built on. Deliberately not aggregated across events here: doing that needs a collection
  * group query and an index, and it is the owner console's job rather than this module's.
  */
+export interface FunnelRollup {
+  /** Summed across every event read. */
+  totals: Partial<Record<FunnelEvent, number>>;
+  /** How many events contributed, so a ratio built on three of them can be taken with salt. */
+  events: number;
+  /** …and how many of those had any counters at all. */
+  eventsWithData: number;
+}
+
+/**
+ * Every counter, summed across recent events.
+ *
+ * This is the one that answers the questions the per-event view cannot. "Do guests click gift
+ * links" is not a question about one party — a single host's fortieth tells you nothing, and
+ * the per-event numbers are already better served by the guest list, which counts people
+ * rather than sums.
+ *
+ * **Reads each event's counters directly rather than running a collection-group query.** That
+ * costs one extra read per event, which is the wrong trade on a hot path and the right one
+ * here: this is opened by an owner, occasionally, and it needs no collection-group index.
+ * A missing index is invisible locally — the emulator happily answers queries production
+ * refuses — and this repo has already shipped a 500 that way. When the volume justifies it,
+ * swap in the collection-group query and add the index in both places.
+ */
+export async function funnelAcrossEvents(limit = funnelRollupEventLimit): Promise<FunnelRollup> {
+  const events = await db()
+    .collection(collections.events)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
+
+  const totals: Partial<Record<FunnelEvent, number>> = {};
+  let eventsWithData = 0;
+
+  // Sequential rather than a Promise.all over two hundred events: this is a background-ish
+  // page, and a burst of two hundred concurrent subcollection reads is the sort of thing that
+  // earns rate limiting for no benefit to anyone waiting on it.
+  for (const event of events.docs) {
+    const days = await event.ref.collection(collections.funnel).get();
+    if (days.empty) continue;
+    eventsWithData += 1;
+
+    for (const day of days.docs) {
+      const { day: _day, updatedAt: _updatedAt, ...counts } = day.data() as Record<string, unknown>;
+      for (const [name, value] of Object.entries(counts)) {
+        if (typeof value !== 'number') continue;
+        const key = name as FunnelEvent;
+        totals[key] = (totals[key] ?? 0) + value;
+      }
+    }
+  }
+
+  return { totals, events: events.size, eventsWithData };
+}
+
 export async function funnelForEvent(eventId: string): Promise<FunnelDay[]> {
   const snapshot = await eventRef(eventId).collection(collections.funnel).orderBy('day').get();
 
