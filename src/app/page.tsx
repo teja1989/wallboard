@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   ArrowRight,
+  BadgeCheck,
   CalendarCheck,
   Images,
   MailOpen,
@@ -9,7 +10,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { brand, templates, occasions, plans } from '@/config';
+import { adFreePromiseHolds, brand, templates, occasions, plans } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 
@@ -222,6 +223,36 @@ export default function LandingPage() {
             </dl>
           </div>
         </section>
+
+        {/*
+          --- no ads ----------------------------------------------------
+          Its own section rather than a fifth assurance above, because it is not a data-safety
+          promise — it is the difference between this and the free tier everybody has already
+          used, and it was true from the first commit while being said nowhere a customer
+          could read it. Rendered only while the claim is actually true.
+        */}
+        {adFreePromiseHolds() && (
+          <section className="mx-auto w-full max-w-6xl px-6 py-16">
+            <div className="card flex flex-col gap-6 p-10 sm:p-14 lg:flex-row lg:items-center lg:gap-12">
+              <div className="lg:flex-1">
+                <span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                  <BadgeCheck className="size-5" aria-hidden />
+                </span>
+                <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                  {brand.noAds.headline}
+                </h2>
+              </div>
+              <div className="lg:flex-1">
+                <p className="leading-relaxed text-pretty text-[var(--text-secondary)]">
+                  {brand.noAds.body}
+                </p>
+                <p className="mt-4 leading-relaxed text-pretty text-[var(--text-muted)]">
+                  {brand.noAds.why}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* --- pricing teaser ------------------------------------------ */}
         <section className="mx-auto w-full max-w-6xl px-6 py-16">

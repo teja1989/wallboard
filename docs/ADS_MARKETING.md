@@ -1,8 +1,24 @@
 # Ads and marketing integration
 
 Written during v1, before any of it is built, so the seams exist while the code is still
-shaped by them. Nothing here is live: `features.ads` and `features.analytics` are both
-`false`.
+shaped by them. Nothing here is live: `features.ads` is `false`, and `features.analytics` was
+superseded by the first-party funnel in `analytics.config.ts`.
+
+## Not shipping ads is now a stated promise
+
+The arithmetic below concluded against ads, and that conclusion is now a customer-facing
+claim rather than an internal note: `brand.noAds`, on the landing page, the pricing page and
+the free plan's own bullets. Evite's free tier is the ad-supported one, so this is the free
+tier's whole differentiator — and it was true from the first commit while being said nowhere
+a customer could read it.
+
+**The claim is checked, not pasted.** Every surface calls `adFreePromiseHolds()`, which reads
+the `ads` flag. If ads were ever switched on, the promise disappears in the same commit that
+made it untrue rather than sitting there contradicting the product. `tests/unit/no-ads.test.ts`
+asserts both halves: that it holds today, and that it tracks the flag rather than a constant.
+
+Turning ads on is therefore no longer a flag flip. It is a flag flip plus deliberately
+retracting a promise from three pages, which is the friction it deserves.
 
 ## The constraint that shapes everything
 

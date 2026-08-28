@@ -137,6 +137,9 @@ export const plans: Record<PlanId, Plan> = {
       'Photos, video, voice notes and messages',
       'Four invitation themes',
       'Wall stays live for 7 days',
+      // Last, and phrased as the promise rather than a feature, because it is the line that
+      // answers "what is the catch" — which is the only real objection a free tier has.
+      'No ads. Not even here.',
     ],
   },
   event: {
@@ -155,6 +158,7 @@ export const plans: Record<PlanId, Plan> = {
       'Private notes with each RSVP',
       'One custom question on the RSVP',
       'Guest list export',
+      'A planning list for your kind of event, with the dates worked out',
       'Wall stays live for 30 days, then downloads as an archive',
       'No Marquee branding',
     ],

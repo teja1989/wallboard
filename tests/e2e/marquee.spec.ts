@@ -1336,6 +1336,31 @@ test.describe('the plan', () => {
   });
 });
 
+/**
+ * The no-ads promise is the free tier's whole differentiator against the incumbent, and it
+ * was true from the first commit while being said nowhere a customer could read it. These
+ * assert it reaches the two pages a prospective host actually looks at.
+ */
+test.describe('the no-ads promise', () => {
+  test('is on the landing page, with a reason', async ({ page }) => {
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { name: /nobody is advertising at your guests/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/free does not mean ad-supported/i)).toBeVisible();
+    // The "what's the catch" answer, not just the claim.
+    await expect(page.getByText(/earn us pennies and cost you the moment/i)).toBeVisible();
+  });
+
+  test('is on the pricing page and on the free plan itself', async ({ page }) => {
+    await page.goto('/pricing');
+    await expect(page.getByText(/no ads\. not even on the free plan/i)).toBeVisible();
+    await expect(page.getByText(/is the free plan ad-supported/i)).toBeVisible();
+    // On the free column, which is the tier the claim is about.
+    await expect(page.getByText(/no ads\. not even here/i)).toBeVisible();
+  });
+});
+
 test.describe('accessibility and theming', () => {
   test('every page renders in dark mode without console errors', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, Check } from 'lucide-react';
-import { brand, formatPrice, planOrder, plans } from '@/config';
+import { ArrowRight, BadgeCheck, Check } from 'lucide-react';
+import { adFreePromiseHolds, brand, formatPrice, planOrder, plans } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,15 @@ export default function PricingPage() {
             No per-guest fees, no charge for the wall, and nothing your guests ever have to pay for
             or sign up to.
           </p>
+
+          {/* Above the table rather than buried in a bullet: for most people the last free
+              invitation they used had a banner on it, and this is the answer to that. */}
+          {adFreePromiseHolds() && (
+            <p className="mx-auto mt-6 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-5 py-2.5 text-sm font-medium">
+              <BadgeCheck className="size-4 text-[var(--accent)]" aria-hidden />
+              {brand.noAds.badge}
+            </p>
+          )}
 
           {/* The banner is a block, not an inline-flex: as a flex container the bold
               lead-in becomes its own column and the sentence breaks in half. */}
@@ -124,6 +133,14 @@ export default function PricingPage() {
               The wall closes on the date you chose, and the files are deleted from storage shortly
               after. On a paid event you can download the whole archive before it closes.
             </Faq>
+            {adFreePromiseHolds() && (
+              <Faq q="Is the free plan ad-supported?">
+                No. There are no ads on any plan, and none are coming — an ad beside
+                somebody&rsquo;s invitation earns us pennies and costs you the moment. The free plan
+                is the whole product with smaller limits, not a worse one with something sold in the
+                gaps.
+              </Faq>
+            )}
             <Faq q="Is it per guest?">
               Never. The plans differ in how many guests they allow, but you are never charged per
               head or per invitation sent.
