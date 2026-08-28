@@ -48,8 +48,25 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
-      # A moderate advisory in a transitive dependency should not silently accumulate.
-      - run: npm audit --audit-level=moderate
+      # Dependency hygiene, calibrated by what this gate actually caused.
+      #
+      # This step used to be `npm audit --audit-level=moderate` across dev dependencies too.
+      # It went red on advisories with no honest fix, and the pressure to make it green
+      # produced an `overrides` block that forced `gaxios` to v7 — a major the entire Cloud
+      # Storage auth chain does not support. The result was that no credential could be
+      # obtained from the metadata server, so photo upload, the wall's signed image URLs, the
+      # archive and event deletion were all broken in production for the life of the project,
+      # while this very check reported success. A gate that pushes people into corrupting the
+      # dependency tree is worse than no gate.
+      #
+      # So: block on anything high or critical in what actually ships, and report the rest
+      # without failing. `--omit=dev` because firebase-tools and the emulators never reach a
+      # container. `tests/unit/dependencies.test.ts` covers the failure mode this created —
+      # it fails on any package resolving a dependency outside its declared range, which is
+      # exactly what an override added to quiet this step tends to do.
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Report lower-severity advisories (not blocking)
+        run: npm audit --omit=dev || true
 
   rules:
     name: Firestore rules
