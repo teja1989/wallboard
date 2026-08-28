@@ -2,6 +2,8 @@ import type {
   CommsChannel,
   DeliveryState,
   EventRole,
+  MilestoneCategoryId,
+  MilestoneLiveField,
   TemplateId,
   OccasionId,
   PlanId,
@@ -15,6 +17,8 @@ export type {
   CommsChannel,
   DeliveryState,
   EventRole,
+  MilestoneCategoryId,
+  MilestoneLiveField,
   TemplateId,
   OccasionId,
   PlanId,
@@ -310,6 +314,36 @@ export interface RegistryLinkDoc {
   order: number;
   addedAt: number;
   clickCount: number;
+}
+
+/**
+ * One thing on the host's planning list.
+ *
+ * Host-only, always: this is somebody's working notes about their own party, including what
+ * they are spending, and none of it is a guest's business. The Firestore rules deny the
+ * collection outright in both directions.
+ *
+ * A seeded row carries the `templateKey` it came from, which is what stops a re-seed
+ * duplicating rows the host has already edited or ticked.
+ */
+export interface MilestoneDoc {
+  id: string;
+  title: string;
+  note: string;
+  categoryId: MilestoneCategoryId;
+  done: boolean;
+  doneAt: number | null;
+  /** When it wants doing. Seeded backwards from the event's date; editable after. */
+  dueAt: number | null;
+  /** Whole currency units, or null. Optional because most rows do not cost anything. */
+  budget: number | null;
+  order: number;
+  /** Null for a row the host wrote themselves. */
+  templateKey: string | null;
+  /** A number this row can show off the event, resolved at render. Never stored stale. */
+  live: MilestoneLiveField | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface AuditLogDoc {

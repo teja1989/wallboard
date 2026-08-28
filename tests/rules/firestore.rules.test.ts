@@ -85,6 +85,11 @@ beforeEach(async () => {
       url: 'https://example.com/registry',
       clickCount: 3,
     });
+    await setDoc(doc(db, 'events', EVENT_ID, 'milestones', 'milestone0001'), {
+      title: 'Book the caterer',
+      done: false,
+      budget: 4200,
+    });
     await setDoc(doc(db, 'events', EVENT_ID, 'funnel', '2026-08-28'), {
       day: '2026-08-28',
       inviteSent: 40,
@@ -398,6 +403,44 @@ describe('the gift list', () => {
       setDoc(
         doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0001'),
         { clickCount: 9999 },
+        { merge: true },
+      ),
+    );
+  });
+});
+
+/**
+ * The planning list is shut in both directions, and unusually the *host* is locked out too.
+ *
+ * Reads because it is somebody's working notes about their own party — including what they are
+ * spending on it — and a guest reading the catering budget for the party they are attending is
+ * exactly the surprise this product must never produce. Writes because ticking a row is gated
+ * on a paid entitlement, and a Firestore rule cannot check one.
+ */
+describe('the planning list', () => {
+  it('is unreadable by a guest, budget and all', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'milestones', 'milestone0001')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'milestones')));
+  });
+
+  it('is unreadable by an outsider', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'milestones', 'milestone0001')));
+  });
+
+  it('is not even readable by the host, who reaches it through the API', async () => {
+    // Not an oversight. The entitlement gate lives in the route handler, and a client that
+    // could read the collection directly would be one step from a client that writes it.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'milestones', 'milestone0001')));
+  });
+
+  it('cannot be ticked off from a browser', async () => {
+    // Which is what stops a free-tier host working a list they are only entitled to read.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(
+        doc(host, 'events', EVENT_ID, 'milestones', 'milestone0001'),
+        { done: true },
         { merge: true },
       ),
     );

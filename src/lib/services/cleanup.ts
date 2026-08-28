@@ -38,6 +38,7 @@ const EVENT_SUBCOLLECTIONS = [
   collections.rsvpNotes,
   collections.invitees,
   collections.registry,
+  collections.milestones,
   // Aggregate counters. They hold no personal data, but "nothing outlives the event" is the
   // product's promise rather than a data-protection technicality, and a table of how a
   // wedding went that survived the wedding would make it untrue by degrees.

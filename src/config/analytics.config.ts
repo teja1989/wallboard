@@ -48,6 +48,14 @@ export const FUNNEL_EVENTS = [
    * whether cash gifting is a business or a three-month bet on a hunch.
    */
   'giftLinkClicked',
+  /**
+   * A host ticked something off the planning list.
+   *
+   * Whether the planning board is a reason to pay or a tab nobody opens twice. It is the only
+   * host-side counter here, and deliberately measures *use* rather than views: opening a tab
+   * proves curiosity, working the list proves it was worth building.
+   */
+  'milestoneCompleted',
   /** A host reached checkout. Where the money question starts being answerable. */
   'checkoutStarted',
 ] as const;

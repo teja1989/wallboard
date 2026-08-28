@@ -734,6 +734,7 @@ async function main() {
     },
   });
   const giftEventId = giftEvent.payload?.data?.event?.id;
+  const giftJoinCode = giftEvent.payload?.data?.joinCode;
   check(
     'host creates a gifting occasion',
     giftEvent.status === 200,
@@ -833,6 +834,205 @@ async function main() {
     method: 'DELETE',
   });
   check('the host removes a gift link', removed.status === 200, JSON.stringify(removed.payload));
+
+  // --- the planning list ----------------------------------------------------
+  // Reuses the birthday, which has a named plan and a date to count backwards from.
+  //
+  // The entitlement gate is *not* asserted here: with billing off every event is created on
+  // `previewPlanId`, so no event this suite can make is on the free tier. That case is unit
+  // tested against a plan id directly, which is what the dev skill says to do rather than
+  // stubbing a flag.
+  const plan = await call(host.session, `/api/events/${giftEventId}/plan`);
+  check('the host reads the plan', plan.status === 200, JSON.stringify(plan.payload));
+  const seeded = plan.payload?.data?.milestones ?? [];
+  check('it arrives already written', seeded.length > 0, `${seeded.length} rows`);
+  check(
+    'nothing is stored until the host touches it',
+    plan.payload?.data?.saved === false,
+    JSON.stringify(plan.payload?.data?.saved),
+  );
+  check(
+    'a birthday gets the birthday list, not the generic one',
+    seeded.some((row) => row.templateKey === 'cake'),
+    JSON.stringify(seeded.map((row) => row.templateKey)),
+  );
+  check(
+    'every row has a date, counted back from the event',
+    seeded.every((row) => typeof row.dueAt === 'number'),
+    JSON.stringify(seeded.map((row) => row.dueAt)),
+  );
+  check(
+    'the rows carry the live fields that make this more than a checklist',
+    seeded.some((row) => row.live === 'headcount'),
+    JSON.stringify(seeded.map((row) => row.live)),
+  );
+  check(
+    'the live numbers come back with it',
+    typeof plan.payload?.data?.live?.headcount === 'number',
+    JSON.stringify(plan.payload?.data?.live),
+  );
+
+  // Ticking an unsaved row has to write the whole template out first, and exactly once.
+  const firstRow = seeded[0];
+  const ticked = await call(host.session, `/api/events/${giftEventId}/plan/${firstRow.id}`, {
+    method: 'PATCH',
+    body: { done: true },
+  });
+  check('the host ticks a row off', ticked.status === 200, JSON.stringify(ticked.payload));
+  check('it comes back done', ticked.payload?.data?.milestone?.done === true);
+  check(
+    'the server sets the time it was done, not the client',
+    typeof ticked.payload?.data?.milestone?.doneAt === 'number',
+  );
+
+  const afterTick = await call(host.session, `/api/events/${giftEventId}/plan`);
+  check('the plan is saved once it has been touched', afterTick.payload?.data?.saved === true);
+  check(
+    'writing the template out did not duplicate it',
+    (afterTick.payload?.data?.milestones ?? []).length === seeded.length,
+    `${(afterTick.payload?.data?.milestones ?? []).length} vs ${seeded.length}`,
+  );
+  check(
+    'the tick survived',
+    (afterTick.payload?.data?.milestones ?? []).filter((row) => row.done).length === 1,
+  );
+
+  // A second tick on a different row must not re-seed either.
+  const secondRow = (afterTick.payload?.data?.milestones ?? [])[1];
+  await call(host.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: { done: true },
+  });
+  const afterSecondTick = await call(host.session, `/api/events/${giftEventId}/plan`);
+  check(
+    'a second tick still does not duplicate the list',
+    (afterSecondTick.payload?.data?.milestones ?? []).length === seeded.length,
+    `${(afterSecondTick.payload?.data?.milestones ?? []).length}`,
+  );
+
+  const planFunnel = await call(host.session, `/api/events/${giftEventId}/funnel`);
+  const planTotals = (planFunnel.payload?.data?.days ?? []).reduce((sum, day) => {
+    for (const [name, value] of Object.entries(day.counts ?? {})) {
+      sum[name] = (sum[name] ?? 0) + value;
+    }
+    return sum;
+  }, {});
+  check(
+    'ticking a row is counted, so we learn whether the plan is used',
+    planTotals.milestoneCompleted === 2,
+    JSON.stringify(planTotals.milestoneCompleted),
+  );
+
+  // Untick and re-tick: the counter moves on the transition, not on every request.
+  await call(host.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: { done: true },
+  });
+  const notInflated = await call(host.session, `/api/events/${giftEventId}/funnel`);
+  const stillTwo = (notInflated.payload?.data?.days ?? []).reduce(
+    (sum, day) => sum + (day.counts?.milestoneCompleted ?? 0),
+    0,
+  );
+  check('ticking an already-ticked row does not inflate the count', stillTwo === 2, `${stillTwo}`);
+
+  /*
+    The one that would lose a host's data.
+
+    The handler applies a patch by spreading it over the stored row, so a schema field that
+    defaults instead of staying absent silently overwrites. `budget` briefly carried
+    `.default(null)`, which meant a bare `{ done: true }` wiped whatever the host had budgeted.
+  */
+  const budgeted = await call(host.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: { budget: 4200 },
+  });
+  check('a row takes a budget', budgeted.payload?.data?.milestone?.budget === 4200);
+
+  const tickedAgain = await call(host.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: { done: false },
+  });
+  check(
+    'unticking a row does not wipe its budget',
+    tickedAgain.payload?.data?.milestone?.budget === 4200,
+    JSON.stringify(tickedAgain.payload?.data?.milestone),
+  );
+
+  const emptyPatch = await call(host.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: {},
+  });
+  check('a patch that changes nothing is refused', emptyPatch.status === 400);
+
+  const added = await call(host.session, `/api/events/${giftEventId}/plan`, {
+    method: 'POST',
+    body: { title: 'Borrow more chairs', categoryId: 'admin' },
+  });
+  check('the host adds their own row', added.status === 200, JSON.stringify(added.payload));
+  check('an added row is not a template row', added.payload?.data?.milestone?.templateKey === null);
+  check(
+    'and cannot claim a live number the host did not earn',
+    added.payload?.data?.milestone?.live === null,
+  );
+
+  const namelessRow = await call(host.session, `/api/events/${giftEventId}/plan`, {
+    method: 'POST',
+    body: { title: '   ' },
+  });
+  check('a row with no name is refused', namelessRow.status === 400);
+
+  const removedRow = await call(
+    host.session,
+    `/api/events/${giftEventId}/plan/${added.payload?.data?.milestone?.id}`,
+    { method: 'DELETE' },
+  );
+  check('the host removes a row', removedRow.status === 200);
+
+  // A real member of *this* event, so the refusal below is about the host gate rather than
+  // about not being in the room at all — `member` joined the party further up, not this.
+  await call(member.session, '/api/events/join', {
+    method: 'POST',
+    body: { code: giftJoinCode },
+  });
+
+  const memberPlan = await call(member.session, `/api/events/${giftEventId}/plan`);
+  check(
+    'a guest cannot read the host planning notes',
+    memberPlan.status === 403,
+    `status ${memberPlan.status}`,
+  );
+
+  // 404 rather than 403 for somebody not in the event at all, matching the funnel and the
+  // guest list: a member already knows the event exists, a stranger must not learn it.
+  const strangerPlan = await call(stranger.session, `/api/events/${giftEventId}/plan`);
+  check(
+    'nor is a stranger told the plan exists',
+    strangerPlan.status === 404,
+    `status ${strangerPlan.status}`,
+  );
+
+  const memberTick = await call(member.session, `/api/events/${giftEventId}/plan/${secondRow.id}`, {
+    method: 'PATCH',
+    body: { done: true },
+  });
+  check(
+    'a guest cannot tick the host list off for them',
+    memberTick.status === 403,
+    `status ${memberTick.status}`,
+  );
+
+  // The write path hides exactly as much as the read path and no more: a difference between
+  // them is itself a disclosure.
+  const strangerTick = await call(
+    stranger.session,
+    `/api/events/${giftEventId}/plan/${secondRow.id}`,
+    { method: 'PATCH', body: { done: true } },
+  );
+  check(
+    'and a stranger is told nothing either way',
+    strangerTick.status === 404,
+    `status ${strangerTick.status}`,
+  );
 
   // --- add to calendar ------------------------------------------------------
   // The link in an email, which has to work with no session and no JavaScript — the reader

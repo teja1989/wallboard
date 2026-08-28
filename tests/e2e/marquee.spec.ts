@@ -1241,6 +1241,101 @@ test.describe('the gift list', () => {
   });
 });
 
+/**
+ * The planning list is the clearest answer this product has to "why pay when Evite is free",
+ * so the thing worth proving through the real UI is that it arrives *already written* — a host
+ * opening an empty board would be looking at a worse Reminders app.
+ */
+test.describe('the plan', () => {
+  test('arrives written, with dates and the numbers a notes app cannot know', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Fiftieth', 'birthday');
+
+    await page.goto(`/e/${eventId}?tab=plan`);
+    const plan = page.getByRole('region', { name: /the plan/i });
+    await expect(plan).toBeVisible({ timeout: 20_000 });
+
+    // The rows themselves are the product. A birthday knows about cakes.
+    await expect(plan.getByText(/order the cake/i)).toBeVisible();
+    await expect(plan.getByText(/confirm final numbers/i)).toBeVisible();
+    // With a lead time counted back from the date the host already gave us.
+    await expect(plan.getByText(/^· By /).first()).toBeVisible();
+
+    // The host is attending their own event, so the live headcount has something to say —
+    // this is the line a general-purpose planner structurally cannot produce.
+    await expect(plan.getByText(/coming so far/i)).toBeVisible();
+
+    await expect(plan.getByText(/0 of \d+ done/)).toBeVisible();
+  });
+
+  test('a host ticks something off and it sticks', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Ticking along', 'birthday');
+
+    await page.goto(`/e/${eventId}?tab=plan`);
+    const row = page.getByRole('checkbox', { name: /order the cake/i });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    await expect(row).toHaveAttribute('aria-checked', 'false');
+
+    await row.click();
+    await expect(row).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
+
+    // The first tick is what writes the seeded list out. A reload proves it landed, and that
+    // materialising did not duplicate every row in the process.
+    await page.reload();
+    const reloaded = page.getByRole('checkbox', { name: /order the cake/i });
+    await expect(reloaded).toHaveAttribute('aria-checked', 'true', { timeout: 20_000 });
+    await expect(page.getByText(/1 of \d+ done/)).toBeVisible();
+  });
+
+  test('a host adds something the template did not think of', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Extra chairs', 'birthday');
+
+    await page.goto(`/e/${eventId}?tab=plan`);
+    const field = page.getByPlaceholder(/what else needs doing/i);
+    await expect(field).toBeVisible({ timeout: 20_000 });
+
+    await field.fill('Borrow more chairs');
+    await page.getByRole('button', { name: /add something/i }).click();
+
+    await expect(page.getByRole('checkbox', { name: 'Borrow more chairs' })).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
+  test('is not offered to a guest at all', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId, joinCode } = await createEvent(page, 'Private notes', 'birthday');
+
+    // A signed-in member, not an anonymous one. An anonymous visitor is refused at identity
+    // with a 401 and never reaches the permission, so testing that would prove nothing about
+    // who is allowed to read a host's planning notes.
+    const memberContext = await browser.newContext();
+    const memberPage = await memberContext.newPage();
+    await signIn(memberPage, uniqueEmail('member'));
+    await memberPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await memberPage.waitForURL(`**/e/${eventId}`, { timeout: 20_000 });
+
+    // The tab is absent for a guest…
+    await expect(memberPage.getByRole('button', { name: 'Plan', exact: true })).toHaveCount(0);
+
+    // …and hiding it is not the protection. Through the page rather than `page.request`,
+    // which is a separate context carrying no session cookie and would answer 401 for anyone.
+    //
+    // 403 rather than 404, matching the funnel: this guest already knows the event exists —
+    // they are standing in it — so pretending otherwise would be theatre. A stranger holding
+    // only an id gets the 404, which is the case that actually needs hiding.
+    const status = await memberPage.evaluate(async (id) => {
+      const response = await fetch(`/api/events/${id}/plan`, { credentials: 'same-origin' });
+      return response.status;
+    }, eventId);
+    expect(status).toBe(403);
+
+    await memberContext.close();
+  });
+});
+
 test.describe('accessibility and theming', () => {
   test('every page renders in dark mode without console errors', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });

@@ -85,6 +85,17 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // The host's planning list. Shut in both directions, guests and host alike.
+      //
+      // Reads because it is somebody's working notes about their own party — what they have
+      // not done yet, and what they are spending — and a guest reading the budget for the
+      // party they are attending is exactly the surprise this product should never produce.
+      // Writes because ticking a row is gated on a paid entitlement, and a rule cannot check
+      // one; the host reaches it through an authorised API call like every other write here.
+      match /milestones/{milestoneId} {
+        allow read, write: if false;
+      }
+
       // Aggregate funnel counters, one document per day. Server-only in both directions.
       //
       // Writes, obviously: a client that could increment its own counters could tell the host

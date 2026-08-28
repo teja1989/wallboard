@@ -11,6 +11,7 @@ events/{eventId}
   members/{uid}             ← guest list, incl. the public half of each RSVP
   rsvpNotes/{uid}           ← server-only, the private half
   registry/{linkId}         ← the gift list; members read, only the host writes
+  milestones/{milestoneId}  ← server-only, the host's planning list
   posts/{postId}
 joinCodes/{codeHash}        ← server-only
 rateLimits/{bucketKey}      ← server-only
@@ -118,6 +119,36 @@ ones we were already paid for.
 
 No prices, no images, no stock. Fetching those would make this a worse version of the shop the
 host already chose, and Amazon's terms forbid caching a price beyond 24 hours anyway.
+
+## `events/{eventId}/milestones/{milestoneId}`
+
+| Field                    | Type                         | Notes                                                |
+| ------------------------ | ---------------------------- | ---------------------------------------------------- |
+| `title`, `note`          | string                       |                                                      |
+| `categoryId`             | venue \| food \| guests \| … | from `planning.config.ts`                            |
+| `done`, `doneAt`         | boolean, number \| null      | `doneAt` derived from `done`, never sent by a client |
+| `dueAt`                  | number \| null               | seeded backwards from `startsAt`; null with no date  |
+| `budget`                 | number \| null               | whole currency units                                 |
+| `order`                  | number                       |                                                      |
+| `templateKey`            | string \| null               | null for a row the host wrote                        |
+| `live`                   | headcount \| replies \| …    | which live number this row shows                     |
+| `createdAt`, `updatedAt` | number                       |                                                      |
+
+`allow read, write: if false` — and unusually the **host** is locked out too. Reads because
+this is somebody's working notes about their own party, the budget included, and a guest
+reading the catering spend for the party they are attending is a surprise this product must
+never produce. Writes because ticking a row is gated on the `eventPlanning` entitlement, and a
+Firestore rule cannot check one.
+
+**Nothing is written until the host touches it.** A read returns saved rows if any exist and
+otherwise renders the occasion's template from config, with ids of the form `template:{key}`.
+The first mutation materialises the whole template and then applies itself. So reads stay pure,
+a host who never opens the tab has nothing written on their behalf, and the seeded wording
+stays editable in config right up until somebody uses it. `templateKey` is what makes that
+idempotent — the seed cannot run twice into duplicates.
+
+The read also returns `live` numbers derived from the event in hand (headcount, replies still
+outstanding, the venue). Never stored: they cannot go stale, and they cost no extra read.
 
 ## `events/{eventId}/posts/{postId}`
 

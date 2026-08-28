@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  MILESTONE_CATEGORY_IDS,
   POST_KINDS,
   IMAGE_VARIANT_IDS,
   contentLimits,
@@ -11,6 +12,7 @@ import {
   joinCodeConfig,
   mediaRules,
   occasions,
+  planningLimits,
   registryLimits,
   rsvpChoices,
   type MediaKind,
@@ -309,6 +311,54 @@ export const mapCoordsSchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
 });
+
+/**
+ * The planning list.
+ *
+ * `dueAt` reuses the event timestamp bounds — a plan whose deadlines can land in the year
+ * 30000 sorts wrongly forever. `budget` is whole currency units: nobody budgets a party to
+ * the cent, and an integer cannot accumulate a rounding error across a total.
+ */
+const milestoneBudget = z.number().int().min(0).max(planningLimits.maxBudget).nullable();
+
+export const addMilestoneSchema = z.object({
+  title: cleanText(planningLimits.titleMaxLength).pipe(z.string().min(1, 'Give it a name.')),
+  note: cleanText(planningLimits.noteMaxLength).default(''),
+  categoryId: z.enum(MILESTONE_CATEGORY_IDS).default('admin'),
+  dueAt: eventTimestamp.default(null),
+  budget: milestoneBudget.default(null),
+});
+export type AddMilestoneInput = z.infer<typeof addMilestoneSchema>;
+
+/**
+ * Every field optional, because this one endpoint serves a tick, a rename and a budget edit.
+ *
+ * **No `.default()` on anything here**, and that is load-bearing rather than stylistic. The
+ * handler applies the patch by spreading it over the stored row, so a field that defaults
+ * instead of staying absent is a field that silently overwrites. `budget` had `.default(null)`
+ * shared with the add schema for about ten minutes, which meant a request carrying nothing but
+ * `{ done: true }` parsed as `{ done: true, budget: null }` — and ticking a box wiped whatever
+ * the host had budgeted for that row. The "nothing to change" refusal below is what caught it.
+ *
+ * `doneAt` is deliberately absent for the same family of reason: the server derives it from
+ * `done`, so the two cannot disagree and a host cannot backdate their own progress.
+ */
+export const patchMilestoneSchema = z
+  .object({
+    title: cleanText(planningLimits.titleMaxLength).pipe(z.string().min(1)).optional(),
+    note: cleanText(planningLimits.noteMaxLength).optional(),
+    categoryId: z.enum(MILESTONE_CATEGORY_IDS).optional(),
+    done: z.boolean().optional(),
+    dueAt: eventTimestamp.optional(),
+    budget: milestoneBudget.optional(),
+  })
+  .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change.');
+export type PatchMilestoneInput = z.infer<typeof patchMilestoneSchema>;
+
+/** Either an id we minted, or the `template:key` a rendered row carries before it is saved. */
+export const milestoneIdSchema = z
+  .string()
+  .regex(/^(template:)?[A-Za-z0-9_-]{3,60}$/, 'That is not on the list.');
 
 /**
  * A gift-list link.

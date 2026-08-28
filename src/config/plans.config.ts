@@ -43,6 +43,14 @@ export interface Entitlements {
   archiveDownload: boolean;
   /** A readable link, /e/priya-and-sam rather than an id. */
   vanityLink: boolean;
+  /**
+   * The planning list: tick things off, change them, add your own.
+   *
+   * The clearest answer this product has to "why pay when Evite is free", because it is a
+   * category Evite does not play in at all. The free tier still *sees* the list for its
+   * occasion — that is the pitch — but cannot work it.
+   */
+  eventPlanning: boolean;
 }
 
 export interface Plan {
@@ -77,6 +85,7 @@ const freeEntitlements: Entitlements = {
   guestListExport: false,
   archiveDownload: false,
   vanityLink: false,
+  eventPlanning: false,
 };
 
 const eventEntitlements: Entitlements = {
@@ -92,6 +101,7 @@ const eventEntitlements: Entitlements = {
   guestListExport: true,
   archiveDownload: true,
   vanityLink: true,
+  eventPlanning: true,
 };
 
 const proEntitlements: Entitlements = {
@@ -107,6 +117,7 @@ const proEntitlements: Entitlements = {
   guestListExport: true,
   archiveDownload: true,
   vanityLink: true,
+  eventPlanning: true,
 };
 
 export const plans: Record<PlanId, Plan> = {

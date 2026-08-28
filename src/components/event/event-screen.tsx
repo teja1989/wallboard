@@ -12,6 +12,7 @@ import { GuestList } from '@/components/event/guest-list';
 import { HostPanel } from '@/components/event/host-panel';
 import { InvitePanel } from '@/components/event/invite-panel';
 import { Invitation } from '@/components/event/invitation';
+import { PlanPanel } from '@/components/event/plan-panel';
 import { RsvpCard } from '@/components/event/rsvp-card';
 import { Composer } from '@/components/wall/composer';
 import { Lightbox } from '@/components/wall/lightbox';
@@ -34,7 +35,21 @@ interface EventResponse {
   };
 }
 
-type Section = 'invite' | 'wall' | 'guests';
+type Section = 'invite' | 'wall' | 'guests' | 'plan';
+
+/**
+ * The tabs, in the order they matter to whoever is looking.
+ *
+ * `Plan` is host-only and last, because it is the one section a guest has no business seeing
+ * and the one a host reaches for least often — the invitation and the replies are what they
+ * open the page for.
+ */
+const SECTIONS: readonly { id: Section; label: string; hostOnly?: boolean }[] = [
+  { id: 'invite', label: 'Invitation' },
+  { id: 'wall', label: 'Wall' },
+  { id: 'guests', label: 'Guests' },
+  { id: 'plan', label: 'Plan', hostOnly: true },
+];
 
 /**
  * The event, in three parts.
@@ -166,26 +181,20 @@ export function EventScreen({ eventId }: { eventId: string }) {
           aria-label="Event sections"
           className="glass mb-6 flex gap-1 rounded-[var(--radius-pill)] p-1"
         >
-          {(
-            [
-              ['invite', 'Invitation'],
-              ['wall', 'Wall'],
-              ['guests', 'Guests'],
-            ] as const
-          ).map(([id, label]) => (
+          {SECTIONS.filter((tab) => !tab.hostOnly || permissions.canManage).map((tab) => (
             <button
-              key={id}
+              key={tab.id}
               type="button"
-              aria-current={active === id ? 'page' : undefined}
-              onClick={() => setSection(id)}
+              aria-current={active === tab.id ? 'page' : undefined}
+              onClick={() => setSection(tab.id)}
               className={cn(
-                'flex-1 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium transition-all duration-200',
-                active === id
+                'flex-1 rounded-[var(--radius-pill)] px-3 py-2 text-sm font-medium transition-all duration-200 sm:px-4',
+                active === tab.id
                   ? 'bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-[var(--shadow-soft)]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
               )}
             >
-              {label}
+              {tab.label}
             </button>
           ))}
         </nav>
@@ -330,6 +339,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
             />
           </div>
         )}
+
+        {/* Guarded as well as hidden: the tab is not rendered for a guest, and the route
+            behind it answers 404 to anyone who is not the host. */}
+        {active === 'plan' && permissions.canManage && <PlanPanel event={event} />}
       </main>
 
       <Lightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
@@ -360,7 +373,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
 function requestedSection(): Section | null {
   if (typeof window === 'undefined') return null;
   const tab = new URLSearchParams(window.location.search).get('tab');
-  return tab === 'invite' || tab === 'wall' || tab === 'guests' ? tab : null;
+  return SECTIONS.some((section) => section.id === tab) ? (tab as Section) : null;
 }
 
 function openingSection(detail: EventResponse): Section {

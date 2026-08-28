@@ -371,6 +371,7 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
     await deleteSubcollection(event.id, collections.rsvpNotes);
     await deleteSubcollection(event.id, collections.funnel);
     await deleteSubcollection(event.id, collections.registry);
+    await deleteSubcollection(event.id, collections.milestones);
     await deleteSubcollection(event.id, collections.private);
 
     if (codeHash) {

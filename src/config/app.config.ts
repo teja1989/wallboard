@@ -76,6 +76,8 @@ export const collections = {
   invitees: 'invitees',
   /** Links a host wants guests to see. Readable by members; written only by the host. */
   registry: 'registry',
+  /** The host's planning list. Never readable by a guest — see planning.config.ts. */
+  milestones: 'milestones',
   /** Aggregate funnel counters, one document per day. No per-visitor rows — see funnel.ts. */
   funnel: 'funnel',
   // Subcollection of events/{eventId}/invitees/{inviteeId}
