@@ -230,9 +230,16 @@ async function main() {
     console.log(`    (a reader in Tokyo would previously have been told: ${inTokyo})`);
   }
 
+  say('Check the invitation offers a calendar entry');
+  const calendar = await fetch(`${BASE}/i/${joinCode}/calendar`);
+  const ics = await calendar.text();
+  ok('calendar file served', `${calendar.status} · ${calendar.headers.get('content-type')}`);
+  ok('reminders included', ics.includes('BEGIN:VALARM') ? 'yes' : 'no');
+
   console.log('\n─────────────────────────────────────────────');
   console.log('Open these in a browser:');
   console.log(`  Invitation   ${BASE}/i/${joinCode}`);
+  console.log(`  Calendar     ${BASE}/i/${joinCode}/calendar`);
   for (const invitee of invitees) {
     console.log(`  ${invitee.email.padEnd(34)} ${BASE}/i/${joinCode}?g=${invitee.token}`);
   }

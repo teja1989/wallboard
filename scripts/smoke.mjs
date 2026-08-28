@@ -597,6 +597,36 @@ async function main() {
   });
   check('a member cannot send', memberSends.status === 403);
 
+  // --- add to calendar ------------------------------------------------------
+  // The link in an email, which has to work with no session and no JavaScript — the reader
+  // is not a member yet, which is precisely why they were sent an invitation.
+  const currentCode = rotated.payload.data.code;
+  const icsResponse = await fetch(`${BASE}/i/${currentCode}/calendar`);
+  const ics = await icsResponse.text();
+
+  check('anyone holding the code can fetch the calendar file', icsResponse.status === 200);
+  check(
+    'it is served as a calendar, not as text a browser would just display',
+    (icsResponse.headers.get('content-type') ?? '').includes('text/calendar'),
+  );
+  check(
+    'it downloads under the event name rather than opening in the tab',
+    (icsResponse.headers.get('content-disposition') ?? '').startsWith('attachment;'),
+  );
+  check('it is a well-formed iCalendar file', ics.startsWith('BEGIN:VCALENDAR\r\n'));
+  check('with exactly one event in it', (ics.match(/BEGIN:VEVENT/g) ?? []).length === 1);
+  check(
+    'the time is written in UTC, so it lands correctly in any zone',
+    /DTSTART:\d{8}T\d{6}Z/.test(ics),
+  );
+  check('and it brings its own reminders', ics.includes('BEGIN:VALARM'));
+
+  const staleCalendar = await fetch(`${BASE}/i/${joinCode}/calendar`);
+  check('a rotated-away code cannot fetch the calendar either', staleCalendar.status === 404);
+
+  const nonsenseCalendar = await fetch(`${BASE}/i/ZZZZZZZZ/calendar`);
+  check('a code that was never real gets nothing', nonsenseCalendar.status === 404);
+
   // --- guests by phone, per-guest links, and what "seen" is worth ------------
   const byPhone = await call(host.session, `/api/events/${eventId}/invites`, {
     method: 'POST',

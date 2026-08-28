@@ -2,6 +2,7 @@
 import { CalendarDays, Clock, MapPin, Shirt } from 'lucide-react';
 import { brand, directionsUrl, occasionById, placesConfig, templateById } from '@/config';
 import { entitlementsFor } from '@/lib/billing/entitlements';
+import { AddToCalendar } from '@/components/event/add-to-calendar';
 import { invitationLayouts } from '@/components/event/layouts';
 import { formatCountdownToEvent, formatEventDate } from '@/lib/utils';
 import type { EventDoc } from '@/types/domain';
@@ -34,6 +35,11 @@ export function Invitation({ event }: { event: EventDoc }) {
               until {formatEventDate(event.endsAt, event.timeZone)}
             </span>
           )}
+          {/*
+            Directly under the date, because that is the moment someone decides whether they
+            can make it — and the moment they decide is the only moment they will save it.
+          */}
+          <AddToCalendar event={event} />
         </Detail>
       )}
 

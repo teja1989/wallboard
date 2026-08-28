@@ -45,6 +45,23 @@ metering — US SMS costs roughly thirty times what email does. US A2P 10DLC bra
 campaign registration and Meta business verification each take one to three weeks and must
 be started before any of that code is worth writing.
 
+### Add to calendar — shipped
+
+Every invitation with a date offers a `.ics` download and a Google Calendar link, and the
+emailed invitation, reminder and confirmation carry the same link. The entry brings two
+reminders with it — the day before, and two hours before — which is the cheapest attendance
+lift available: the guest's own phone does the nagging, at no per-message cost.
+
+Times are written in UTC rather than tagged with the event's zone. A `TZID` is only legal
+alongside a `VTIMEZONE` block spelling out that zone's daylight-saving rules, and hand-rolling
+those means shipping a copy of the zone database that goes stale. A UTC instant is
+unambiguous, and it is what makes the entry land at the right moment for a guest reading it
+from anywhere.
+
+Not yet: wallet passes (lock-screen presence on the day, and they update themselves if the
+venue moves) and automatic reminders sent on a schedule rather than by the host pressing a
+button.
+
 ### Payments
 
 The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,

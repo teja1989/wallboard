@@ -429,7 +429,18 @@ export async function sendRsvpConfirmation(
   email: string,
   guestName: string,
 ): Promise<void> {
-  const rendered = renderEmail('rsvpConfirmation', { event, guestName });
+  /*
+    The join code, only so the confirmation can carry an "add to calendar" link — the moment
+    someone taps "Going" is the moment they will actually save the date, and the link needs a
+    code because the file is served through the invitation route.
+
+    One extra document read on a path that is already making a network call to send mail, and
+    best-effort: a confirmation that arrives without the link is fine, one that fails to
+    arrive is not. It reveals nothing — the recipient redeemed this very code to reply.
+  */
+  const joinCode = await readJoinCode(event.id).catch(() => undefined);
+
+  const rendered = renderEmail('rsvpConfirmation', { event, guestName, joinCode });
   await mailer().send({
     to: normalizeEmail(email),
     fromName: `${event.hostedBy} ${emailConfig.fromNameSuffix}`,

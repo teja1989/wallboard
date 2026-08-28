@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
   apiCall,
@@ -722,6 +723,68 @@ test.describe('inviting people', () => {
  * sign-in silently stops working for everybody who is not already on that list — and the
  * symptom shows up nowhere near the cause.
  */
+test.describe('adding it to the calendar', () => {
+  test('the host gets a real calendar file out of the invitation', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Calendar party');
+    await page.goto(`/e/${eventId}`);
+
+    // The file is built in the browser from the event already on the page, so this exercises
+    // the whole path a guest takes — no route, no round trip.
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: /add to calendar/i }).click();
+    const file = await download;
+
+    expect(file.suggestedFilename()).toBe('calendar-party.ics');
+
+    const path = await file.path();
+    const ics = readFileSync(path, 'utf8');
+    expect(ics).toContain('BEGIN:VCALENDAR');
+    expect(ics).toContain('SUMMARY:Calendar party');
+    // The reminders are the reason anyone taps this in the first place.
+    expect(ics).toContain('BEGIN:VALARM');
+  });
+
+  test('there is nothing to add when the host has not set a date', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { status, payload } = await apiCall<{ data: { event: { id: string } } }>(
+      page,
+      '/api/events/create',
+      {
+        title: 'Save the date, eventually',
+        occasion: 'party',
+        hostedBy: 'The test suite',
+        expiryPresetId: '24h',
+        startsAt: null,
+        rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
+        allowedKinds: ['text'],
+      },
+    );
+    expect(status).toBe(200);
+
+    await page.goto(`/e/${payload.data.event.id}`);
+    await expect(page.getByText('has not set a date yet')).toBeVisible();
+    // A button that produces an entry at an invented hour is worse than no button.
+    await expect(page.getByRole('button', { name: /add to calendar/i })).toHaveCount(0);
+  });
+
+  test('the link in an email works with no account and no JavaScript', async ({
+    page,
+    request,
+  }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { joinCode } = await createEvent(page, 'Emailed party');
+    const code = joinCode.replace('-', '');
+
+    // A plain fetch, carrying no session — which is every recipient of an invitation.
+    const response = await request.get(`/i/${code}/calendar`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/calendar');
+    expect(response.headers()['content-disposition']).toContain('attachment');
+    expect(await response.text()).toContain('SUMMARY:Emailed party');
+  });
+});
+
 test.describe('the legal pages', () => {
   test('both resolve and reach each other', async ({ page }) => {
     await page.goto('/privacy');

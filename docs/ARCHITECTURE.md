@@ -13,7 +13,7 @@ Browser ──┬─ Next.js pages (RSC + client components)
 ```
 
 One event, three surfaces — invitation, wall and guest list — served from one page and one
-Firestore document tree. Six ideas carry most of the design.
+Firestore document tree. A handful of decisions carry most of the design.
 
 ### 1. Writes are server-only; reads can be direct
 
@@ -176,7 +176,30 @@ coordinates rather than through Google's Time Zone API — one fewer API to enab
 fewer thing to fail while somebody is publishing. It beats the host's browser zone, which is
 the fallback: someone in London booking a wedding in Goa means Goa.
 
-### 8. The invitation link is `/i/{code}`, and it previews
+### 8. The calendar entry is written in UTC, and built twice from one function
+
+Adding the event to a calendar is the one thing that survives the week between reading an
+invitation and attending it, and it arrives with reminders nobody has to pay for.
+
+**Times are UTC, never a `TZID`.** Tagging the local time with the event's zone is only legal
+if the file also carries a `VTIMEZONE` component spelling out that zone's daylight-saving
+rules; a `TZID` without one is rejected by Outlook and quietly misread elsewhere, and
+hand-rolling `VTIMEZONE` means shipping a copy of the zone database that goes stale. A UTC
+instant needs none of it, and `startsAt` is already absolute.
+
+The file is produced in two places from one builder in `src/lib/calendar/ics.ts`, which
+carries no `server-only` for exactly that reason. In the app the browser builds it from the
+event already on the page — no round trip, nothing to authorize. In email it cannot: a
+message is HTML in someone else's client, so the link points at `/i/{code}/calendar`, keyed
+on the join code like the invitation page beside it and serving the identical bytes.
+
+A link rather than an attachment. Attaching `text/calendar` to a bulk send is a strong spam
+signal, Gmail hides the part behind an RSVP widget that mails a reply to an organizer address
+we do not run, and an attachment is frozen at the moment it was sent — so a venue change
+would leave every guest holding the old one. A link is fetched when it is tapped, which is
+when it is correct. For the same reason the file names no `ORGANIZER` at all.
+
+### 9. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -198,7 +221,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 9. Answers are public, notes are not
+### 10. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -215,7 +238,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 10. Media never touches the app server
+### 11. Media never touches the app server
 
 Uploading is a two-step handshake:
 
@@ -348,6 +371,7 @@ their wall back intact.
 | `src/lib/authz/`    | `can()` policy engine, session resolution           |
 | `src/lib/services/` | events, posts, cleanup — logic shared across routes |
 | `src/lib/storage/`  | the adapter and its two drivers                     |
+| `src/lib/calendar/` | the `.ics` builder, shared by the browser and email |
 | `src/app/api/`      | route handlers; thin, they orchestrate services     |
 | `src/components/`   | UI, grouped by area                                 |
 | `src/proxy.ts`      | security headers and the CSP nonce                  |

@@ -1,6 +1,14 @@
 import 'server-only';
 import { invitationPath } from '@/lib/codes-format';
-import { appConfig, brand, emailSubjects, faceOf, occasionById, templateById } from '@/config';
+import {
+  appConfig,
+  brand,
+  calendarCopy,
+  emailSubjects,
+  faceOf,
+  occasionById,
+  templateById,
+} from '@/config';
 import { formatEventDate } from '@/lib/utils';
 import type { EmailKind } from '@/config';
 import type { EventDoc } from '@/types/domain';
@@ -52,6 +60,20 @@ export function eventUrl(eventId: string): string {
  */
 export function joinUrl(joinCode: string, guestToken?: string): string {
   return `${appConfig.siteUrl}${invitationPath(joinCode, guestToken)}`;
+}
+
+/**
+ * The `.ics` for an emailed invitation.
+ *
+ * A link rather than an attachment. Attaching the file is the more familiar pattern and it
+ * is the wrong one here: an attachment on a bulk send is the strongest spam signal a message
+ * can carry, Gmail hides `text/calendar` parts behind its own RSVP widget which then mails a
+ * reply to an organizer address we do not run, and the file would be frozen at the moment it
+ * was sent — so a venue change would leave every guest holding the old address. A link is
+ * fetched when it is tapped, which is when it is correct.
+ */
+export function calendarUrl(joinCode: string): string {
+  return `${appConfig.siteUrl}${invitationPath(joinCode)}/calendar`;
 }
 
 interface Shell {
@@ -123,11 +145,18 @@ function shell({ event, preview, bodyHtml, ctaLabel, ctaUrl, unsubscribeUrl }: S
 }
 
 /** The event's facts, as a block both the invitation and the reminder reuse. */
-function detailsHtml(event: EventDoc): string {
+function detailsHtml(event: EventDoc, joinCode?: string): string {
   const rows: string[] = [];
 
   if (event.startsAt !== null) {
-    rows.push(row('When', escapeHtml(formatEventDate(event.startsAt, event.timeZone, 'always'))));
+    // Right under the date, because deciding you can make it and saving it are the same
+    // moment — and if it is not saved then, it is not saved at all.
+    const add = joinCode
+      ? `<br><a href="${escapeHtml(calendarUrl(joinCode))}" style="color:#c65f47;font-size:13px;">${escapeHtml(calendarCopy.emailLabel)}</a>`
+      : '';
+    rows.push(
+      row('When', `${escapeHtml(formatEventDate(event.startsAt, event.timeZone, 'always'))}${add}`),
+    );
   }
   if (event.location?.name || event.location?.address) {
     const place = [event.location.name, event.location.address].filter(Boolean).join(', ');
@@ -150,10 +179,12 @@ function row(label: string, value: string): string {
   </tr>`;
 }
 
-function detailsText(event: EventDoc): string {
+function detailsText(event: EventDoc, joinCode?: string): string {
   const lines: string[] = [];
-  if (event.startsAt !== null)
+  if (event.startsAt !== null) {
     lines.push(`When:  ${formatEventDate(event.startsAt, event.timeZone, 'always')}`);
+    if (joinCode) lines.push(`       ${calendarCopy.emailLabel}: ${calendarUrl(joinCode)}`);
+  }
   if (event.location?.name || event.location?.address) {
     lines.push(
       `Where: ${[event.location.name, event.location.address].filter(Boolean).join(', ')}`,
@@ -205,11 +236,11 @@ function renderInvitation({
     <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">From ${escapeHtml(event.hostedBy)}</p>
     <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:30px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
     ${event.description ? `<p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${escapeHtml(event.description)}</p>` : ''}
-    ${detailsHtml(event)}
+    ${detailsHtml(event, joinCode)}
     <p style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#5c4f49;">${escapeHtml(occasion.rsvpPrompt)} It takes one tap — no account, no app.</p>`;
 
   const text = `${event.hostedBy} invited you to ${event.title}
-${event.description ? `\n${event.description}\n` : ''}${detailsText(event)}
+${event.description ? `\n${event.description}\n` : ''}${detailsText(event, joinCode)}
 ${occasion.rsvpPrompt} Reply here:
 ${url}
 ${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}` : ''}`;
@@ -246,12 +277,12 @@ function renderReminder({
     <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">A gentle nudge</p>
     <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
     <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${greeting} have not heard from you yet, and ${escapeHtml(event.hostedBy)} is working out numbers. Even a no is genuinely useful.</p>
-    ${detailsHtml(event)}`;
+    ${detailsHtml(event, joinCode)}`;
 
   const text = `${event.title} — a gentle nudge
 
 ${guestName ? `${guestName}, we` : 'We'} have not heard from you yet, and ${event.hostedBy} is working out numbers. Even a no is genuinely useful.
-${detailsText(event)}
+${detailsText(event, joinCode)}
 Reply here:
 ${url}
 ${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}` : ''}`;
@@ -270,7 +301,7 @@ ${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}`
   };
 }
 
-function renderConfirmation({ event, guestName }: RenderContext): RenderedEmail {
+function renderConfirmation({ event, guestName, joinCode }: RenderContext): RenderedEmail {
   const template = templateById(event.templateId);
   const face = faceOf(template);
   const url = eventUrl(event.id);
@@ -279,13 +310,13 @@ function renderConfirmation({ event, guestName }: RenderContext): RenderedEmail 
     <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">You're on the list</p>
     <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
     <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${guestName ? `Thanks, ${escapeHtml(guestName)}. ` : 'Thanks. '}${escapeHtml(event.hostedBy)} knows you are coming. Here are the details again, so they are in your inbox when you need them.</p>
-    ${detailsHtml(event)}
+    ${detailsHtml(event, joinCode)}
     <p style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#5c4f49;">On the day, the same link becomes the wall where everyone posts their photos.</p>`;
 
   const text = `You're on the list for ${event.title}
 
 ${guestName ? `Thanks, ${guestName}. ` : 'Thanks. '}${event.hostedBy} knows you are coming.
-${detailsText(event)}
+${detailsText(event, joinCode)}
 On the day, the same link becomes the wall where everyone posts their photos:
 ${url}`;
 
