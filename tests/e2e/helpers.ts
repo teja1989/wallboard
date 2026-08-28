@@ -158,14 +158,24 @@ export interface CreatedEvent {
   joinCode: string;
 }
 
-/** Creates an event through the API, for tests whose subject is not the create form. */
-export async function createEvent(page: Page, title: string): Promise<CreatedEvent> {
+/**
+ * Creates an event through the API, for tests whose subject is not the create form.
+ *
+ * The occasion is overridable because it is not merely cosmetic: it decides whether the
+ * invitation carries a gift list at all, so a test about that has to ask for a birthday
+ * rather than the default party.
+ */
+export async function createEvent(
+  page: Page,
+  title: string,
+  occasion = 'party',
+): Promise<CreatedEvent> {
   const { status, payload } = await apiCall<{
     ok: boolean;
     data: { event: { id: string }; joinCode: string };
   }>(page, '/api/events/create', {
     title,
-    occasion: 'party',
+    occasion,
     hostedBy: 'The test suite',
     expiryPresetId: '24h',
     startsAt: Date.now() + 3 * 24 * 60 * 60 * 1000,

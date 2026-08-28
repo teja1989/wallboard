@@ -76,6 +76,15 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // The gift list. Members read it — it is shown on the invitation, and a guest deciding
+      // what to bring is the whole audience for it. Writes go through the host-only API like
+      // everything else, and the click count on each row is incremented there rather than by
+      // whoever happened to tap it.
+      match /registry/{linkId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
       // Aggregate funnel counters, one document per day. Server-only in both directions.
       //
       // Writes, obviously: a client that could increment its own counters could tell the host

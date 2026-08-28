@@ -29,6 +29,15 @@ export interface Occasion {
   plusOnesByDefault: boolean;
   /** Occasions where celebratory language would be wrong. */
   somber: boolean;
+  /**
+   * Whether guests at this occasion would expect to bring something.
+   *
+   * What decides if the invitation offers a gift list at all. A fortieth and a baby shower
+   * are occasions where somebody is already wondering what to buy; a work offsite is one
+   * where asking would be a faux pas, and a memorial where it would be worse. So this is a
+   * property of the occasion rather than a switch every host has to find and think about.
+   */
+  giftsExpected: boolean;
 }
 
 export const occasions: readonly Occasion[] = [
@@ -44,6 +53,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: true,
   },
   {
     id: 'wedding',
@@ -57,6 +67,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: true,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: true,
   },
   {
     id: 'party',
@@ -70,6 +81,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: true,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: false,
   },
   {
     id: 'dinner',
@@ -83,6 +95,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: false,
   },
   {
     id: 'baby',
@@ -96,6 +109,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: false,
     somber: false,
+    giftsExpected: true,
   },
   {
     id: 'graduation',
@@ -109,6 +123,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: true,
   },
   {
     id: 'reunion',
@@ -122,6 +137,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: false,
   },
   {
     id: 'work',
@@ -135,6 +151,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: true,
     plusOnesByDefault: false,
     somber: false,
+    giftsExpected: false,
   },
   {
     id: 'memorial',
@@ -148,6 +165,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: false,
     somber: true,
+    giftsExpected: false,
   },
   {
     id: 'other',
@@ -161,6 +179,7 @@ export const occasions: readonly Occasion[] = [
     asksDressCode: false,
     plusOnesByDefault: true,
     somber: false,
+    giftsExpected: false,
   },
 ] as const;
 

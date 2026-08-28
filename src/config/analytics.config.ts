@@ -40,6 +40,14 @@ export const FUNNEL_EVENTS = [
   'rsvpYes',
   /** Something reached the wall. The moment a replier becomes a participant. */
   'postCreated',
+  /**
+   * A guest clicked through to a gift list.
+   *
+   * The whole reason the registry exists. Over `invitationOpened` this is the one number that
+   * says whether guests have any purchase intent on an invitation at all — and therefore
+   * whether cash gifting is a business or a three-month bet on a hunch.
+   */
+  'giftLinkClicked',
   /** A host reached checkout. Where the money question starts being answerable. */
   'checkoutStarted',
 ] as const;

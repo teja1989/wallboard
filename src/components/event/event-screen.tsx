@@ -6,6 +6,8 @@ import { Clock, Loader2, Settings2, Sparkles, Users } from 'lucide-react';
 import { brand, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
+import { GiftList } from '@/components/event/gift-list';
+import { GiftListPanel } from '@/components/event/gift-list-panel';
 import { GuestList } from '@/components/event/guest-list';
 import { HostPanel } from '@/components/event/host-panel';
 import { InvitePanel } from '@/components/event/invite-panel';
@@ -201,6 +203,12 @@ export function EventScreen({ eventId }: { eventId: string }) {
               // tap from the wall rather than at the end of the road.
               onOpenWall={() => setSection('wall')}
             />
+            {/*
+              Under the reply rather than above it. Somebody who has not yet said whether they
+              are coming is not thinking about presents, and putting a gift list between the
+              invitation and the RSVP is how an invitation starts to read like an invoice.
+            */}
+            <GiftList eventId={eventId} />
             {isAnonymous && (
               <SignInPrompt
                 compact
@@ -299,12 +307,21 @@ export function EventScreen({ eventId }: { eventId: string }) {
               what this tab has always shown them.
             */}
             {permissions.canManage && (
-              <InvitePanel
-                eventId={eventId}
-                eventTitle={event.title}
-                hostedBy={event.hostedBy || event.hostName}
-                onSent={loadEvent}
-              />
+              <>
+                <InvitePanel
+                  eventId={eventId}
+                  eventTitle={event.title}
+                  hostedBy={event.hostedBy || event.hostName}
+                  onSent={loadEvent}
+                />
+                {/*
+                  The gift list is managed beside the guest list rather than in the host drawer,
+                  because it is a thing a host does *to* their guests and belongs where they are
+                  already thinking about them. It renders nothing on occasions where gifts would
+                  be a faux pas — a work offsite, a memorial.
+                */}
+                <GiftListPanel eventId={eventId} />
+              </>
             )}
             <GuestList
               eventId={eventId}

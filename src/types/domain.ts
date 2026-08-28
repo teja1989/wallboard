@@ -294,6 +294,24 @@ export interface DeliveryDoc {
   updatedAt: number;
 }
 
+/**
+ * One link on the gift list.
+ *
+ * No price, no image, no stock level — see `registry.config.ts` for why. The click count is
+ * kept here as well as in the funnel because they answer different questions: the funnel says
+ * whether guests click at all, this says which of the host's links they clicked.
+ */
+export interface RegistryLinkDoc {
+  id: string;
+  /** What the host wants it called, e.g. "Our registry". */
+  label: string;
+  url: string;
+  note: string;
+  order: number;
+  addedAt: number;
+  clickCount: number;
+}
+
 export interface AuditLogDoc {
   id: string;
   actorUid: string;

@@ -80,6 +80,11 @@ beforeEach(async () => {
       name: 'Guest',
       status: 'sent',
     });
+    await setDoc(doc(db, 'events', EVENT_ID, 'registry', 'giftlink0001'), {
+      label: 'Our registry',
+      url: 'https://example.com/registry',
+      clickCount: 3,
+    });
     await setDoc(doc(db, 'events', EVENT_ID, 'funnel', '2026-08-28'), {
       day: '2026-08-28',
       inviteSent: 40,
@@ -353,6 +358,48 @@ describe('the funnel counters', () => {
     );
     await assertFails(
       setDoc(doc(member(), 'events', EVENT_ID, 'funnel', '2026-08-29'), { rsvpYes: 1 }),
+    );
+  });
+});
+
+/**
+ * The gift list is the one host-managed subcollection guests are *meant* to read: it renders
+ * on the invitation, and a guest deciding what to bring is the entire audience for it. So the
+ * interesting assertions here are the other two — that a stranger cannot, and that the click
+ * count on each row cannot be written by whoever tapped it.
+ */
+describe('the gift list', () => {
+  it('is readable by a member, because it is shown on their invitation', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0001')));
+  });
+
+  it('is not readable by an outsider', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'registry', 'giftlink0001')));
+  });
+
+  it('cannot be written, by the host or by a guest', async () => {
+    // The host adds links through the API so the destination is validated and audited; a
+    // guest must not be able to put a link of their own in front of the whole guest list.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(doc(host, 'events', EVENT_ID, 'registry', 'giftlink0002'), {
+        url: 'https://example.com/x',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0003'), {
+        url: 'https://evil.example/x',
+      }),
+    );
+  });
+
+  it('has a click count nobody can inflate from a browser', async () => {
+    await assertFails(
+      setDoc(
+        doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0001'),
+        { clickCount: 9999 },
+        { merge: true },
+      ),
     );
   });
 });

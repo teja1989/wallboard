@@ -74,6 +74,8 @@ export const collections = {
   private: 'private',
   rsvpNotes: 'rsvpNotes',
   invitees: 'invitees',
+  /** Links a host wants guests to see. Readable by members; written only by the host. */
+  registry: 'registry',
   /** Aggregate funnel counters, one document per day. No per-visitor rows — see funnel.ts. */
   funnel: 'funnel',
   // Subcollection of events/{eventId}/invitees/{inviteeId}

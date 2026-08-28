@@ -242,6 +242,19 @@ than a 403 so an event's existence is not confirmed to someone who is not in it.
 
 Deleted with the event, by both the sweep and the delete, like everything else here.
 
+**The one counter with a business question attached** is `giftLinkClicked`. Over
+`invitationOpened` it says whether guests on an invitation have any purchase intent at all,
+which is the assumption every gifting feature rests on. It is measured with links and nothing
+else — `events/{id}/registry` holds URLs a host pasted, no prices and no money — because
+building payments to find out would be a quarter spent on a hunch, and if guests will not tap
+a free link they will certainly not send $85 through a site they have never heard of.
+
+The tap is counted by a beacon on the way out, not by routing guests through a redirect of
+ours. Same reason the view beacon runs after hydration: mail scanners fetch every URL in every
+message, so a redirect in an emailed invitation would be counted as interest by robots. The
+anchor keeps a real `href`, so the destination works with JavaScript off and works if our own
+route is down — the measurement is ours to lose, not the guest's.
+
 ### 11. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an

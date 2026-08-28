@@ -715,6 +715,125 @@ async function main() {
     `status ${strangerFunnel.status}`,
   );
 
+  // --- the gift list --------------------------------------------------------
+  // The whole point of this feature is one number — do guests click? — so the read path,
+  // the occasion gate and the click beacon all have to actually work.
+  //
+  // A birthday, because the main smoke event is a `party` and parties do not carry a gift
+  // list. That asymmetry is the feature, and it gets asserted below.
+  const giftEvent = await call(host.session, '/api/events/create', {
+    method: 'POST',
+    body: {
+      title: 'Smoke test birthday',
+      occasion: 'birthday',
+      hostedBy: 'The smoke test',
+      expiryPresetId: '24h',
+      startsAt: Date.now() + 5 * 24 * 60 * 60 * 1000,
+      rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
+      allowedKinds: ['text'],
+    },
+  });
+  const giftEventId = giftEvent.payload?.data?.event?.id;
+  check(
+    'host creates a gifting occasion',
+    giftEvent.status === 200,
+    JSON.stringify(giftEvent.payload),
+  );
+
+  const giftAllowed = await call(host.session, `/api/events/${giftEventId}/registry`);
+  check(
+    'a birthday carries a gift list',
+    giftAllowed.payload?.data?.allowed === true,
+    JSON.stringify(giftAllowed.payload),
+  );
+
+  const partyRegistry = await call(host.session, `/api/events/${eventId}/registry`);
+  check(
+    'a party does not carry a gift list',
+    partyRegistry.payload?.data?.allowed === false,
+    JSON.stringify(partyRegistry.payload),
+  );
+
+  const addedLink = await call(host.session, `/api/events/${giftEventId}/registry`, {
+    method: 'POST',
+    body: { url: 'https://www.amazon.com/wedding/registry/SMOKE', label: '', note: '' },
+  });
+  check('the host adds a gift link', addedLink.status === 200, JSON.stringify(addedLink.payload));
+  check(
+    'a link with no name is named after where it points',
+    addedLink.payload?.data?.link?.label === 'Amazon',
+    JSON.stringify(addedLink.payload?.data?.link),
+  );
+  const linkId = addedLink.payload?.data?.link?.id;
+
+  // The one that matters: a registry row is a link we put in front of the whole guest list.
+  const badRegistryLink = await call(host.session, `/api/events/${giftEventId}/registry`, {
+    method: 'POST',
+    body: { url: 'javascript:alert(1)' },
+  });
+  check('a non-http gift link is refused', badRegistryLink.status === 400);
+
+  // Refused on the occasion, not merely hidden in the UI — a host who found the endpoint
+  // must not be able to put a gift list on a memorial.
+  const partyAdd = await call(host.session, `/api/events/${eventId}/registry`, {
+    method: 'POST',
+    body: { url: 'https://example.com/registry' },
+  });
+  check(
+    'a gift list cannot be added to an occasion that does not carry one',
+    partyAdd.status === 400,
+    `status ${partyAdd.status}`,
+  );
+
+  // The beacon is unauthenticated on purpose: the reader may be a guest with no session.
+  const clicked = await call(newSession(), `/api/events/${giftEventId}/registry/click`, {
+    method: 'POST',
+    body: { linkId },
+  });
+  check('a gift-list tap is counted without a session', clicked.status === 200);
+
+  const afterClick = await call(host.session, `/api/events/${giftEventId}/registry`);
+  check(
+    'the click lands on the link the host can see',
+    afterClick.payload?.data?.links?.[0]?.clickCount === 1,
+    JSON.stringify(afterClick.payload?.data?.links),
+  );
+
+  const giftFunnel = await call(host.session, `/api/events/${giftEventId}/funnel`);
+  const giftTotals = (giftFunnel.payload?.data?.days ?? []).reduce((sum, day) => {
+    for (const [name, value] of Object.entries(day.counts ?? {})) {
+      sum[name] = (sum[name] ?? 0) + value;
+    }
+    return sum;
+  }, {});
+  check(
+    'the tap also reaches the funnel, which is the number the business case needs',
+    giftTotals.giftLinkClicked >= 1,
+    JSON.stringify(giftTotals),
+  );
+
+  const strangerRegistry = await call(stranger.session, `/api/events/${giftEventId}/registry`);
+  check(
+    'a stranger is not told the gift list exists',
+    strangerRegistry.status === 404,
+    `status ${strangerRegistry.status}`,
+  );
+
+  const memberAdd = await call(member.session, `/api/events/${giftEventId}/registry`, {
+    method: 'POST',
+    body: { url: 'https://evil.example/mine' },
+  });
+  check(
+    'a guest cannot put their own link on somebody else invitation',
+    memberAdd.status === 403 || memberAdd.status === 404,
+    `status ${memberAdd.status}`,
+  );
+
+  const removed = await call(host.session, `/api/events/${giftEventId}/registry/${linkId}`, {
+    method: 'DELETE',
+  });
+  check('the host removes a gift link', removed.status === 200, JSON.stringify(removed.payload));
+
   // --- add to calendar ------------------------------------------------------
   // The link in an email, which has to work with no session and no JavaScript — the reader
   // is not a member yet, which is precisely why they were sent an invitation.

@@ -11,6 +11,7 @@ import {
   joinCodeConfig,
   mediaRules,
   occasions,
+  registryLimits,
   rsvpChoices,
   type MediaKind,
 } from '@/config';
@@ -308,6 +309,36 @@ export const mapCoordsSchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
 });
+
+/**
+ * A gift-list link.
+ *
+ * The URL is required here, unlike `externalUrl`, because a registry row with no destination
+ * is a row that does nothing but take up space on somebody's invitation. `label` is optional:
+ * left blank the client names it from the host, so pasting a URL and pressing add works.
+ */
+export const addRegistryLinkSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .min(1, 'Paste a link first.')
+    .max(500)
+    .refine((value) => {
+      try {
+        return ['http:', 'https:'].includes(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    }, 'That does not look like a web address.'),
+  label: cleanText(registryLimits.labelMaxLength).default(''),
+  note: cleanText(registryLimits.noteMaxLength).default(''),
+});
+export type AddRegistryLinkInput = z.infer<typeof addRegistryLinkSchema>;
+
+/** Ids are minted by us, so this only has to reject anything that is not one of ours. */
+export const registryLinkIdSchema = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
+
+export const registryClickSchema = z.object({ linkId: registryLinkIdSchema });
 
 export const addInviteesSchema = z.object({
   invitees: z

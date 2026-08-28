@@ -1181,6 +1181,66 @@ test.describe('the archive and deletion', () => {
   });
 });
 
+/**
+ * The gift list is the cheapest question in the business plan: will a guest on an invitation
+ * click through to buy something? Everything about cash gifting waits on that number, so the
+ * path that produces it — host adds a link, guest sees it, tap gets counted — is worth an
+ * end-to-end test rather than trusting the API assertions alone.
+ */
+test.describe('the gift list', () => {
+  test('a host adds a link and a guest sees it on the invitation', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId, joinCode } = await createEvent(page, 'Fortieth', 'birthday');
+
+    await page.goto(`/e/${eventId}?tab=guests`);
+    await page.getByLabel('Link').fill('https://www.amazon.com/wedding/registry/TEST');
+    await page.getByRole('button', { name: /add a link/i }).click();
+
+    // Named from where it points, because the host left the name blank — which is the
+    // common case and the reason the field is optional.
+    const panel = page.getByRole('region', { name: /gift list/i });
+    await expect(panel.getByText('Amazon', { exact: true })).toBeVisible({ timeout: 15_000 });
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await expect(guestPage.getByRole('heading', { name: 'Fortieth' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const list = guestPage.getByRole('region', { name: /gift list/i });
+    await expect(list).toBeVisible();
+    // A real href, so it survives our own beacon route being down and works with no JS.
+    const link = list.getByRole('link', { name: /amazon/i });
+    await expect(link).toHaveAttribute('href', 'https://www.amazon.com/wedding/registry/TEST');
+    // `noopener` keeps the shop from reaching back through window.opener.
+    await expect(link).toHaveAttribute('rel', /noopener/);
+
+    await guestContext.close();
+  });
+
+  test('nothing is asked for at an occasion where a gift would be a faux pas', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    // A work offsite. The default `createEvent` occasion is a party, which is also giftless,
+    // so this names the one where asking would be actively wrong.
+    const { eventId } = await createEvent(page, 'Q4 offsite', 'work');
+
+    await page.goto(`/e/${eventId}?tab=guests`);
+    // Anchored on the invite form, which every host sees, rather than on a send control —
+    // those only render once somebody is on the list.
+    await expect(page.getByRole('region', { name: /add your guests/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    // The panel is absent rather than empty: a "Gift list" heading with nothing under it
+    // still reads as an ask.
+    await expect(page.getByRole('region', { name: /gift list/i })).toHaveCount(0);
+
+    await page.goto(`/e/${eventId}`);
+    await expect(page.getByRole('heading', { name: 'Q4 offsite' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /gift list/i })).toHaveCount(0);
+  });
+});
+
 test.describe('accessibility and theming', () => {
   test('every page renders in dark mode without console errors', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });

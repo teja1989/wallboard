@@ -31,6 +31,8 @@ export const AUDIT_ACTIONS = [
   'invite.send',
   'invite.remind',
   'invite.unsubscribe',
+  'registry.add',
+  'registry.remove',
   'billing.checkoutStarted',
   'billing.eventUnlocked',
   'billing.subscriptionActive',

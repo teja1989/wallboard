@@ -370,6 +370,7 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
   await inStage('records', async () => {
     await deleteSubcollection(event.id, collections.rsvpNotes);
     await deleteSubcollection(event.id, collections.funnel);
+    await deleteSubcollection(event.id, collections.registry);
     await deleteSubcollection(event.id, collections.private);
 
     if (codeHash) {

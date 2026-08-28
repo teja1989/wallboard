@@ -10,6 +10,7 @@ events/{eventId}
   private/joinCode          ← server-only
   members/{uid}             ← guest list, incl. the public half of each RSVP
   rsvpNotes/{uid}           ← server-only, the private half
+  registry/{linkId}         ← the gift list; members read, only the host writes
   posts/{postId}
 joinCodes/{codeHash}        ← server-only
 rateLimits/{bucketKey}      ← server-only
@@ -92,6 +93,31 @@ rules. Anonymous visitors join as `viewer`; identified ones as `member`.
 A separate subcollection purely because Firestore rules cannot restrict a single field, and
 a note addressed to the host is not for the rest of the guest list. `allow read, write: if
 false` — nobody reaches it from a browser, host and owner included.
+
+## `events/{eventId}/registry/{linkId}`
+
+| Field        | Type   | Notes                                                             |
+| ------------ | ------ | ----------------------------------------------------------------- |
+| `id`         | string | matches the document id; twelve base64url characters              |
+| `label`      | string | what the host calls it, or the destination's name if they did not |
+| `url`        | string | http(s) only, validated before it is stored                       |
+| `note`       | string | optional line under the name                                      |
+| `order`      | number | append order                                                      |
+| `addedAt`    | number |                                                                   |
+| `clickCount` | number | server-incremented; the host's per-link view of the funnel        |
+
+The one host-managed subcollection guests are _meant_ to read: it renders on the invitation,
+and a guest deciding what to bring is the whole audience. So `allow read: if isMemberOf(...)`,
+and writes go through the host-only API like everything else — including `clickCount`, which a
+browser must not be able to inflate.
+
+Whether an event has one at all is decided by `occasion.giftsExpected`, not by the host and
+not by the plan. A work offsite and a memorial never ask anybody for anything, and putting the
+gift list behind a paywall would mean the only invitations asking guests for money are the
+ones we were already paid for.
+
+No prices, no images, no stock. Fetching those would make this a worse version of the shop the
+host already chose, and Amazon's terms forbid caching a price beyond 24 hours anyway.
 
 ## `events/{eventId}/posts/{postId}`
 
