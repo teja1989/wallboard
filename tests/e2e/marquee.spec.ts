@@ -77,7 +77,13 @@ test.describe('creating an event', () => {
     const code = await page.locator('.code-display').first().innerText();
     expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
 
-    await page.getByRole('button', { name: /open the invitation/i }).click();
+    // The guest list is the primary action, not the code. This screen used to offer a code
+    // and "Share the link" and never mention guests, so the default path skipped per-guest
+    // links, delivery status and reminders entirely.
+    await expect(page.getByRole('button', { name: /add your guests/i })).toBeVisible();
+    await expect(page.getByText(/nothing sent this way can be tracked/i)).toBeVisible();
+
+    await page.getByRole('button', { name: /or just look at it first/i }).click();
     await expect(page.getByRole('heading', { name: 'Rooftop dinner' })).toBeVisible();
     await expect(page.getByText('From Priya & Sam')).toBeVisible();
     await expect(page.getByText('The Rooftop')).toBeVisible();
@@ -111,7 +117,7 @@ test.describe('creating an event', () => {
       timeout: 20_000,
     });
 
-    await page.getByRole('button', { name: /open the invitation/i }).click();
+    await page.getByRole('button', { name: /or just look at it first/i }).click();
     await expect(page.getByRole('heading', { name: 'Anonymous rooftop dinner' })).toBeVisible();
     await expect(page.getByText('From Someone New')).toBeVisible();
   });
@@ -267,7 +273,7 @@ test.describe('the address field', () => {
     await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible({
       timeout: 20_000,
     });
-    await page.getByRole('button', { name: /open the invitation/i }).click();
+    await page.getByRole('button', { name: /or just look at it first/i }).click();
 
     await expect(page.getByText('14 Bridge Street')).toBeVisible({ timeout: 15_000 });
     // A typed address gets directions but no map — a map of the wrong street is worse
@@ -339,7 +345,7 @@ test.describe('the wall', () => {
     const { eventId } = await createEvent(page, 'Live update test');
 
     await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: 'Wall' }).click();
+    await page.getByRole('button', { name: 'Wall', exact: true }).click();
     await expect(page.getByText(/nothing here yet/i)).toBeVisible();
 
     await page.getByPlaceholder('Say something…').fill('First post from the host');
@@ -353,7 +359,7 @@ test.describe('the wall', () => {
     await signIn(page, uniqueEmail('host'));
     const { eventId, joinCode } = await createEvent(page, 'Streaming test');
     await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: 'Wall' }).click();
+    await page.getByRole('button', { name: 'Wall', exact: true }).click();
     await expect(page.getByText(/nothing here yet/i)).toBeVisible();
 
     const guestContext = await browser.newContext();
@@ -374,7 +380,7 @@ test.describe('the wall', () => {
     await apiCall(page, '/api/posts', { eventId, body: 'Remove me please' });
 
     await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: 'Wall' }).click();
+    await page.getByRole('button', { name: 'Wall', exact: true }).click();
     await expect(page.getByText('Remove me please')).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
@@ -412,7 +418,7 @@ test.describe('the wall', () => {
     await apiCall(page, `/api/events/${eventId}/end`);
 
     await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: 'Wall' }).click();
+    await page.getByRole('button', { name: 'Wall', exact: true }).click();
     await expect(page.getByText(/this wall is closed/i)).toBeVisible();
     await expect(page.getByPlaceholder('Say something…')).toHaveCount(0);
   });
@@ -977,9 +983,13 @@ test.describe('adding it to the calendar', () => {
     await page.goto(`/e/${eventId}`);
 
     // The file is built in the browser from the event already on the page, so this exercises
-    // the whole path a guest takes — no route, no round trip.
+    // the whole path a guest takes — no route, no round trip. Scoped to the invitation card:
+    // the RSVP confirmation below it offers its own, and the host is attending their own event.
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: /add to calendar/i }).click();
+    await page
+      .getByRole('article')
+      .getByRole('button', { name: /add to calendar/i })
+      .click();
     const file = await download;
 
     expect(file.suggestedFilename()).toBe('calendar-party.ics');
