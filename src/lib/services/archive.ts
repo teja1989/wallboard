@@ -4,6 +4,8 @@ import { Readable } from 'node:stream';
 import { brand, collections, occasionById, templateById } from '@/config';
 import { db } from '@/lib/firebase/admin';
 import { storage } from '@/lib/storage';
+import { StorageSweepError } from '@/lib/storage/batch';
+import { ApiError } from '@/lib/server/api';
 import { eventRef } from '@/lib/services/events';
 import { guestsToCsv, listGuests } from '@/lib/services/rsvp';
 import { formatEventDate } from '@/lib/utils';
@@ -277,6 +279,44 @@ export interface DeletionSummary {
  * The join code hash is removed too, so the code stops working the instant this returns
  * rather than leading to a 404 that looks like a bug.
  */
+/**
+ * Which half of a delete failed, in a form the host can read.
+ *
+ * Deleting is destructive, host-only, and irreversible, and until now a failure anywhere
+ * inside it produced one flat "something went wrong on our end" — which tells the person who
+ * just pressed the button nothing about whether to retry, and tells whoever has to fix it
+ * nothing at all without a log they may not be able to reach.
+ *
+ * So the two halves report themselves. `storage` means the files were not removed and
+ * *nothing else was touched*, which is safe and worth retrying. `records` means the files are
+ * already gone and the documents are not, which is not safe to leave and is worth saying out
+ * loud rather than hiding behind a generic apology.
+ *
+ * The upstream HTTP status rides along when there is one — a 403 and a 429 need completely
+ * different responses from whoever is looking, and a bare number gives away nothing about
+ * bucket names, paths or internals. The message itself stays on the server.
+ */
+async function inStage<T>(stage: 'storage' | 'records', run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    // Already says exactly what happened, and can only come from the storage stage.
+    if (error instanceof StorageSweepError) throw error;
+    if (error instanceof ApiError) throw error;
+
+    const status = (error as { code?: unknown }).code;
+    console.error(`[delete] ${stage} stage failed`, error);
+
+    throw new ApiError(
+      'bad_gateway',
+      stage === 'storage'
+        ? 'The files could not be removed, so nothing was deleted. Please try again.'
+        : 'The files were removed but the records were not. Please try again.',
+      { stage, upstreamStatus: typeof status === 'number' ? status : null },
+    );
+  }
+}
+
 export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSummary> {
   const summary: DeletionSummary = {
     objectsDeleted: 0,
@@ -297,14 +337,22 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
     entirely intact and the host is told to try again. Deletion is idempotent, so the retry
     costs nothing but the objects already removed.
   */
-  summary.objectsDeleted = await storage().deletePrefix(`events/${event.id}/`);
+  summary.objectsDeleted = await inStage('storage', () =>
+    storage().deletePrefix(`events/${event.id}/`),
+  );
 
   const reference = eventRef(event.id);
-  const codeSnapshot = await reference.collection(collections.private).doc('joinCode').get();
+  const codeSnapshot = await inStage('records', () =>
+    reference.collection(collections.private).doc('joinCode').get(),
+  );
   const codeHash = codeSnapshot.exists ? String(codeSnapshot.get('codeHash') ?? '') : '';
 
-  summary.postsDeleted = await deleteSubcollection(event.id, collections.posts);
-  summary.membersDeleted = await deleteSubcollection(event.id, collections.members);
+  summary.postsDeleted = await inStage('records', () =>
+    deleteSubcollection(event.id, collections.posts),
+  );
+  summary.membersDeleted = await inStage('records', () =>
+    deleteSubcollection(event.id, collections.members),
+  );
 
   // Invitees are swept recursively, not batch-deleted like the rest.
   //
@@ -313,18 +361,21 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
   // delete would leave a record of who was sent what, and when they read it, alive forever
   // under a guest list that no longer exists. Counting first because recursiveDelete does
   // not report what it removed.
-  summary.inviteesDeleted = (
-    await reference.collection(collections.invitees).count().get()
-  ).data().count;
-  await db().recursiveDelete(reference.collection(collections.invitees));
+  summary.inviteesDeleted = await inStage('records', async () => {
+    const counted = (await reference.collection(collections.invitees).count().get()).data().count;
+    await db().recursiveDelete(reference.collection(collections.invitees));
+    return counted;
+  });
 
-  await deleteSubcollection(event.id, collections.rsvpNotes);
-  await deleteSubcollection(event.id, collections.private);
+  await inStage('records', async () => {
+    await deleteSubcollection(event.id, collections.rsvpNotes);
+    await deleteSubcollection(event.id, collections.private);
 
-  if (codeHash) {
-    await db().collection(collections.joinCodes).doc(codeHash).delete();
-  }
-  await reference.delete();
+    if (codeHash) {
+      await db().collection(collections.joinCodes).doc(codeHash).delete();
+    }
+    await reference.delete();
+  });
 
   return summary;
 }

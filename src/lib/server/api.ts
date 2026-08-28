@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { ZodError, type ZodType } from 'zod';
 import type { RateLimitName } from '@/config';
@@ -101,8 +102,18 @@ export function toResponse(error: unknown): NextResponse {
     });
   }
 
-  console.error('[api] unhandled error', error);
-  return failure('server_error', 'Something went wrong on our end.');
+  /*
+    An unmapped error is a bug, and the one thing the caller must not get is its message —
+    stack traces and internal paths stay here. But a flat apology with nothing in it makes
+    the report useless too: "delete is failing, server_error" is not something anyone can
+    search a log for.
+
+    So the response carries a short random id and the log line carries the same id. It gives
+    away nothing, and it turns "somewhere in the last hour something failed" into one grep.
+  */
+  const incident = randomUUID().slice(0, 8);
+  console.error(`[api] unhandled error (incident ${incident})`, error);
+  return failure('server_error', 'Something went wrong on our end.', { incident });
 }
 
 /** Wraps a handler so no route can leak an unmapped exception. */
