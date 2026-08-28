@@ -5,6 +5,7 @@ import { deleteEventCompletely } from '@/lib/services/archive';
 import { requireEvent } from '@/lib/services/events';
 import { ApiError, ok, parseBody, requireIdentifiedActor, route } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
+import { matchesEventTitle } from '@/lib/utils';
 import { deleteEventSchema, eventIdSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -36,7 +37,9 @@ export const POST = route(async (request, { params }: Params) => {
   assertCan('event:update', { actor, eventRole: await eventRoleFor(id, actor.uid) });
 
   const { confirm } = await parseBody(request, deleteEventSchema);
-  if (confirm.trim().toLowerCase() !== event.title.trim().toLowerCase()) {
+  // The same comparison the button uses, from the same function — see `matchesEventTitle`.
+  // Two implementations here would mean a button that enables on a request that then fails.
+  if (!matchesEventTitle(confirm, event.title)) {
     throw new ApiError('bad_request', 'That does not match the event name.');
   }
 

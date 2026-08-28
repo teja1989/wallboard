@@ -147,3 +147,35 @@ export function initialsOf(name: string): string {
   if (parts.length === 1) return (parts[0] ?? '?').slice(0, 2).toUpperCase();
   return `${parts[0]?.[0] ?? ''}${parts[parts.length - 1]?.[0] ?? ''}`.toUpperCase();
 }
+
+/**
+ * Whether what the host typed matches the event's name closely enough to delete it.
+ *
+ * Exported and used on both sides, because the button being enabled and the request being
+ * accepted must never disagree — a disabled button with no explanation is indistinguishable
+ * from a broken feature, and that is exactly how this read.
+ *
+ * Three normalisations, each for a specific way a real title defeats an exact comparison:
+ *
+ *  - **Curly quotes.** A title created on a phone gets `Ada’s 40th` from autocorrect. A host
+ *    typing it back on a laptop produces `Ada's 40th`. Those are different strings and the
+ *    same name.
+ *  - **Whitespace.** A double space between words is invisible and unreproducible.
+ *  - **Case**, which was already handled and is the least of the three.
+ *
+ * Deliberately no further than that. Stripping punctuation or accents would start matching
+ * names that are genuinely different, and this is the last guard before something
+ * irreversible.
+ */
+export function matchesEventTitle(typed: string, title: string): boolean {
+  return normalizeTitle(typed) === normalizeTitle(title) && normalizeTitle(title).length > 0;
+}
+
+function normalizeTitle(value: string): string {
+  return value
+    .replace(/[\u2018\u2019\u201B\u02BC]/g, "'")
+    .replace(/[\u201C\u201D\u201F]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   apiCall,
   createEvent,
@@ -617,62 +617,128 @@ test.describe('the invitation and RSVP', () => {
   });
 });
 
+/**
+ * Inviting people.
+ *
+ * All of this used to happen inside the host-controls drawer. It lives on the Guests tab now,
+ * beside the replies, because inviting someone and seeing whether they answered is one job.
+ */
 test.describe('inviting people', () => {
+  /** The guest list and the form for adding to it, on the tab where they now live. */
+  async function openGuests(page: Page, eventId: string) {
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: 'Guests', exact: true }).click();
+    return page.getByRole('region', { name: /add your guests/i });
+  }
+
   test('a host builds a list, sends it, and does not send twice', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Email journey');
     const guest = uniqueEmail('guest');
 
-    await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: /host controls/i }).click();
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Priya Sharma');
+    await form.getByLabel(/phone or email/i).fill(guest);
+    await form.getByRole('button', { name: /^add/i }).click();
 
-    const panel = page.getByRole('dialog', { name: /host controls/i });
-    await panel.getByLabel(/phone numbers or email addresses/i).fill(`Priya Sharma <${guest}>`);
-    await panel.getByRole('button', { name: /^add/i }).click();
-
-    await expect(panel.getByText('Priya Sharma')).toBeVisible();
-    await expect(panel.getByText('Not sent')).toBeVisible();
+    await expect(page.getByText('Priya Sharma')).toBeVisible();
+    await expect(page.getByText('Not sent')).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
-    await panel.getByRole('button', { name: /email 1 unsent/i }).click();
-    await expect(panel.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /email 1 unsent/i }).click();
+    await expect(page.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
 
     // The invitation goes once; that is what the nudge button is for.
-    await expect(panel.getByRole('button', { name: /email 0 unsent/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /email 0 unsent/i })).toBeDisabled();
   });
 
-  test('a guest can be added by phone number alone', async ({ page }) => {
+  /**
+   * The reason the form was rebuilt.
+   *
+   * The old paste box could only attach a name through `Name <address>` — angle brackets, and
+   * unavailable to anyone entering a phone number. Typing a name beside a number silently
+   * dropped the name, so a host ended up with a list of bare digits.
+   */
+  test('a guest can be added by name and phone number, with the name kept', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Phone journey');
 
-    await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: /host controls/i }).click();
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Lee Nakamura');
+    await form.getByLabel(/phone or email/i).fill('+1 415 555 0161');
+    await form.getByRole('button', { name: /^add/i }).click();
 
-    const panel = page.getByRole('dialog', { name: /host controls/i });
-    await panel.getByLabel(/phone numbers or email addresses/i).fill('Lee Nakamura <+14155550161>');
-    await panel.getByRole('button', { name: /^add/i }).click();
-
-    await expect(panel.getByText('Lee Nakamura')).toBeVisible();
+    await expect(page.getByText('Lee Nakamura')).toBeVisible();
     // Normalised on the way in, so it is dialable or it is not stored.
-    await expect(panel.getByText('+14155550161')).toBeVisible();
+    await expect(page.getByText('+14155550161')).toBeVisible();
 
     // Nobody can be emailed, so the email buttons have nothing to offer.
-    await expect(panel.getByRole('button', { name: /email .* unsent/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /email .* unsent/i })).toHaveCount(0);
     // But the host can still send it themselves, which is the whole point.
-    await expect(panel.getByRole('button', { name: /copy every message/i })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /copy every message/i })).toBeEnabled();
+  });
+
+  test('the form clears once the guests are on the list', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Clear after add');
+
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Ada Lovelace');
+    await form.getByLabel(/phone or email/i).fill(uniqueEmail('ada'));
+    await form.getByRole('button', { name: /^add/i }).click();
+
+    await expect(page.getByText('Ada Lovelace')).toBeVisible();
+    await expect(form.getByLabel('Name')).toHaveValue('');
+    await expect(form.getByLabel(/phone or email/i)).toHaveValue('');
+  });
+
+  test('a pasted list fills a row per person', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Pasted list');
+
+    const form = await openGuests(page, eventId);
+    const contact = form.getByLabel(/phone or email/i);
+    await contact.click();
+    // Paste is what a host with a list in their phone actually does; it must not all land in
+    // one field.
+    await contact.evaluate((node: HTMLInputElement) => {
+      const data = new DataTransfer();
+      data.setData('text', 'Ada <ada@example.com>, Grace <grace@example.com>, +14155550177');
+      node.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+    });
+
+    await expect(form.getByRole('button', { name: /^add 3$/i })).toBeEnabled();
+    await form.getByRole('button', { name: /^add 3$/i }).click();
+    await expect(page.getByText('Ada', { exact: true })).toBeVisible();
+    await expect(page.getByText('Grace', { exact: true })).toBeVisible();
   });
 
   test('nothing that is not a contact gets added', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
     const { eventId } = await createEvent(page, 'Bad addresses');
 
-    await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: /host controls/i }).click();
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Someone');
+    await form.getByLabel(/phone or email/i).fill('not a way to reach anyone');
 
-    const panel = page.getByRole('dialog', { name: /host controls/i });
-    await panel.getByLabel(/phone numbers or email addresses/i).fill('please invite everyone');
-    await expect(panel.getByText(/no numbers or addresses found/i)).toBeVisible();
-    await expect(panel.getByRole('button', { name: /^add/i })).toBeDisabled();
+    // Said out loud rather than left as a greyed-out button with no explanation.
+    await expect(form.getByText(/not an address or a number/i)).toBeVisible();
+    await expect(form.getByRole('button', { name: /^add$/i })).toBeDisabled();
+  });
+
+  test('only the host is offered the invite form', async ({ browser, page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId, joinCode } = await createEvent(page, 'Members do not invite');
+
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/i/${joinCode.replace('-', '')}`);
+    await guestPage.waitForURL(`**/e/${eventId}`, { timeout: 20_000 });
+    await guestPage.getByRole('button', { name: 'Guests', exact: true }).click();
+
+    // A member sees who replied. Adding people and reading delivery status is the host's.
+    await expect(guestPage.getByRole('region', { name: /add your guests/i })).toHaveCount(0);
+    await guestContext.close();
   });
 
   /**
@@ -684,14 +750,13 @@ test.describe('inviting people', () => {
     const { eventId } = await createEvent(page, 'Watch it land');
     const guest = uniqueEmail('guest');
 
-    await page.goto(`/e/${eventId}`);
-    await page.getByRole('button', { name: /host controls/i }).click();
-    const panel = page.getByRole('dialog', { name: /host controls/i });
+    const form = await openGuests(page, eventId);
+    await form.getByLabel('Name').fill('Ada Lovelace');
+    await form.getByLabel(/phone or email/i).fill(guest);
+    await form.getByRole('button', { name: /^add/i }).click();
 
-    await panel.getByLabel(/phone numbers or email addresses/i).fill(`Ada Lovelace <${guest}>`);
-    await panel.getByRole('button', { name: /^add/i }).click();
-    await expect(panel.getByText('Ada Lovelace')).toBeVisible();
-    await expect(panel.getByText('Not sent')).toBeVisible();
+    await expect(page.getByText('Ada Lovelace')).toBeVisible();
+    await expect(page.getByText('Not sent')).toBeVisible();
 
     // Take the guest's own link straight from the API the panel reads.
     const link = await page.evaluate(async (id) => {
@@ -708,21 +773,12 @@ test.describe('inviting people', () => {
     await guestPage.waitForTimeout(1500);
     await guestContext.close();
 
-    await page.reload();
-    await page.getByRole('button', { name: /host controls/i }).click();
-    const reopened = page.getByRole('dialog', { name: /host controls/i });
-    await expect(reopened.getByText('Seen', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: 'Guests', exact: true }).click();
+    await expect(page.getByText('Seen', { exact: true })).toBeVisible({ timeout: 20_000 });
   });
 });
 
-/**
- * These pages are load-bearing beyond being polite.
- *
- * Google's OAuth review fetches the privacy policy before it will let the app serve anyone
- * outside its test-user list. If they stop resolving, or fall behind a Disallow, production
- * sign-in silently stops working for everybody who is not already on that list — and the
- * symptom shows up nowhere near the cause.
- */
 test.describe('adding it to the calendar', () => {
   test('the host gets a real calendar file out of the invitation', async ({ page }) => {
     await signIn(page, uniqueEmail('host'));
@@ -785,6 +841,14 @@ test.describe('adding it to the calendar', () => {
   });
 });
 
+/**
+ * These pages are load-bearing beyond being polite.
+ *
+ * Google's OAuth review fetches the privacy policy before it will let the app serve anyone
+ * outside its test-user list. If they stop resolving, or fall behind a Disallow, production
+ * sign-in silently stops working for everybody who is not already on that list — and the
+ * symptom shows up nowhere near the cause.
+ */
 test.describe('the legal pages', () => {
   test('both resolve and reach each other', async ({ page }) => {
     await page.goto('/privacy');
@@ -851,7 +915,9 @@ test.describe('the archive and deletion', () => {
     await expect(panel.getByRole('button', { name: /delete it all/i })).toBeEnabled();
     await panel.getByRole('button', { name: /delete it all/i }).click();
 
-    await page.waitForURL('/', { timeout: 20_000 });
+    // Lands on the invitation list rather than the marketing homepage — someone who has
+    // just deleted one event is far more likely to want the others than the sales pitch.
+    await page.waitForURL('**/account**', { timeout: 20_000 });
 
     // And it is genuinely gone, not merely hidden.
     const after = await page.evaluate(async (id) => {
@@ -859,6 +925,58 @@ test.describe('the archive and deletion', () => {
       return response.status;
     }, eventId);
     expect(after).toBe(404);
+  });
+
+  test('the confirmation says why the button is grey', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Explain yourself');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByRole('button', { name: /delete this event permanently/i }).click();
+
+    // A disabled control with no explanation is how a working feature reads as a broken one.
+    await expect(panel.getByText(/type the name above/i)).toBeVisible();
+    await panel.getByLabel(/type .* to confirm/i).fill('Explain');
+    await expect(panel.getByText(/does not match yet/i)).toBeVisible();
+    await panel.getByLabel(/type .* to confirm/i).fill('Explain yourself');
+    await expect(panel.getByText(/that matches/i)).toBeVisible();
+  });
+
+  /**
+   * A title created on a phone comes back with an autocorrected apostrophe. Typing a straight
+   * one used to leave the button greyed out with nothing said about why — indistinguishable
+   * from a delete that simply does not work, which is what it was reported as.
+   */
+  test('a straight apostrophe confirms a curly-quoted name', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'Ada\u2019s 40th');
+
+    await page.goto(`/e/${eventId}`);
+    await page.getByRole('button', { name: /host controls/i }).click();
+    const panel = page.getByRole('dialog', { name: /host controls/i });
+    await panel.getByRole('button', { name: /delete this event permanently/i }).click();
+
+    await panel.getByLabel(/type .* to confirm/i).fill("Ada's 40th");
+    await expect(panel.getByRole('button', { name: /delete it all/i })).toBeEnabled();
+    await panel.getByRole('button', { name: /delete it all/i }).click();
+    await page.waitForURL('**/account**', { timeout: 20_000 });
+  });
+
+  test('an event can be deleted from the account list, without opening it', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    await createEvent(page, 'Tidy up later');
+
+    // The only delete in the product used to be at the bottom of a drawer inside the event —
+    // which is the last place someone tidying up an event that has ended would look.
+    await page.goto('/account');
+    const card = page.locator('li', { hasText: 'Tidy up later' });
+    await card.getByRole('button', { name: /^delete$/i }).click();
+    await card.getByLabel(/type .* to confirm/i).fill('Tidy up later');
+    await card.getByRole('button', { name: /delete it all/i }).click();
+
+    await expect(page.getByText('Tidy up later')).toHaveCount(0, { timeout: 20_000 });
   });
 });
 

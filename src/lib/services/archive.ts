@@ -285,6 +285,18 @@ export async function deleteEventCompletely(event: EventDoc): Promise<DeletionSu
     inviteesDeleted: 0,
   };
 
+  /*
+    Bytes first, records second, and the order is load-bearing.
+
+    The Firestore documents are the only route anyone has to these objects — the bucket is
+    private and nothing is listed anywhere else. So deleting the records first would turn any
+    storage failure into bytes nobody can find and nothing will ever sweep, which is the one
+    outcome this product must not produce.
+
+    `deletePrefix` throws unless every object is gone, so a failure here leaves the event
+    entirely intact and the host is told to try again. Deletion is idempotent, so the retry
+    costs nothing but the objects already removed.
+  */
   summary.objectsDeleted = await storage().deletePrefix(`events/${event.id}/`);
 
   const reference = eventRef(event.id);

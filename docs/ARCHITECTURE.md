@@ -199,7 +199,26 @@ we do not run, and an attachment is frozen at the moment it was sent — so a ve
 would leave every guest holding the old one. A link is fetched when it is tapped, which is
 when it is correct. For the same reason the file names no `ORGANIZER` at all.
 
-### 9. The invitation link is `/i/{code}`, and it previews
+### 9. Deleting an event removes the bytes before it removes the records
+
+The Firestore documents are the only route to an event's objects — the bucket is private and
+nothing is listed anywhere else. So `deleteEventCompletely` sweeps storage first and only then
+deletes the records: doing it the other way round turns any storage failure into bytes nobody
+can find and no sweep will ever reach, which is the one outcome a product built on "your
+photos are deleted for real" must not produce.
+
+That ordering only works if the sweep is honest about failing, so `deletePrefix` is
+all-or-nothing. It pages the listing, deletes with a fixed number of requests in flight,
+retries whatever failed once, and throws `StorageSweepError` if anything still will not go —
+leaving the event completely intact and the host told to try again. Deletion is idempotent, so
+the retry costs only the objects already removed.
+
+The unbounded version this replaced — `Promise.all` over every object — worked on the four
+files a development event holds and fell over on the fifteen hundred a real wedding produces,
+taking the whole delete down with it and leaving the host with nothing deleted and no
+explanation.
+
+### 10. The invitation link is `/i/{code}`, and it previews
 
 `/e/{id}` is the event and it turns away non-members — which is every recipient of an
 invitation. Both the emailed button and the share sheet pointed there, so a shared
@@ -221,7 +240,7 @@ controls, so it carries only what the link already grants its holder: title, hos
 Never the guest list, the wall, or the code itself. And never indexed — a private
 invitation in a search result is a failure however good the card looks.
 
-### 10. Answers are public, notes are not
+### 11. Answers are public, notes are not
 
 An RSVP is two pieces of data with two audiences. The answer and the headcount belong to
 the guest list — that is what a guest list is. The note a guest writes for the host, and
@@ -238,7 +257,7 @@ member documents, and the delta is always computed from the stored member docume
 than from anything the client claims — otherwise replaying a request would inflate the
 headcount.
 
-### 11. Media never touches the app server
+### 12. Media never touches the app server
 
 Uploading is a two-step handshake:
 

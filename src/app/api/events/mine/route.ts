@@ -27,9 +27,16 @@ export const GET = route(async () => {
       occasion: event.occasion,
       templateId: event.templateId,
       startsAt: event.startsAt,
+      // The zone the event happens in. Missing until now, so this list rendered every date
+      // in the reader's own zone — the one bug the rest of the product went to some trouble
+      // to fix, still live on the page a host looks at most.
+      timeZone: event.timeZone,
       expiresAt: event.expiresAt,
       createdAt: event.createdAt,
       status: effectiveStatus(event),
+      // Decides whether this card offers a download. Sent rather than assumed, so the answer
+      // stays right once billing is live and different events sit on different plans.
+      plan: event.plan,
       postCount: event.postCount,
       rsvpTally: event.rsvpTally,
     })),

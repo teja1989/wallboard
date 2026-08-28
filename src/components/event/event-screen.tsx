@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { GuestList } from '@/components/event/guest-list';
 import { HostPanel } from '@/components/event/host-panel';
+import { InvitePanel } from '@/components/event/invite-panel';
 import { Invitation } from '@/components/event/invitation';
 import { RsvpCard } from '@/components/event/rsvp-card';
 import { Composer } from '@/components/wall/composer';
@@ -284,11 +285,30 @@ export function EventScreen({ eventId }: { eventId: string }) {
         )}
 
         {active === 'guests' && (
-          <GuestList
-            eventId={eventId}
-            canExport={permissions.canExportGuests}
-            refreshKey={guestRefreshKey}
-          />
+          <div className="space-y-6">
+            {/*
+              Inviting people and seeing who replied are one job, and they used to live in
+              two places: the guest list here, the list of who had been invited buried in a
+              384px drawer between "add time" and "delete everything". A host chasing four
+              non-repliers had to hold both in their head at once.
+
+              Only the host sees the invite half — everyone else sees the replies, which is
+              what this tab has always shown them.
+            */}
+            {permissions.canManage && (
+              <InvitePanel
+                eventId={eventId}
+                eventTitle={event.title}
+                hostedBy={event.hostedBy || event.hostName}
+                onSent={loadEvent}
+              />
+            )}
+            <GuestList
+              eventId={eventId}
+              canExport={permissions.canExportGuests}
+              refreshKey={guestRefreshKey}
+            />
+          </div>
         )}
       </main>
 
@@ -296,7 +316,6 @@ export function EventScreen({ eventId }: { eventId: string }) {
       <HostPanel
         eventId={eventId}
         title={event.title}
-        hostedBy={event.hostedBy || event.hostName}
         plan={event.plan}
         open={hostPanelOpen}
         onClose={() => setHostPanelOpen(false)}

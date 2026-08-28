@@ -187,6 +187,19 @@ export const absoluteMaxEventLifetimeMs = 90 * DAY;
  * Grace window between an event expiring and its bytes being swept, so a host who
  * extends an event a minute after it lapsed does not lose the media.
  */
+/**
+ * Sweeping objects out of the bucket.
+ *
+ * `concurrency` is how many deletes are in flight at once. Unbounded was the bug: a real
+ * wedding wall is well over a thousand objects, and a thousand simultaneous requests earns
+ * rate limiting rather than a fast delete.
+ *
+ * `pageSize` is how many are listed at a time. Listing everything first means holding the
+ * metadata for an entire event in memory before a single byte is removed; a page at a time
+ * costs one extra round trip and bounds the process instead.
+ */
+export const storageSweep = { concurrency: 32, pageSize: 500 } as const;
+
 export const cleanupGraceMs = 6 * HOUR;
 
 export const joinCodeConfig = {

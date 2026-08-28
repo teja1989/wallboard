@@ -6,6 +6,7 @@ import { ForbiddenError } from '@/lib/authz/policy';
 import { currentActor } from '@/lib/authz/session';
 import { RateLimitError, enforceRateLimit } from '@/lib/ratelimit';
 import { ipSubject } from '@/lib/server/request';
+import { StorageSweepError } from '@/lib/storage/batch';
 import type { Actor } from '@/types/domain';
 
 /**
@@ -77,6 +78,15 @@ export function toResponse(error: unknown): NextResponse {
       'bad_request',
       'Some of that did not look right.',
       error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+    );
+  }
+
+  if (error instanceof StorageSweepError) {
+    // Nothing else was touched, so the honest answer is "try again" rather than a 500. The
+    // deletes that did land are no-ops on the retry.
+    return failure(
+      'bad_gateway',
+      'Some files would not delete, so nothing was removed. Please try again in a moment.',
     );
   }
 

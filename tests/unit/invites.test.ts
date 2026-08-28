@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseContacts } from '@/components/event/invite-panel';
+import { classifyContact, isMultiContactPaste, parseContacts, toContact } from '@/lib/contacts';
 import { addInviteesSchema, unsubscribeSchema } from '@/lib/validation/schemas';
 
 /**
@@ -123,5 +123,73 @@ describe('unsubscribeSchema', () => {
   it('rejects a token that is not the right shape', () => {
     expect(unsubscribeSchema.safeParse({ ...valid, token: 'short' }).success).toBe(false);
     expect(unsubscribeSchema.safeParse({ ...valid, token: 'z'.repeat(32) }).success).toBe(false);
+  });
+});
+
+/**
+ * What a single field holds.
+ *
+ * New with the row-based guest form, and the reason it exists: the old paste box had no way
+ * to say "this is a phone number belonging to Priya", so a name typed next to a number was
+ * dropped on the floor. Classifying one field at a time is what lets the form keep the name.
+ */
+describe('classifyContact', () => {
+  it('knows an address', () => {
+    expect(classifyContact('priya@example.com')).toBe('email');
+    expect(classifyContact('  PRIYA@example.com  ')).toBe('email');
+  });
+
+  it('knows a number in the shapes a contacts app produces', () => {
+    expect(classifyContact('+1 415 555 0123')).toBe('phone');
+    expect(classifyContact('(415) 555-0123')).toBe('phone');
+    expect(classifyContact('415.555.0123')).toBe('phone');
+  });
+
+  it('says nothing while the field is still empty', () => {
+    expect(classifyContact('')).toBe('unknown');
+    expect(classifyContact('   ')).toBe('unknown');
+  });
+
+  it('refuses a name, a year, and a half-typed address', () => {
+    expect(classifyContact('Priya Sharma')).toBe('unknown');
+    expect(classifyContact('2026')).toBe('unknown');
+    expect(classifyContact('priya@')).toBe('unknown');
+  });
+});
+
+describe('toContact', () => {
+  it('keeps the name beside a phone number, which is the whole point', () => {
+    expect(toContact('+1 415 555 0123', 'Priya')).toEqual({
+      phone: '+1 415 555 0123',
+      name: 'Priya',
+    });
+  });
+
+  it('lowercases an address so two spellings are one person', () => {
+    expect(toContact('Priya@Example.com', ' Priya ')).toEqual({
+      email: 'priya@example.com',
+      name: 'Priya',
+    });
+  });
+
+  it('is null for something we could not reach', () => {
+    expect(toContact('Priya Sharma', 'Priya')).toBeNull();
+  });
+});
+
+describe('isMultiContactPaste', () => {
+  it('is true for a pasted list', () => {
+    expect(isMultiContactPaste('a@x.com, b@x.com, c@x.com')).toBe(true);
+    expect(isMultiContactPaste('a@x.com\n+14155550123')).toBe(true);
+  });
+
+  it('is false for one address, so a normal paste stays a normal paste', () => {
+    // Restructuring the form because somebody pasted a single address would be obnoxious.
+    expect(isMultiContactPaste('priya@example.com')).toBe(false);
+    expect(isMultiContactPaste('')).toBe(false);
+  });
+
+  it('splits on tabs, which is what a spreadsheet column pastes as', () => {
+    expect(isMultiContactPaste('a@x.com\tb@x.com')).toBe(true);
   });
 });

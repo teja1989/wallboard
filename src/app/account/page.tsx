@@ -2,28 +2,17 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CalendarDays, Check, LogOut, Plus, Sparkles, Users } from 'lucide-react';
-import { brand, formatPrice, occasionById, planById } from '@/config';
+import { Check, LogOut, Plus, Sparkles } from 'lucide-react';
+import { brand, formatPrice, planById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { InvitationCard, type HostedEventSummary } from '@/components/account/invitation-card';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { cn, formatEventDate } from '@/lib/utils';
-
-interface HostedEvent {
-  id: string;
-  title: string;
-  occasion: string;
-  startsAt: number | null;
-  timeZone: string | null;
-  createdAt: number;
-  status: string;
-  postCount: number;
-  rsvpTally: { yes: number; no: number; maybe: number; pending: number; attending: number };
-}
 
 interface AccountSummary {
   profile: {
@@ -67,7 +56,7 @@ export default function AccountPage() {
   const { actor, isAnonymous, loading, signOut } = useAuth();
 
   const [summary, setSummary] = useState<AccountSummary | null>(null);
-  const [events, setEvents] = useState<HostedEvent[] | null>(null);
+  const [events, setEvents] = useState<HostedEventSummary[] | null>(null);
   const [section, setSection] = useState<Section>(() => sectionFrom(params.get('tab')));
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +66,7 @@ export default function AccountPage() {
     try {
       const [account, mine] = await Promise.all([
         api.get<AccountSummary>('/api/account'),
-        api.get<{ events: HostedEvent[] }>('/api/events/mine'),
+        api.get<{ events: HostedEventSummary[] }>('/api/events/mine'),
       ]);
       setSummary(account);
       setEvents(mine.events);
@@ -186,7 +175,15 @@ export default function AccountPage() {
       )}
 
       {section === 'invitations' && (
-        <Invitations events={events} onCreate={() => router.push('/create')} />
+        <Invitations
+          events={events}
+          onCreate={() => router.push('/create')}
+          onDeleted={(eventId) =>
+            // Dropped from the list rather than refetched: the server has already confirmed,
+            // and a spinner replacing a card that is definitively gone is worse than nothing.
+            setEvents((current) => (current ?? []).filter((event) => event.id !== eventId))
+          }
+        />
       )}
       {section === 'plan' && summary && <PlanSection billing={summary.billing} notify={notify} />}
       {section === 'settings' && summary && (
@@ -203,7 +200,15 @@ export default function AccountPage() {
   );
 }
 
-function Invitations({ events, onCreate }: { events: HostedEvent[] | null; onCreate: () => void }) {
+function Invitations({
+  events,
+  onCreate,
+  onDeleted,
+}: {
+  events: HostedEventSummary[] | null;
+  onCreate: () => void;
+  onDeleted: (eventId: string) => void;
+}) {
   if (events === null) return <p className="mt-8 text-sm text-[var(--text-muted)]">Loading…</p>;
 
   if (events.length === 0) {
@@ -229,40 +234,7 @@ function Invitations({ events, onCreate }: { events: HostedEvent[] | null; onCre
       <ul className="mt-3 space-y-3">
         {events.map((event) => (
           <li key={event.id}>
-            <Link
-              href={`/e/${event.id}`}
-              className="card block p-5 transition-colors hover:bg-[var(--accent-soft)]"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-medium">{event.title}</h2>
-                  <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                    {occasionById(event.occasion).label}
-                    {event.startsAt ? ` · ${formatEventDate(event.startsAt, event.timeZone)}` : ''}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    'shrink-0 rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-medium',
-                    event.status === 'live'
-                      ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                      : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
-                  )}
-                >
-                  {event.status}
-                </span>
-              </div>
-              <div className="mt-3 flex gap-4 text-sm text-[var(--text-secondary)]">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="size-4" aria-hidden />
-                  {event.rsvpTally?.attending ?? 0} coming
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarDays className="size-4" aria-hidden />
-                  {event.postCount} on the wall
-                </span>
-              </div>
-            </Link>
+            <InvitationCard event={event} onDeleted={onDeleted} />
           </li>
         ))}
       </ul>

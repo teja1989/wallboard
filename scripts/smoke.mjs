@@ -9,6 +9,7 @@
  *   node scripts/smoke.mjs
  */
 import { Buffer } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
 
 const BASE = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000';
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
@@ -26,6 +27,41 @@ function check(name, condition, detail = '') {
     failed += 1;
     console.log(`  FAIL  ${name}${detail ? ` — ${detail}` : ''}`);
   }
+}
+
+/**
+ * Refuses to run against a server that is not this build.
+ *
+ * `next start` fails with EADDRINUSE when an older instance is still holding the port — and
+ * that older instance keeps answering perfectly well, so every readiness check passes and the
+ * suite quietly tests the previous build. It has produced a confident, entirely fictitious
+ * failure report more than once. Next writes a fresh id into `.next/BUILD_ID` on every build
+ * and serves its assets under that id, so asking for one is a direct question: are you the
+ * build on disk?
+ *
+ * Skipped when there is no local build to compare against, which is the case when this is
+ * pointed at a deployed environment.
+ */
+async function assertServerIsThisBuild() {
+  let buildId;
+  try {
+    buildId = (await readFile(new URL('../.next/BUILD_ID', import.meta.url), 'utf8')).trim();
+  } catch {
+    return;
+  }
+  if (!buildId) return;
+
+  const probe = await fetch(`${BASE}/_next/static/${buildId}/_buildManifest.js`).catch(() => null);
+  if (probe?.ok) return;
+
+  console.error(
+    `\nThe server at ${BASE} is not serving this build (${buildId}).\n` +
+      'An older `next start` is probably still holding the port — the new one exits with\n' +
+      'EADDRINUSE while the old one keeps answering. Stop it and start again:\n\n' +
+      "  kill $(ps -eo pid,args | grep '[n]ext-server' | awk '{print $1}')\n" +
+      '  npm run build && npm start\n',
+  );
+  process.exit(1);
 }
 
 /** A cookie jar just big enough to act like one browser session. */
@@ -144,6 +180,8 @@ async function resetRateLimits() {
 }
 
 async function main() {
+  await assertServerIsThisBuild();
+
   console.log(`\nMarquee smoke test → ${BASE}\n`);
   await resetRateLimits();
 
@@ -820,6 +858,43 @@ async function main() {
     body: { confirm: 'Smoke test party' },
   });
   check('a member cannot delete the event', memberDeletes.status === 403);
+
+  // A title created on a phone comes back with an autocorrected apostrophe; the host types a
+  // straight one. The button used to stay grey and the request used to 400, which is
+  // indistinguishable from a broken delete.
+  const curly = await call(host.session, '/api/events/create', {
+    method: 'POST',
+    body: {
+      title: 'Ada\u2019s 40th',
+      occasion: 'party',
+      hostedBy: 'Smoke',
+      expiryPresetId: '24h',
+      startsAt: Date.now() + 86400000,
+      rsvp: { enabled: true, allowPlusOnes: true, maxPartySize: 4 },
+      allowedKinds: ['text'],
+    },
+  });
+  check('an event can be named with a curly apostrophe', curly.status === 200);
+
+  const straightTyped = await call(
+    host.session,
+    `/api/events/${curly.payload.data.event.id}/delete`,
+    {
+      method: 'POST',
+      body: { confirm: "ada's 40th" },
+    },
+  );
+  check(
+    'a straight apostrophe confirms a curly-quoted title',
+    straightTyped.status === 200,
+    JSON.stringify(straightTyped.payload),
+  );
+
+  const untitledish = await call(host.session, `/api/events/${eventId}/delete`, {
+    method: 'POST',
+    body: { confirm: '   ' },
+  });
+  check('whitespace alone never confirms anything', untitledish.status === 400);
 
   // --- ending the event ----------------------------------------------------
   const memberEnd = await call(member.session, `/api/events/${eventId}/end`, { method: 'POST' });

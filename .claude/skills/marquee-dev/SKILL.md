@@ -218,8 +218,15 @@ to change one of them.
   touching that component.
 - **`next start` on a taken port fails into the log, not the terminal.** It backgrounds
   cleanly, the old process keeps answering on :3000, and the whole suite then runs against
-  the previous build — twice here, once producing a "failure" in code that was already
-  correct. Kill the old server and `grep EADDRINUSE` the log before believing a result.
+  the previous build — three times here now, twice producing a confident "failure" in code
+  that was already correct. Checking that _something_ answers on :3000 does not help: the
+  stale server answers.
+
+  `npm run smoke` now refuses to start unless the server is serving `.next/BUILD_ID`, so it
+  says so instead of inventing failures. Nothing guards `npm run test:e2e`, so before an e2e
+  run: `kill $(ps -eo pid,args | grep '[n]ext-server' | awk '{print $1}')`, rebuild, restart.
+  A `pkill -f "next start"` matches the shell running it and kills your own session.
+
 - **A provider's `name` claim will overwrite a chosen display name.** Google sends one on
   every token, so `displayNameChosen` on the user document is what stops the next session
   mint from undoing a rename. `src/lib/authz/display-name.ts` holds the precedence; keep it

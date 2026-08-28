@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Loader2, Mail, Send, Share2, Trash2, UserPlus } from 'lucide-react';
+import { Check, Copy, Loader2, Mail, Send, Share2, Trash2 } from 'lucide-react';
 import { deliveryCopy, emailConfig, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { GuestEntry } from '@/components/event/guest-entry';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { invitationPath } from '@/lib/codes-format';
-import { looksLikePhone } from '@/lib/phone';
+import { type Contact } from '@/lib/contacts';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { DeliveryState, InviteeDoc } from '@/types/domain';
 
@@ -33,10 +34,9 @@ function toneOf(state: DeliveryState) {
  *
  * Two things shape this panel.
  *
- * **People are known by phone at least as often as by email.** So the box takes either, and
- * a guest can be added with only a number. Anything that looks like an address or a number
- * is picked out of whatever gets pasted, because asking someone to reformat their contacts
- * is how you lose them.
+ * **People are known by phone at least as often as by email.** So a guest can be added with
+ * only a number, and — since the entry form was rebuilt — with a name beside it, which the
+ * old paste box could not express for anyone who was not an email address.
  *
  * **Every guest has their own link.** That is what makes "has Priya opened it?" answerable,
  * and it is why the host can send the invitation themselves — from their own phone, in the
@@ -46,7 +46,6 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
   const { notify } = useToast();
   const [invitees, setInvitees] = useState<InviteeDoc[] | null>(null);
   const [code, setCode] = useState<string | null>(null);
-  const [raw, setRaw] = useState('');
   const [busy, setBusy] = useState<'add' | 'send' | 'remind' | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -68,7 +67,6 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
     })();
   }, [load]);
 
-  const parsed = parseContacts(raw);
   const all = invitees ?? [];
   const emailable = all.filter((i) => i.email);
   const unsent = emailable.filter((i) => i.status === 'pending' || i.status === 'failed');
@@ -102,8 +100,8 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
     notify(relayCopy.copiedAll, 'success');
   }
 
-  async function add() {
-    if (parsed.length === 0) return;
+  async function add(guests: Contact[]): Promise<boolean> {
+    if (guests.length === 0) return false;
     setBusy('add');
     try {
       const result = await api.post<{
@@ -111,8 +109,7 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
         duplicates: number;
         blocked: number;
         invalid: number;
-      }>(`/api/events/${eventId}/invites`, { invitees: parsed });
-      setRaw('');
+      }>(`/api/events/${eventId}/invites`, { invitees: guests });
       await load();
 
       // Account for all of them, not just the ones that worked — a count that does not move
@@ -122,8 +119,12 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
       if (result.blocked) parts.push(`${result.blocked} previously opted out`);
       if (result.invalid) parts.push(`${result.invalid} unusable`);
       notify(parts.join(', '), 'success');
+      return true;
     } catch (caught) {
+      // Left in the form rather than cleared, so a failed add is a retry instead of
+      // fifteen names to type again.
       notify(errorMessage(caught, 'Could not add those.'), 'error');
+      return false;
     } finally {
       setBusy(null);
     }
@@ -169,39 +170,7 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
 
   return (
     <section className="space-y-5">
-      <div className="card p-5">
-        <h3 className="flex items-center gap-2 font-semibold">
-          <UserPlus className="size-4" aria-hidden />
-          Add your guests
-        </h3>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Phone numbers or email addresses — paste them however you have them.
-        </p>
-
-        <label htmlFor="invite-contacts" className="sr-only">
-          Phone numbers or email addresses
-        </label>
-        <textarea
-          id="invite-contacts"
-          value={raw}
-          onChange={(e) => setRaw(e.target.value)}
-          rows={3}
-          placeholder={'+1 415 555 0123, priya@example.com\nLee Nakamura <lee@example.com>'}
-          className="mt-3 w-full resize-none rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-3 text-sm placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] focus:outline-none"
-        />
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" loading={busy === 'add'} disabled={parsed.length === 0} onClick={add}>
-            <UserPlus className="size-4" aria-hidden />
-            Add {parsed.length > 0 ? parsed.length : ''}
-          </Button>
-          {raw.trim().length > 0 && parsed.length === 0 && (
-            <span className="text-sm text-[var(--text-muted)]">
-              No numbers or addresses found in that.
-            </span>
-          )}
-        </div>
-      </div>
+      <GuestEntry busy={busy === 'add'} onAdd={add} />
 
       {invitees === null ? (
         <div className="flex justify-center py-10">
@@ -329,47 +298,4 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, onSent }: InvitePan
       )}
     </section>
   );
-}
-
-/**
- * Pulls people out of whatever was pasted.
- *
- * Handles `Name <a@b.com>`, bare addresses, and phone numbers in any of the shapes a
- * contacts app produces, separated by commas, semicolons or newlines. Anything that is
- * neither is dropped silently — pasted text is full of stray words, and refusing the whole
- * paste over one of them would be infuriating.
- *
- * Numbers are only shape-checked here. The server normalises them to E.164 with a real
- * phone-number library and refuses what it cannot dial, because a number stored as typed is
- * a guest who never hears anything.
- */
-export function parseContacts(input: string): { email?: string; phone?: string; name: string }[] {
-  const out = new Map<string, { email?: string; phone?: string; name: string }>();
-
-  for (const chunk of input.split(/[,;\n\r]+/)) {
-    const piece = chunk.trim();
-    if (!piece) continue;
-
-    const angled = /^(.*?)<([^>]+)>$/.exec(piece);
-    const value = (angled ? angled[2] : piece)?.trim() ?? '';
-    const name = angled ? (angled[1] ?? '').trim().replace(/^["']|["']$/g, '') : '';
-
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
-      const email = value.toLowerCase();
-      if (!out.has(email)) out.set(email, { email, name });
-      continue;
-    }
-
-    if (looksLikePhone(value)) {
-      // Only exact repeats are collapsed here. The same number written two ways —
-      // `+1 415 555 0123` and `(415) 555-0123` — is one person, but deciding that needs real
-      // phone-number metadata, and guessing with a digit heuristic risks treating two
-      // genuinely different numbers as one and silently dropping a guest. The server
-      // normalises to E.164 and reports what it collapsed, which is the honest place for it.
-      const key = value.replace(/\s+/g, '');
-      if (!out.has(key)) out.set(key, { phone: value, name });
-    }
-  }
-
-  return [...out.values()];
 }

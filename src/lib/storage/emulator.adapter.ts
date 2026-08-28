@@ -1,5 +1,6 @@
 import 'server-only';
-import { appConfig, serverConfig } from '@/config';
+import { appConfig, serverConfig, storageSweep } from '@/config';
+import { StorageSweepError, deleteAllWithRetry } from './batch';
 import type { ObjectStat, StorageAdapter, UploadTarget, UploadTargetRequest } from './types';
 
 /**
@@ -104,24 +105,44 @@ export const emulatorAdapter: StorageAdapter = {
     await emulatorAdapter.put(toPath, body, metadata.contentType ?? 'application/octet-stream');
   },
 
+  /**
+   * Bounded and retried exactly as the GCS driver is.
+   *
+   * The concurrency limit is not needed against a local emulator, and that is the point:
+   * the two drivers have to fail the same way, or the behaviour under test is not the
+   * behaviour in production — which is how the unbounded version survived this long.
+   */
   async delete(objectPaths: string[]): Promise<void> {
-    await Promise.all(
-      objectPaths.map(async (objectPath) => {
-        const response = await fetch(objectUrl(objectPath), { method: 'DELETE' });
-        if (!response.ok && response.status !== 404) {
-          throw new Error(`Storage emulator delete failed (${response.status}) for ${objectPath}`);
-        }
-      }),
-    );
+    const swept = await deleteAllWithRetry(objectPaths, deleteOne);
+    if (swept.failed.length > 0) throw new StorageSweepError(swept.failed.length);
   },
 
   async deletePrefix(prefix: string): Promise<number> {
-    const listUrl = `${baseUrl()}/storage/v1/b/${bucketName()}/o?prefix=${encodeURIComponent(prefix)}`;
-    const response = await fetch(listUrl);
-    if (!response.ok) return 0;
-    const body = (await response.json()) as { items?: GcsObjectMetadata[] };
-    const names = (body.items ?? []).map((i) => i.name).filter((n): n is string => !!n);
-    await emulatorAdapter.delete(names);
-    return names.length;
+    let deleted = 0;
+
+    for (;;) {
+      const listUrl =
+        `${baseUrl()}/storage/v1/b/${bucketName()}/o` +
+        `?prefix=${encodeURIComponent(prefix)}&maxResults=${storageSweep.pageSize}`;
+      const response = await fetch(listUrl);
+      if (!response.ok) return deleted;
+
+      const body = (await response.json()) as { items?: GcsObjectMetadata[] };
+      const names = (body.items ?? []).map((i) => i.name).filter((n): n is string => !!n);
+      if (names.length === 0) return deleted;
+
+      const swept = await deleteAllWithRetry(names, deleteOne);
+      if (swept.failed.length > 0) throw new StorageSweepError(swept.failed.length);
+
+      deleted += swept.deleted;
+    }
   },
 };
+
+/** One object. A 404 is success — deleting something already gone is what we asked for. */
+async function deleteOne(objectPath: string): Promise<void> {
+  const response = await fetch(objectUrl(objectPath), { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Storage emulator delete failed (${response.status}) for ${objectPath}`);
+  }
+}

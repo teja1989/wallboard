@@ -62,6 +62,22 @@ Not yet: wallet passes (lock-screen presence on the day, and they update themsel
 venue moves) and automatic reminders sent on a schedule rather than by the host pressing a
 button.
 
+### Host tools that a host can actually use — shipped
+
+Three complaints, one cause. The guest list, the join code, "add time", the plan, "end the
+event" and "delete everything" all lived in one 384px drawer, so the thing a host touches most
+sat in the same scroll as the thing they must never touch by accident.
+
+- **Guests moved to their own tab**, beside the replies, because inviting someone and seeing
+  whether they answered is one job. The drawer keeps only the occasional controls.
+- **Guests are entered as rows** — a name and a phone number or address — replacing a paste
+  box whose only way to attach a name was `Name <address>`, unavailable to anyone entering a
+  number. A name typed beside a number was silently discarded. Pasting a list still fills the
+  rows in one go.
+- **Deleting works on a real guest wall**, and can be done from the account list without
+  opening the event. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the ordering that makes a
+  storage failure safe.
+
 ### Payments
 
 The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,

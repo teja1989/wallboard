@@ -1,6 +1,7 @@
 import 'server-only';
 import { Storage } from '@google-cloud/storage';
-import { appConfig, serverConfig } from '@/config';
+import { appConfig, serverConfig, storageSweep } from '@/config';
+import { StorageSweepError, deleteAllWithRetry } from './batch';
 import type { ObjectStat, StorageAdapter, UploadTarget, UploadTargetRequest } from './types';
 
 /**
@@ -79,12 +80,42 @@ export const gcsAdapter: StorageAdapter = {
   },
 
   async delete(objectPaths: string[]): Promise<void> {
-    await Promise.all(objectPaths.map((p) => bucket().file(p).delete({ ignoreNotFound: true })));
+    const swept = await deleteAllWithRetry(objectPaths, async (path) => {
+      await bucket().file(path).delete({ ignoreNotFound: true });
+    });
+    if (swept.failed.length > 0) throw new StorageSweepError(swept.failed.length);
   },
 
+  /**
+   * Everything under a prefix, a page at a time.
+   *
+   * Re-listing from the start each round rather than following a page token: every object
+   * listed is deleted before the next call, so the next page is whatever is left. It is the
+   * same shape as the Firestore subcollection sweep next door, and it cannot walk off the
+   * end of a listing that is shrinking underneath it.
+   */
   async deletePrefix(prefix: string): Promise<number> {
-    const [files] = await bucket().getFiles({ prefix });
-    await Promise.all(files.map((f) => f.delete({ ignoreNotFound: true })));
-    return files.length;
+    let deleted = 0;
+
+    for (;;) {
+      const [files] = await bucket().getFiles({
+        prefix,
+        maxResults: storageSweep.pageSize,
+        autoPaginate: false,
+      });
+      if (files.length === 0) return deleted;
+
+      const swept = await deleteAllWithRetry(
+        files.map((file) => file.name),
+        async (path) => {
+          await bucket().file(path).delete({ ignoreNotFound: true });
+        },
+      );
+      // Thrown rather than skipped: the caller is about to delete the Firestore records that
+      // are the only way anyone would ever find these objects again.
+      if (swept.failed.length > 0) throw new StorageSweepError(swept.failed.length);
+
+      deleted += swept.deleted;
+    }
   },
 };

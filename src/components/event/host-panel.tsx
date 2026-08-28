@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, Eye, RefreshCw, Timer, X } from 'lucide-react';
 import { DangerSection } from '@/components/event/danger-section';
-import { InvitePanel } from '@/components/event/invite-panel';
 import { UpgradeSection } from '@/components/event/upgrade-section';
 import { expiryPresets, motion as motionTokens } from '@/config';
 import { Button } from '@/components/ui/button';
@@ -15,8 +14,6 @@ interface HostPanelProps {
   eventId: string;
   /** Needed for the typed delete confirmation. */
   title: string;
-  /** Who the invitation is from — it goes in the message the host copies to send. */
-  hostedBy: string;
   /** The plan the event currently runs on, so the panel knows whether to offer an upgrade. */
   plan: string;
   open: boolean;
@@ -25,19 +22,21 @@ interface HostPanelProps {
 }
 
 /**
- * Host controls. The join code is not part of the event payload — it is fetched on demand
- * here, which is what makes each read auditable and keeps it out of any response a
- * non-host could receive.
+ * Host controls — the settings, not the work.
+ *
+ * This used to hold the entire guest list as well: adding people, the relay panel, the send
+ * buttons and every guest's delivery status, stacked in a 384px drawer between "add time"
+ * and "delete everything". The thing a host touches most was buried in a scroll with the
+ * thing they must never touch by accident, and there was no separating them by eye.
+ *
+ * Guests moved to their own tab. What is left is deliberately the occasional stuff — the
+ * things you do once or twice for an event, in rough order of how reversible they are, with
+ * the irreversible one last.
+ *
+ * The join code is not part of the event payload. It is fetched on demand here, which is
+ * what makes each read auditable and keeps it out of any response a non-host could receive.
  */
-export function HostPanel({
-  eventId,
-  title,
-  hostedBy,
-  plan,
-  open,
-  onClose,
-  onChanged,
-}: HostPanelProps) {
+export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: HostPanelProps) {
   const { notify } = useToast();
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
@@ -178,15 +177,6 @@ export function HostPanel({
             </section>
 
             <section className="mb-6">
-              <InvitePanel
-                eventId={eventId}
-                eventTitle={title}
-                hostedBy={hostedBy}
-                onSent={onChanged}
-              />
-            </section>
-
-            <section className="mb-6">
               <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-[var(--text-secondary)]">
                 <Timer className="size-4" aria-hidden />
                 Add time
@@ -212,6 +202,9 @@ export function HostPanel({
             <UpgradeSection eventId={eventId} plan={plan} />
 
             <section className="mb-6">
+              <h3 className="mb-2 text-sm font-medium text-[var(--text-secondary)]">
+                Finish early
+              </h3>
               <Button
                 variant="danger"
                 className="w-full"
