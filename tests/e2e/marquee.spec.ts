@@ -427,6 +427,17 @@ test.describe('the wall', () => {
     const panel = page.getByRole('dialog', { name: /host controls/i });
     await expect(panel).toBeVisible();
 
+    /*
+      The code is not on screen until somebody asks for it.
+
+      The co-host work briefly fetched it when the panel opened, so opening the settings drawer
+      auto-revealed the credential and wrote an `event.codeViewed` audit entry for a read
+      nobody had performed. It also replaced this button mid-click, which is what the CI
+      failure ("element was detached from the DOM") was actually reporting.
+    */
+    await expect(panel.locator('.code-display')).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: /show the code/i })).toBeVisible();
+
     await panel.getByRole('button', { name: /show the code/i }).click();
     const shown = panel.locator('.code-display');
     await expect(shown).toBeVisible();
@@ -733,7 +744,13 @@ test.describe('the invitation and RSVP', () => {
     await expect(confirmed).toBeVisible();
     // The thing that actually makes somebody turn up.
     await expect(confirmed.getByRole('button', { name: /add to calendar/i })).toBeVisible();
-    // The host counts as attending their own event, so this guest is not the first.
+    /*
+      The host counts as attending their own event, so this guest is not the first.
+
+      Phrased as *others* deliberately, and asserted here because the facepile briefly replaced
+      it with a caption that names attendees — which, with one attendee, reads the reader's own
+      name back at the person who has just this second replied. See `rsvpCopy.othersComing`.
+    */
     await expect(confirmed.getByText(/other person is coming|others are coming/i)).toBeVisible();
 
     await confirmed.getByRole('button', { name: /say hello on the wall/i }).click();

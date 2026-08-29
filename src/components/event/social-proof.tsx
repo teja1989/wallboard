@@ -11,6 +11,16 @@ export interface SocialProofProps {
   attendees: readonly SocialProofAttendee[];
   totalAttending: number;
   className?: string;
+  /**
+   * Overrides the caption, keeping the facepile.
+   *
+   * The default names attendees, which is right on an invitation somebody has not answered
+   * yet. It is wrong immediately after they reply: with one attendee it reads their own name
+   * back at them ("Priya is attending" — yes, you, you just did that). The confirmation panel
+   * passes `rsvpCopy.othersComing`, which counts *other* people and is phrased so it cannot
+   * do that. See `rsvp.config.ts`.
+   */
+  caption?: string;
 }
 
 /**
@@ -59,11 +69,16 @@ export function formatSocialProofCaption(
  * Renders an avatar stack of confirmed guests plus a friendly caption.
  * Returns null if no attendees have confirmed yet.
  */
-export function SocialProof({ attendees, totalAttending, className }: SocialProofProps) {
+export function SocialProof({
+  attendees,
+  totalAttending,
+  className,
+  caption: captionOverride,
+}: SocialProofProps) {
   const count = Math.max(attendees.length, totalAttending);
   if (count <= 0) return null;
 
-  const caption = formatSocialProofCaption(attendees, totalAttending);
+  const caption = captionOverride ?? formatSocialProofCaption(attendees, totalAttending);
   const displayAvatars = attendees.slice(0, 4);
 
   return (

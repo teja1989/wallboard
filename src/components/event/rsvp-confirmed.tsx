@@ -77,9 +77,19 @@ export function RsvpConfirmed({
       {status === 'yes' && (
         <div className="mt-3">
           {confirmedAttendees && confirmedAttendees.length > 0 ? (
+            /*
+              The facepile, with the caption config already owned.
+
+              `SocialProof`'s own caption names attendees, which is right on an invitation
+              nobody has answered yet and wrong here: the reader has just replied, so with one
+              attendee it reads their own name back at them. `othersComing` counts other people
+              and is phrased so it cannot. Same string as the fallback below, so the two
+              branches say the same thing.
+            */
             <SocialProof
               attendees={confirmedAttendees}
               totalAttending={event.rsvpTally.attending}
+              caption={others > 0 ? rsvpCopy.othersComing(others) : rsvpCopy.firstToReply}
             />
           ) : (
             <p className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">

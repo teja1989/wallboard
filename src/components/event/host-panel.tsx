@@ -56,12 +56,27 @@ export function HostPanel({
 }: HostPanelProps) {
   const { notify } = useToast();
   const [code, setCode] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
+  const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | 'cohostLink' | null>(
+    null,
+  );
   const [copied, setCopied] = useState(false);
   const [cohosts, setCohosts] = useState<CoHostItem[]>([]);
   const [copiedCohost, setCopiedCohost] = useState(false);
   const [removingCohostUid, setRemovingCohostUid] = useState<string | null>(null);
 
+  /*
+    Co-hosts only. **The join code is deliberately not fetched here.**
+
+    It was, briefly, so the co-host invite link would have a code to embed — and that quietly
+    broke two things. `code` being non-null is exactly what swaps "Show the code" for the
+    revealed code, so opening the panel auto-revealed the credential nobody had asked to see;
+    and `GET /code` writes an `event.codeViewed` audit entry, so every open of the settings
+    drawer logged a code read that never happened. `docs/SECURITY.md` is explicit that the
+    plaintext leaves `private/joinCode` only through a deliberate, audited call.
+
+    It also raced the UI: the button was replaced mid-click as the fetch resolved, which is
+    what the e2e failure ("element was detached from the DOM") was reporting.
+  */
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -73,16 +88,7 @@ export function HostPanel({
           setCohosts(res.guests.filter((g) => g.role === 'cohost'));
         }
       } catch {
-        // Non-critical
-      }
-
-      try {
-        const result = await api.get<{ code: string }>(`/api/events/${eventId}/code`);
-        if (!cancelled) {
-          setCode(result.code);
-        }
-      } catch {
-        // Ignored
+        // Non-critical: the panel's other controls all work without the co-host list.
       }
     })();
 
@@ -91,13 +97,36 @@ export function HostPanel({
     };
   }, [open, eventId]);
 
+  /**
+   * The code, fetched on demand.
+   *
+   * Both the reveal button and the co-host link need it, and neither should get it before a
+   * host has asked for something that requires it — one audited read per deliberate act.
+   */
+  async function fetchCode(): Promise<string | null> {
+    if (code) return code;
+    const result = await api.get<{ code: string }>(`/api/events/${eventId}/code`);
+    setCode(result.code);
+    return result.code;
+  }
+
   async function copyCohostLink() {
-    if (!code) return;
-    const url = `${window.location.origin}/i/${code}?role=cohost`;
-    await navigator.clipboard.writeText(url);
-    setCopiedCohost(true);
-    notify('Co-host invite link copied to clipboard!', 'success');
-    setTimeout(() => setCopiedCohost(false), 2200);
+    setBusy('cohostLink');
+    try {
+      // Reads the code only now, because the host has just asked for a link that contains it.
+      // It used to silently do nothing when the panel had not pre-fetched one.
+      const value = await fetchCode();
+      if (!value) return;
+      const url = `${window.location.origin}/i/${value}?role=cohost`;
+      await navigator.clipboard.writeText(url);
+      setCopiedCohost(true);
+      notify('Co-host invite link copied to clipboard!', 'success');
+      setTimeout(() => setCopiedCohost(false), 2200);
+    } catch (caught) {
+      notify(errorMessage(caught, 'Could not build the invite link.'), 'error');
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function removeCohost(targetUid: string) {
@@ -117,8 +146,7 @@ export function HostPanel({
   async function revealCode() {
     setBusy('reveal');
     try {
-      const result = await api.get<{ code: string }>(`/api/events/${eventId}/code`);
-      setCode(result.code);
+      await fetchCode();
     } catch (caught) {
       notify(errorMessage(caught, 'Could not read the code.'), 'error');
     } finally {
@@ -290,32 +318,29 @@ export function HostPanel({
                   </p>
                 )}
 
-                {code ? (
-                  <Button
-                    variant="soft"
-                    size="sm"
-                    className="w-full justify-center gap-2"
-                    onClick={copyCohostLink}
-                  >
-                    {copiedCohost ? (
-                      <Check className="size-4 text-[var(--accent)]" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
-                    {copiedCohost ? 'Co-host link copied!' : 'Copy Co-host Invite Link'}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="soft"
-                    size="sm"
-                    className="w-full"
-                    loading={busy === 'reveal'}
-                    onClick={revealCode}
-                  >
-                    <Eye className="size-4" />
-                    Get Co-host Invite Link
-                  </Button>
-                )}
+                {/*
+                  One button, not two.
+
+                  It used to be a pair — "Get the link", which really revealed the join code
+                  above, and then "Copy the link" once `code` was set. That existed only
+                  because the code was pre-fetched, and it made getting a co-host link a
+                  two-step act whose first step silently did something else. Copying fetches
+                  what it needs.
+                */}
+                <Button
+                  variant="soft"
+                  size="sm"
+                  className="w-full justify-center gap-2"
+                  loading={busy === 'cohostLink'}
+                  onClick={copyCohostLink}
+                >
+                  {copiedCohost ? (
+                    <Check className="size-4 text-[var(--accent)]" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  {copiedCohost ? 'Co-host link copied!' : 'Copy co-host invite link'}
+                </Button>
               </div>
               <p className="mt-2 text-xs text-[var(--text-muted)]">
                 Co-hosts can manage invitations, edit details, and moderate posts, but cannot delete

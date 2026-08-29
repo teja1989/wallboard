@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rsvpCopy } from '@/config';
 import { formatSocialProofCaption } from '@/components/event/social-proof';
 
 describe('formatSocialProofCaption', () => {
@@ -51,5 +52,32 @@ describe('formatSocialProofCaption', () => {
 
     // No names known, 10 total
     expect(formatSocialProofCaption([], 10)).toBe('10 people are attending');
+  });
+});
+
+/**
+ * The caption the *confirmation panel* uses is not this one.
+ *
+ * `formatSocialProofCaption` names attendees, which is right on an invitation somebody has not
+ * answered yet. Right after they reply it is wrong: with one attendee it reads their own name
+ * back at them. `rsvpCopy.othersComing` counts other people and is phrased so it cannot, which
+ * is why `SocialProof` takes a caption override and `rsvp-confirmed.tsx` passes that one.
+ *
+ * These pin the distinction, because the regression was silent — the facepile shipped, the
+ * caption changed underneath it, and only an e2e assertion noticed.
+ */
+describe('the two captions are different on purpose', () => {
+  it('counts others rather than naming them, and never says "1 person"', () => {
+    expect(rsvpCopy.othersComing(1)).toBe('1 other person is coming');
+    expect(rsvpCopy.othersComing(3)).toBe('3 others are coming');
+
+    for (const others of [1, 2, 5, 40]) {
+      expect(rsvpCopy.othersComing(others)).toContain('other');
+    }
+  });
+
+  it('has a first-replier line, so nobody is told that nobody is coming', () => {
+    expect(rsvpCopy.firstToReply.length).toBeGreaterThan(0);
+    expect(rsvpCopy.firstToReply.toLowerCase()).not.toContain('0 ');
   });
 });
