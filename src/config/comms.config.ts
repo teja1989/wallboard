@@ -152,9 +152,9 @@ export const relayCopy = {
   message: (hostedBy: string, title: string, link: string) =>
     `${hostedBy} invited you to ${title}\n${link}`,
 
-  panelTitle: 'Send it yourself',
+  panelTitle: 'Text or share yourself',
   panelBody:
-    'Each guest gets their own link, so you can see who has opened it. Send them however you normally talk to them — the invitation still tracks.',
+    'Each guest gets their own personalized link so you can see when they view and RSVP. Tap the SMS icon beside any phone number to text them directly from your phone’s Messages app, or copy their link.',
   copiedOne: 'Link copied',
   copiedAll: 'All the messages copied',
   noContact: 'No phone or email — you can still copy their link.',

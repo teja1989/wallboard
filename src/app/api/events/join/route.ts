@@ -50,7 +50,7 @@ export const POST = route(async (request) => {
     throw new ApiError('not_found', 'That code did not work. Check it and try again.');
   }
 
-  const outcome = await joinEvent(actor, event, input.displayName);
+  const outcome = await joinEvent(actor, event, input.displayName, input.role);
 
   if (!outcome.alreadyMember) {
     await recordAudit(

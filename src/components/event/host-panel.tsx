@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Copy, Eye, RefreshCw, Timer, X } from 'lucide-react';
+import { Check, Copy, Eye, RefreshCw, Shield, Timer, X } from 'lucide-react';
+import { Avatar } from '@/components/ui/avatar';
 import { DangerSection } from '@/components/event/danger-section';
 import { UpgradeSection } from '@/components/event/upgrade-section';
 import { expiryPresets, motion as motionTokens } from '@/config';
@@ -20,6 +21,13 @@ interface HostPanelProps {
   open: boolean;
   onClose: () => void;
   onChanged: () => void;
+}
+
+interface CoHostItem {
+  uid: string;
+  displayName: string;
+  photoUrl: string | null;
+  role: string;
 }
 
 /**
@@ -50,6 +58,61 @@ export function HostPanel({
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [cohosts, setCohosts] = useState<CoHostItem[]>([]);
+  const [copiedCohost, setCopiedCohost] = useState(false);
+  const [removingCohostUid, setRemovingCohostUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await api.get<{ guests: CoHostItem[] }>(`/api/events/${eventId}/guests`);
+        if (!cancelled) {
+          setCohosts(res.guests.filter((g) => g.role === 'cohost'));
+        }
+      } catch {
+        // Non-critical
+      }
+
+      try {
+        const result = await api.get<{ code: string }>(`/api/events/${eventId}/code`);
+        if (!cancelled) {
+          setCode(result.code);
+        }
+      } catch {
+        // Ignored
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, eventId]);
+
+  async function copyCohostLink() {
+    if (!code) return;
+    const url = `${window.location.origin}/i/${code}?role=cohost`;
+    await navigator.clipboard.writeText(url);
+    setCopiedCohost(true);
+    notify('Co-host invite link copied to clipboard!', 'success');
+    setTimeout(() => setCopiedCohost(false), 2200);
+  }
+
+  async function removeCohost(targetUid: string) {
+    setRemovingCohostUid(targetUid);
+    try {
+      await api.post(`/api/events/${eventId}/members/${targetUid}/role`, { role: 'member' });
+      setCohosts((prev) => prev.filter((c) => c.uid !== targetUid));
+      notify('Co-host removed.', 'success');
+      onChanged();
+    } catch (caught) {
+      notify(errorMessage(caught, 'Could not remove co-host.'), 'error');
+    } finally {
+      setRemovingCohostUid(null);
+    }
+  }
 
   async function revealCode() {
     setBusy('reveal');
@@ -183,6 +246,81 @@ export function HostPanel({
                   Show the code
                 </Button>
               )}
+            </section>
+
+            <section className="mb-6">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-secondary)]">
+                  <Shield className="size-4 text-[var(--accent)]" aria-hidden />
+                  Co-hosts
+                </h3>
+                {cohosts.length > 0 && (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {cohosts.length} {cohosts.length === 1 ? 'co-host' : 'co-hosts'}
+                  </span>
+                )}
+              </div>
+
+              <div className="rounded-2xl bg-[var(--surface-sunken)] p-4">
+                {cohosts.length > 0 ? (
+                  <ul className="mb-3 divide-y divide-[var(--border-subtle)]">
+                    {cohosts.map((cohost) => (
+                      <li key={cohost.uid} className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={cohost.displayName} photoUrl={cohost.photoUrl} size={28} />
+                          <span className="text-sm font-medium">{cohost.displayName}</span>
+                        </div>
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-[var(--text-muted)] hover:text-[var(--danger)]"
+                            loading={removingCohostUid === cohost.uid}
+                            onClick={() => removeCohost(cohost.uid)}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mb-3 text-xs text-[var(--text-muted)]">
+                    No co-hosts yet. Share the co-host link below with an event partner.
+                  </p>
+                )}
+
+                {code ? (
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    className="w-full justify-center gap-2"
+                    onClick={copyCohostLink}
+                  >
+                    {copiedCohost ? (
+                      <Check className="size-4 text-[var(--accent)]" />
+                    ) : (
+                      <Copy className="size-4" />
+                    )}
+                    {copiedCohost ? 'Co-host link copied!' : 'Copy Co-host Invite Link'}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    className="w-full"
+                    loading={busy === 'reveal'}
+                    onClick={revealCode}
+                  >
+                    <Eye className="size-4" />
+                    Get Co-host Invite Link
+                  </Button>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Co-hosts can manage invitations, edit details, and moderate posts, but cannot delete
+                the event.
+              </p>
             </section>
 
             <section className="mb-6">

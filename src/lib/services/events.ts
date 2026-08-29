@@ -370,13 +370,19 @@ export async function joinEvent(
   actor: Actor,
   event: EventDoc,
   displayName?: string,
+  requestedRole?: 'member' | 'cohost',
 ): Promise<JoinOutcome> {
   const memberRef = eventRef(event.id).collection(collections.members).doc(actor.uid);
 
   return db().runTransaction(async (transaction) => {
     const existing = await transaction.get(memberRef);
     if (existing.exists) {
-      return { event, role: (existing.data() as MemberDoc).role, alreadyMember: true };
+      const existingData = existing.data() as MemberDoc;
+      if (requestedRole === 'cohost' && !actor.isAnonymous && existingData.role === 'member') {
+        transaction.update(memberRef, { role: 'cohost', roleUpdatedAt: Date.now() });
+        return { event, role: 'cohost', alreadyMember: true };
+      }
+      return { event, role: existingData.role, alreadyMember: true };
     }
 
     const eventSnapshot = await transaction.get(eventRef(event.id));
@@ -389,7 +395,10 @@ export async function joinEvent(
     // unless the host opened posting to anyone holding the code *and* the platform allows it.
     const anonymousMayPost =
       event.settings.whoCanPost === 'anyone' && isEnabled('allowAnonymousPosting');
-    const role: MemberDoc['role'] = actor.isAnonymous && !anonymousMayPost ? 'viewer' : 'member';
+    let role: MemberDoc['role'] = actor.isAnonymous && !anonymousMayPost ? 'viewer' : 'member';
+    if (requestedRole === 'cohost' && !actor.isAnonymous) {
+      role = 'cohost';
+    }
 
     transaction.set(memberRef, newMember(actor, role, displayName));
     transaction.update(eventRef(event.id), {

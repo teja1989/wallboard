@@ -213,6 +213,7 @@ export const extendEventSchema = z.object({ expiryPresetId: z.enum(presetIds) })
 export const joinEventSchema = z.object({
   code: joinCodeSchema,
   displayName: cleanText(contentLimits.displayNameMaxLength).optional(),
+  role: z.enum(['member', 'cohost']).optional(),
 });
 export type JoinEventInput = z.infer<typeof joinEventSchema>;
 

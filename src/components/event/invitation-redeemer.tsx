@@ -45,7 +45,12 @@ export function InvitationRedeemer({
   const redeem = useCallback(async () => {
     try {
       await signInAsGuest();
-      const result = await api.post<{ event: EventPreview }>('/api/events/join', { code });
+      const roleParam =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('role')
+          : null;
+      const role = roleParam === 'cohost' ? 'cohost' : undefined;
+      const result = await api.post<{ event: EventPreview }>('/api/events/join', { code, role });
       router.replace(`/e/${result.event.id}`);
     } catch (caught) {
       setError(errorMessage(caught, 'That invitation link did not work.'));
