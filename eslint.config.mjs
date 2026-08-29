@@ -12,6 +12,7 @@ export default tseslint.config(
       'test-results/**',
       '.emulator-data/**',
       'next-env.d.ts',
+      'src/lib/vendor/**',
     ],
   },
   js.configs.recommended,

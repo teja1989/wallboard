@@ -1,4 +1,4 @@
-import qrcode from 'qrcode-generator';
+import qrcode from './vendor/qrcode';
 
 export interface QrMatrix {
   size: number;
