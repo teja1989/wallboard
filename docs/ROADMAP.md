@@ -58,9 +58,21 @@ those means shipping a copy of the zone database that goes stale. A UTC instant 
 unambiguous, and it is what makes the entry land at the right moment for a guest reading it
 from anywhere.
 
+### Reminders that send themselves — shipped
+
+The nudge to guests who had not replied went out only when a host pressed a button, on a tab
+inside a page they had to think to open. Most never will, and a reply that never arrives
+because nobody asked twice is indistinguishable, in the funnel, from an invitation that did
+not work.
+
+Two slots counted back from the event — a week, then two days — claimed transactionally
+_before_ sending, because a duplicate nudge costs more than a missed one: it burns a guest's
+goodwill and sending reputation that every host here shares. A slot that fell due before the
+invitation existed never fires, so publishing three days out does not immediately chase
+everybody. Hosts can switch it off beside the guest list.
+
 Not yet: wallet passes (lock-screen presence on the day, and they update themselves if the
-venue moves) and automatic reminders sent on a schedule rather than by the host pressing a
-button.
+venue moves).
 
 ### Host tools that a host can actually use — shipped
 

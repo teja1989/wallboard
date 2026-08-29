@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Loader2, Mail, Send, Share2, Trash2 } from 'lucide-react';
-import { deliveryCopy, emailConfig, relayCopy } from '@/config';
+import { deliveryCopy, emailConfig, reminderCopy, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { EmailPreview } from '@/components/event/email-preview';
@@ -19,7 +19,10 @@ interface InvitePanelProps {
   hostedBy: string;
   /** Who is coming, transactionally maintained — never re-derived from the funnel. */
   tally: RsvpTally;
-  onSent: () => void;
+  /** Whether we chase non-repliers for this host. Toggled below. */
+  autoRemind: boolean;
+  /** Reload the event: a send, or a settings change made here, both move it. */
+  onEventChanged: () => void;
 }
 
 const TONE_CLASS: Record<ReturnType<typeof toneOf>, string> = {
@@ -46,7 +49,14 @@ function toneOf(state: DeliveryState) {
  * and it is why the host can send the invitation themselves — from their own phone, in the
  * thread they already talk to that person in — without losing any of the tracking.
  */
-export function InvitePanel({ eventId, eventTitle, hostedBy, tally, onSent }: InvitePanelProps) {
+export function InvitePanel({
+  eventId,
+  eventTitle,
+  hostedBy,
+  tally,
+  autoRemind,
+  onEventChanged,
+}: InvitePanelProps) {
   const { notify } = useToast();
   const [invitees, setInvitees] = useState<InviteeDoc[] | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -149,7 +159,7 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, tally, onSent }: In
         { kind },
       );
       await load();
-      onSent();
+      onEventChanged();
       notify(
         result.sent > 0
           ? `${result.sent} sent${result.failed ? `, ${result.failed} failed` : ''}`
@@ -192,6 +202,8 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, tally, onSent }: In
             nothing to draw.
           */}
           <InviteProgress invitees={invitees} tally={tally} />
+
+          <AutoRemindToggle eventId={eventId} enabled={autoRemind} onChanged={onEventChanged} />
 
           <div className="card space-y-3 p-5">
             <div>
@@ -314,5 +326,70 @@ export function InvitePanel({ eventId, eventTitle, hostedBy, tally, onSent }: In
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Whether we chase the people who have not replied.
+ *
+ * Sits on the guest list rather than in the host drawer, beside the manual nudge it replaces:
+ * this is the same job, done for you, and a host deciding whether to chase somebody is
+ * already looking at who has not answered.
+ *
+ * Optimistic, and deliberately so — a checkbox that waits on a round trip before moving reads
+ * as broken. The failure path puts it back and says why.
+ */
+function AutoRemindToggle({
+  eventId,
+  enabled,
+  onChanged,
+}: {
+  eventId: string;
+  enabled: boolean;
+  onChanged: () => void;
+}) {
+  const { notify } = useToast();
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const on = optimistic ?? enabled;
+
+  async function toggle() {
+    const next = !on;
+    setOptimistic(next);
+    try {
+      await api.patch(`/api/events/${eventId}/settings`, { rsvp: { autoRemind: next } });
+      onChanged();
+    } catch (caught) {
+      setOptimistic(null);
+      notify(errorMessage(caught, 'That did not save.'), 'error');
+    }
+  }
+
+  return (
+    <div className="card flex items-start justify-between gap-4 p-5">
+      <div className="min-w-0">
+        <p className="font-medium">{reminderCopy.settingLabel}</p>
+        <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+          {on ? reminderCopy.settingHint : reminderCopy.settingOff}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={reminderCopy.settingLabel}
+        onClick={toggle}
+        className={cn(
+          'mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
+          on ? 'bg-[var(--accent)]' : 'bg-[var(--surface-sunken)]',
+        )}
+      >
+        <span
+          className={cn(
+            'size-5 rounded-full bg-white shadow-sm transition-transform',
+            on && 'translate-x-5',
+          )}
+        />
+      </button>
+    </div>
   );
 }

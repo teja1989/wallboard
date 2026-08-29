@@ -766,6 +766,164 @@ async function main() {
     `status ${strangerFunnel.status}`,
   );
 
+  // --- scheduled reminders ---------------------------------------------------
+  // The nudge used to go only when a host pressed a button, which most never do. The job that
+  // replaces it emails other people's guests unattended, so the assertions that matter are the
+  // lock on the door and the promise that it cannot send the same slot twice.
+  const unauthorizedRun = await call(newSession(), '/api/internal/reminders', {
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'the reminder job refuses a caller with no secret',
+    unauthorizedRun.status === 401,
+    `status ${unauthorizedRun.status}`,
+  );
+
+  const wrongSecret = await call(newSession(), '/api/internal/reminders', {
+    method: 'POST',
+    body: {},
+    headers: { Authorization: 'Bearer not-the-secret' },
+  });
+  check('and refuses a wrong one', wrongSecret.status === 401, `status ${wrongSecret.status}`);
+
+  const taskSecret = process.env.CLEANUP_TASK_SECRET;
+  if (taskSecret) {
+    const runOnce = await call(newSession(), '/api/internal/reminders', {
+      method: 'POST',
+      body: {},
+      headers: { Authorization: `Bearer ${taskSecret}` },
+    });
+    check('the reminder job runs', runOnce.status === 200, JSON.stringify(runOnce.payload));
+    check(
+      'it reports what it looked at',
+      typeof runOnce.payload?.data?.eventsConsidered === 'number',
+      JSON.stringify(runOnce.payload?.data),
+    );
+
+    // Nothing in this suite is within a reminder window — every event is created days out
+    // with a fresh `createdAt`, and a slot that fell due before the invitation existed is
+    // deliberately skipped. So the honest assertion is that it sends nothing, twice.
+    check(
+      'and sends nothing when no slot is due',
+      runOnce.payload?.data?.sent === 0,
+      JSON.stringify(runOnce.payload?.data),
+    );
+
+    const runTwice = await call(newSession(), '/api/internal/reminders', {
+      method: 'POST',
+      body: {},
+      headers: { Authorization: `Bearer ${taskSecret}` },
+    });
+    check(
+      'a second run is safe to make',
+      runTwice.status === 200 && runTwice.payload?.data?.sent === 0,
+      JSON.stringify(runTwice.payload?.data),
+    );
+  } else {
+    console.log('  SKIP  reminder job run (CLEANUP_TASK_SECRET not set in this environment)');
+  }
+
+  // The host's own switch, which is what stops this being something done *to* them.
+  const remindOff = await call(host.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: { rsvp: { autoRemind: false } },
+  });
+  check(
+    'the host can turn reminders off',
+    remindOff.status === 200,
+    JSON.stringify(remindOff.payload),
+  );
+
+  const afterOff = await call(host.session, `/api/events/${eventId}`);
+  check(
+    'and it sticks',
+    afterOff.payload?.data?.event?.rsvp?.autoRemind === false,
+    JSON.stringify(afterOff.payload?.data?.event?.rsvp),
+  );
+
+  const memberRemind = await call(member.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: { rsvp: { autoRemind: true } },
+  });
+  check(
+    'a guest cannot switch it back on',
+    memberRemind.status === 403 || memberRemind.status === 404,
+    `status ${memberRemind.status}`,
+  );
+
+  /*
+    The settings route used to validate a date, a venue, a dress code and every RSVP setting
+    and then apply none of them — a host who typed the wrong date could not fix it, and the
+    request came back 200 saying nothing was wrong.
+  */
+  const movedDate = Date.now() + 21 * 24 * 60 * 60 * 1000;
+  const edited = await call(host.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: {
+      startsAt: movedDate,
+      dressCode: 'Black tie',
+      hostedBy: 'The smoke test, renamed',
+      rsvp: { question: 'Any dietary requirements?' },
+    },
+  });
+  check(
+    'the host edits the invitation after publishing',
+    edited.status === 200,
+    JSON.stringify(edited.payload),
+  );
+  check('the date actually moves', edited.payload?.data?.event?.startsAt === movedDate);
+  check('the dress code lands', edited.payload?.data?.event?.dressCode === 'Black tie');
+  check(
+    'who it is from lands',
+    edited.payload?.data?.event?.hostedBy === 'The smoke test, renamed',
+  );
+  check(
+    'an rsvp setting lands',
+    edited.payload?.data?.event?.rsvp?.question === 'Any dietary requirements?',
+    JSON.stringify(edited.payload?.data?.event?.rsvp),
+  );
+  check(
+    'and a partial rsvp patch leaves its siblings alone',
+    edited.payload?.data?.event?.rsvp?.autoRemind === false,
+    JSON.stringify(edited.payload?.data?.event?.rsvp),
+  );
+
+  // The venue and the zone survive an unrelated edit. Both fields defaulted to null in the
+  // patch schema, so every edit would have quietly erased them — and an event with no zone
+  // shows every guest the wrong hour, which is a bug this project has already fixed once.
+  // Deliberately not the title: the deletion test further down types the event's name to
+  // confirm, and renaming it here would break that in a way that looks like a delete bug.
+  const keptVenue = await call(host.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: { description: 'Automated run, edited' },
+  });
+  check(
+    'an unrelated edit does not erase the venue',
+    keptVenue.payload?.data?.event?.location?.name === 'The Rooftop',
+    JSON.stringify(keptVenue.payload?.data?.event?.location),
+  );
+
+  const backwards = await call(host.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: { endsAt: movedDate - 60_000 },
+  });
+  check(
+    'an end before the start is refused even when only one of them is sent',
+    backwards.status === 400,
+    `status ${backwards.status}`,
+  );
+
+  const nothing = await call(host.session, `/api/events/${eventId}/settings`, {
+    method: 'PATCH',
+    body: { rsvp: {} },
+  });
+  check(
+    'a request that changes nothing is a 400, not a 500',
+    nothing.status === 400,
+    `status ${nothing.status}`,
+  );
+
   // --- the rollup across every event ----------------------------------------
   // Seven counters were being written and nothing read them. This is the read path, and the
   // permission on it: `admin:*` is platform-only by construction, so hosting a hundred events

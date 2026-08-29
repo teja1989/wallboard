@@ -76,14 +76,15 @@ const externalUrl = z
  * Validated against the runtime's own zone database rather than a regex: an unparseable
  * zone would throw inside Intl at render time, on the invitation, for every guest.
  */
-const timeZoneSchema = z
+const timeZone = z
   .string()
   .max(64)
   .refine(isValidTimeZone, 'That is not a timezone this system knows.')
-  .nullable()
-  .default(null);
+  .nullable();
 
-const locationSchema = z
+const timeZoneSchema = timeZone.default(null);
+
+const location = z
   .object({
     name: cleanText(contentLimits.locationNameMaxLength).default(''),
     address: cleanText(contentLimits.locationAddressMaxLength).default(''),
@@ -94,19 +95,57 @@ const locationSchema = z
     lat: z.number().min(-90).max(90).nullish(),
     lng: z.number().min(-180).max(180).nullish(),
   })
-  .nullable()
-  .default(null);
+  .nullable();
 
-const rsvpSettingsSchema = z.object({
-  enabled: z.boolean().default(true),
-  deadline: eventTimestamp.default(null),
-  allowPlusOnes: z.boolean().default(true),
-  maxPartySize: z.number().int().min(1).max(contentLimits.maxPartySize).default(2),
-  askNote: z.boolean().default(false),
+const locationSchema = location.default(null);
+
+/**
+ * The RSVP settings, in two shapes.
+ *
+ * **`.partial()` does not undo `.default()`**, and that has now cost two bugs. A field with a
+ * default is already optional, so a "partial" update parses into a *complete* object with
+ * every unmentioned field filled in from its default — and a handler that writes what it
+ * parsed silently resets the settings the request never mentioned. Patching the reminder
+ * switch quietly put `maxPartySize` back to two and blanked the host's custom question.
+ *
+ * The same shape caused the milestone-budget bug: ticking a box wiped the row's budget. So
+ * the field definitions live here once, and the two schemas differ in exactly one way —
+ * creation fills a blank in, an update leaves it absent.
+ */
+const rsvpFields = {
+  enabled: z.boolean(),
+  deadline: eventTimestamp,
+  allowPlusOnes: z.boolean(),
+  maxPartySize: z.number().int().min(1).max(contentLimits.maxPartySize),
+  askNote: z.boolean(),
   question: cleanText(contentLimits.rsvpQuestionMaxLength)
     .transform((value) => (value === '' ? null : value))
-    .nullable()
-    .default(null),
+    .nullable(),
+  autoRemind: z.boolean(),
+};
+
+const rsvpSettingsSchema = z.object({
+  enabled: rsvpFields.enabled.default(true),
+  deadline: rsvpFields.deadline.default(null),
+  allowPlusOnes: rsvpFields.allowPlusOnes.default(true),
+  maxPartySize: rsvpFields.maxPartySize.default(2),
+  question: rsvpFields.question.default(null),
+  askNote: rsvpFields.askNote.default(false),
+  // Defaults on. Chasing replies is the part of hosting people forget, and the host can turn
+  // it off in one tap — but a default of off would mean the feature only helps hosts who go
+  // looking for it, which is the same failure the manual nudge button already had.
+  autoRemind: rsvpFields.autoRemind.default(true),
+});
+
+/** No defaults anywhere: absent has to mean "leave it alone". See the note above. */
+const rsvpPatchSchema = z.object({
+  enabled: rsvpFields.enabled.optional(),
+  deadline: rsvpFields.deadline.optional(),
+  allowPlusOnes: rsvpFields.allowPlusOnes.optional(),
+  maxPartySize: rsvpFields.maxPartySize.optional(),
+  question: rsvpFields.question.optional(),
+  askNote: rsvpFields.askNote.optional(),
+  autoRemind: rsvpFields.autoRemind.optional(),
 });
 
 export const joinCodeSchema = z
@@ -157,10 +196,10 @@ export const updateEventSchema = z
     templateId: z.enum(templateIds).optional(),
     startsAt: eventTimestamp.optional(),
     endsAt: eventTimestamp.optional(),
-    location: locationSchema.optional(),
-    timeZone: timeZoneSchema.optional(),
+    location: location.optional(),
+    timeZone: timeZone.optional(),
     dressCode: cleanText(contentLimits.dressCodeMaxLength).optional(),
-    rsvp: rsvpSettingsSchema.partial().optional(),
+    rsvp: rsvpPatchSchema.optional(),
     whoCanPost: z.enum(['members', 'anyone']).optional(),
     allowedKinds: z.array(z.enum(POST_KINDS)).min(1).optional(),
   })

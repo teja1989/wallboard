@@ -63,6 +63,7 @@ async function main(): Promise<void> {
       maxPartySize: 2,
       askNote: false,
       question: null,
+      autoRemind: true,
     },
     expiryPresetId: '7d',
     whoCanPost: 'members',

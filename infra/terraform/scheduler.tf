@@ -47,3 +47,50 @@ resource "google_cloud_scheduler_job" "cleanup" {
 
   depends_on = [google_project_service.this]
 }
+
+# ---------------------------------------------------------------------------
+# Reminders.
+#
+# The nudge to guests who have not replied existed already, and went out only
+# when a host pressed a button on a tab they had to think to open. Most never
+# did, which lost replies for reasons that had nothing to do with the
+# invitation.
+#
+# Runs four times a day rather than hourly. A reminder slot is a day-scale
+# thing, the job claims each slot transactionally before sending so a missed
+# tick simply fires on the next one, and four ticks keeps the whole account
+# inside Cloud Scheduler's free three-job tier alongside the sweep.
+# ---------------------------------------------------------------------------
+
+resource "google_cloud_scheduler_job" "reminders" {
+  project     = var.project_id
+  region      = var.region
+  name        = "${var.service_name}-reminders"
+  description = "Emails guests who have not replied, on a schedule counted back from the event."
+
+  schedule  = "43 */6 * * *"
+  time_zone = "Etc/UTC"
+
+  attempt_deadline = "320s"
+
+  # One retry, not two. Every attempt that gets far enough to claim a slot has
+  # already sent; retrying harder buys nothing and risks more.
+  retry_config {
+    retry_count          = 1
+    min_backoff_duration = "60s"
+  }
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.app.uri}/api/internal/reminders"
+
+    # The same shared task secret as the sweep — see src/lib/server/internal-task.ts
+    # for why these endpoints share one lock rather than holding one each.
+    headers = {
+      "Authorization" = "Bearer ${random_password.cleanup_task_secret.result}"
+      "Content-Type"  = "application/json"
+    }
+  }
+
+  depends_on = [google_project_service.this]
+}

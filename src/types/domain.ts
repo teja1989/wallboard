@@ -101,6 +101,14 @@ export interface RsvpSettings {
   askNote: boolean;
   /** One extra question, e.g. "any dietary requirements?". A paid entitlement. */
   question: string | null;
+  /**
+   * Whether we chase non-repliers on the host's behalf.
+   *
+   * On by default: chasing is the tedious part of hosting and the part hosts forget, and a
+   * reply that never arrives because nobody asked twice is indistinguishable, in the funnel,
+   * from an invitation that did not work.
+   */
+  autoRemind: boolean;
 }
 
 export interface RsvpResponse {
@@ -159,6 +167,15 @@ export interface EventDoc {
   createdAt: number;
   expiresAt: number;
   endedAt: number | null;
+  /**
+   * Reminder slots already sent, by id.
+   *
+   * Claimed in a transaction *before* the send rather than recorded after it. A cron that
+   * recorded afterwards would double-send whenever a run died mid-flight, and a duplicate
+   * nudge costs more than a missed one — it burns a guest's goodwill and sending reputation
+   * shared across every host here.
+   */
+  remindersSent: string[];
   memberCount: number;
   postCount: number;
   storageBytes: number;

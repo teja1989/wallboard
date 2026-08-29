@@ -1,11 +1,9 @@
-import { collections } from '@/config';
 import { assertCan } from '@/lib/authz/policy';
 import { eventRoleFor } from '@/lib/authz/session';
 import { recordAudit } from '@/lib/audit';
 import { recordFunnel } from '@/lib/services/funnel';
-import { db } from '@/lib/firebase/admin';
-import { eventRef, requireEvent } from '@/lib/services/events';
-import { normalizeEmail, sendToInvitees } from '@/lib/services/invites';
+import { requireEvent } from '@/lib/services/events';
+import { repliedAddressesFor, sendToInvitees } from '@/lib/services/invites';
 import {
   ApiError,
   limitByUser,
@@ -16,7 +14,6 @@ import {
 } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
 import { eventIdSchema, sendInvitesSchema } from '@/lib/validation/schemas';
-import type { MemberDoc } from '@/types/domain';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,7 +49,7 @@ export const POST = route(async (request, { params }: Params) => {
 
   // A reminder must never reach someone who has already replied — so the set of people who
   // have is gathered here rather than trusted from the request.
-  const replied = kind === 'reminder' ? await repliedAddresses(id) : new Set<string>();
+  const replied = kind === 'reminder' ? await repliedAddressesFor(id) : new Set<string>();
   const summary = await sendToInvitees(event, kind, replied);
 
   // One per message actually sent, so the denominator matches what left the building rather
@@ -75,33 +72,3 @@ export const POST = route(async (request, { params }: Params) => {
 
   return ok(summary);
 });
-
-/**
- * Addresses belonging to members who have answered.
- *
- * Matching is by address, which only works for guests who arrived through an emailed
- * invitation and signed in with the same address. Someone who used the code and a different
- * account will still get a nudge — annoying, but the alternative is silently not reminding
- * people who genuinely have not replied, which is worse for the host.
- */
-async function repliedAddresses(eventId: string): Promise<Set<string>> {
-  const snapshot = await eventRef(eventId).collection(collections.members).get();
-  const uids = snapshot.docs
-    .map((doc) => doc.data() as MemberDoc)
-    .filter((member) => (member.rsvp?.status ?? 'pending') !== 'pending')
-    .map((member) => member.uid);
-
-  if (uids.length === 0) return new Set();
-
-  const addresses = new Set<string>();
-  // Firestore caps an `in` query at 30 values, so this walks in chunks.
-  for (let i = 0; i < uids.length; i += 30) {
-    const chunk = uids.slice(i, i + 30);
-    const users = await db().collection(collections.users).where('uid', 'in', chunk).get();
-    for (const doc of users.docs) {
-      const email = doc.get('email');
-      if (typeof email === 'string' && email) addresses.add(normalizeEmail(email));
-    }
-  }
-  return addresses;
-}

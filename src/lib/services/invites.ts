@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/server/api';
 import { eventRef, readJoinCode } from '@/lib/services/events';
 import { recordAttempt } from '@/lib/services/delivery';
 import { normalizePhone } from '@/lib/phone';
-import type { CommsChannel, DeliveryState, EventDoc, InviteeDoc } from '@/types/domain';
+import type { CommsChannel, DeliveryState, EventDoc, InviteeDoc, MemberDoc } from '@/types/domain';
 
 /**
  * The invitee list, and sending to it.
@@ -450,4 +450,38 @@ export async function sendRsvpConfirmation(
     kind: 'rsvpConfirmation',
     eventId: event.id,
   });
+}
+
+/**
+ * Addresses belonging to members who have answered.
+ *
+ * Matching is by address, which only works for guests who arrived through an emailed
+ * invitation and signed in with the same address. Someone who used the code and a different
+ * account will still get a nudge — annoying, but the alternative is silently not reminding
+ * people who genuinely have not replied, which is worse for the host.
+ *
+ * Lives here rather than beside the send route because the scheduled reminder needs exactly
+ * the same answer, and two copies of "who counts as having replied" is two places for the
+ * definition to drift.
+ */
+export async function repliedAddressesFor(eventId: string): Promise<Set<string>> {
+  const snapshot = await eventRef(eventId).collection(collections.members).get();
+  const uids = snapshot.docs
+    .map((doc) => doc.data() as MemberDoc)
+    .filter((member) => (member.rsvp?.status ?? 'pending') !== 'pending')
+    .map((member) => member.uid);
+
+  if (uids.length === 0) return new Set();
+
+  const addresses = new Set<string>();
+  // Firestore caps an `in` query at 30 values, so this walks in chunks.
+  for (let i = 0; i < uids.length; i += 30) {
+    const chunk = uids.slice(i, i + 30);
+    const users = await db().collection(collections.users).where('uid', 'in', chunk).get();
+    for (const doc of users.docs) {
+      const email = doc.get('email');
+      if (typeof email === 'string' && email) addresses.add(normalizeEmail(email));
+    }
+  }
+  return addresses;
 }

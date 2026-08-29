@@ -47,6 +47,16 @@ locals {
         { path = "expiresAt", order = "ASCENDING" },
       ]
     }
+    # Live events close enough to the day to need a reminder. Two range filters on
+    # `startsAt` sit on one field, so this is a single index rather than two — and
+    # the range field goes last, which is the whole rule for reading these.
+    events_upcoming = {
+      collection = "events"
+      fields = [
+        { path = "status", order = "ASCENDING" },
+        { path = "startsAt", order = "ASCENDING" },
+      ]
+    }
     audit_by_event = {
       collection = "auditLogs"
       fields = [

@@ -318,3 +318,24 @@ to change one of them.
   entitlements get one for both the gated and the ungated case.
 - Copy is product. A string a guest reads belongs in `branding.config.ts` or
   `occasions.config.ts`, not inline in a component.
+
+- **`.partial()` does not undo `.default()`, and this has now caused four bugs.** A field
+  carrying a default is already optional, so a "partial" update schema parses an absent key
+  into its default — indistinguishable, at the handler, from a value the caller sent. Every
+  handler here applies a patch by writing what it parsed, so the default silently overwrites.
+
+  It wiped a milestone's budget when a box was ticked; it reset `maxPartySize` and blanked a
+  host's custom question when the reminder switch was flipped; and `location` and `timeZone`
+  both ended `.nullable().default(null)`, so *every* settings edit would have erased the venue
+  and the event's timezone — the field that makes each guest see the right hour.
+
+  So: **an update schema has no defaults anywhere.** Where creation genuinely wants them, define
+  the field once and build two schemas from it — `x.default(…)` for create, `x.optional()` for
+  patch — rather than `.partial()`ing the create schema. `tests/unit/reminders.test.ts` asserts
+  the shape (`Object.keys(parsed)`) rather than a symptom, which is what catches it; asserting
+  the symptom needs a real document and only finds the instance you thought of.
+
+- **A route can accept far more than it applies, and nothing will say so.** `/settings`
+  validated a date, a venue, a dress code, who the invitation is from and every RSVP setting,
+  then mapped five fields and dropped the rest — so a host who typed the wrong date could not
+  fix it, and the request came back 200. If a schema names a field, grep the handler for it.

@@ -322,7 +322,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   eventTitle={event.title}
                   hostedBy={event.hostedBy || event.hostName}
                   tally={event.rsvpTally}
-                  onSent={loadEvent}
+                  autoRemind={event.rsvp.autoRemind === true}
+                  onEventChanged={loadEvent}
                 />
                 {/*
                   The gift list is managed beside the guest list rather than in the host drawer,

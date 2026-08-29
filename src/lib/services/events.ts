@@ -274,6 +274,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
       maxPartySize: input.rsvp.allowPlusOnes ? input.rsvp.maxPartySize : 1,
       askNote: input.rsvp.askNote,
       question: input.rsvp.question,
+      autoRemind: input.rsvp.autoRemind,
     },
     // The host counts as going: they are, after all, hosting.
     rsvpTally: { yes: 1, no: 0, maybe: 0, pending: 0, attending: 1 },
@@ -286,6 +287,7 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     createdAt: now,
     expiresAt,
     endedAt: null,
+    remindersSent: [],
     memberCount: 1,
     postCount: 0,
     storageBytes: 0,
