@@ -2,6 +2,7 @@ import { can } from '@/lib/authz/policy';
 import { eventAuthzContext } from '@/lib/authz/event-context';
 import { eventMembershipFor } from '@/lib/authz/session';
 import { effectiveStatus, requireEvent } from '@/lib/services/events';
+import { listConfirmedAttendees } from '@/lib/services/rsvp';
 import { ApiError, ok, requireActor, route } from '@/lib/server/api';
 import { eventIdSchema } from '@/lib/validation/schemas';
 
@@ -32,9 +33,14 @@ export const GET = route(async (_request, { params }: Params) => {
     throw new ApiError('not_found', 'That event does not exist.');
   }
 
+  const canListMembers = can('member:list', eventAuthzContext(actor, event, eventRole));
+  const confirmedAttendees =
+    canListMembers && event.rsvpTally.yes > 0 ? await listConfirmedAttendees(id, 6) : [];
+
   return ok({
     event: { ...event, status: effectiveStatus(event) },
     role: eventRole,
+    confirmedAttendees,
     rsvp: {
       status: membership?.rsvp?.status ?? 'pending',
       partySize: membership?.rsvp?.partySize ?? 1,

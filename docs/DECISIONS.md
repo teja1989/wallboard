@@ -210,10 +210,9 @@ the audit trail points at something real.
 `plans.config.ts`. `/e/` is the wrong surface for it. It should either be built or removed from
 the plan's claims before billing is turned on.
 
-**`features.presentationMode` is `true` and there is no presentation mode.** No route, no
-component — the flag is the entire feature. This is the same class of gap as the five
-unreachable `admin:*` permissions: every layer present except the one that does something.
-Either build it or set the flag false; do not leave it advertising a capability.
+**`features.presentationMode` is `true` and is implemented at `/e/{eventId}/present`.** A full-screen
+ambient projector view with auto-cycling media spotlight, keyboard shortcuts, and live corner QR code
+for guests to scan and post in real time.
 
 ---
 

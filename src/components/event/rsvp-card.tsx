@@ -12,6 +12,7 @@ import {
 } from '@/config';
 import { Button } from '@/components/ui/button';
 import { RsvpConfirmed } from '@/components/event/rsvp-confirmed';
+import { SocialProof, type SocialProofAttendee } from '@/components/event/social-proof';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
 import { cn, formatDateOnly } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface RsvpCardProps {
   adults: number;
   /** Not `children`: React reserves that prop name for nested elements. */
   childGuests: number;
+  confirmedAttendees?: readonly SocialProofAttendee[];
   onAnswered: () => void;
   /** Where the confirmation sends someone who wants to say something. */
   onOpenWall: () => void;
@@ -42,6 +44,7 @@ export function RsvpCard({
   status,
   adults,
   childGuests,
+  confirmedAttendees,
   onAnswered,
   onOpenWall,
 }: RsvpCardProps) {
@@ -104,6 +107,7 @@ export function RsvpCard({
         event={event}
         status={status}
         partySize={adults + childGuests}
+        confirmedAttendees={confirmedAttendees}
         onChange={() => setEditing(true)}
         onOpenWall={onOpenWall}
       />
@@ -142,6 +146,12 @@ export function RsvpCard({
           </span>
         )}
       </div>
+
+      {confirmedAttendees && confirmedAttendees.length > 0 && (
+        <div className="mb-4">
+          <SocialProof attendees={confirmedAttendees} totalAttending={event.rsvpTally.attending} />
+        </div>
+      )}
 
       <div role="radiogroup" aria-labelledby="rsvp-heading" className="grid grid-cols-3 gap-2">
         {rsvpChoices.map((option) => (

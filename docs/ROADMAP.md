@@ -103,6 +103,12 @@ The no-ads promise said out loud, with the reason, on the landing and pricing pa
 "made with Marquee" mark on invitations, as a link rather than a footnote. Promos as config,
 granted at creation and visible where a host would look for one.
 
+### Presentation mode and social proof
+
+`/e/{eventId}/present` — full-screen venue projector display for reception screens and TVs. Auto-cycling spotlight carousel of photos and messages, ambient theme styling, keyboard controls, and an embedded zero-dependency SVG QR code for guests in the room to scan and post in real time.
+
+"Who's coming" attendee avatar stack on invitations (`SocialProof`), pulling confirmed attendees via the composite index on `(rsvp.status ASC, joinedAt ASC)` to drive social proof before and after RSVP.
+
 ### Deployment
 
 Terraform for the bucket, IAM, CORS, lifecycle, Cloud Run, Scheduler, Secret Manager and every
@@ -137,15 +143,12 @@ Then, in order:
 
 ## Next, in the order I would do it
 
-### 1. Close the two open loops in the shipped product
+### 1. Close the open loop in the shipped product
 
-Small, and both are the same class of problem as the admin gap: something advertised with
-nothing behind it.
+Small, and the same class of problem as the admin gap: something advertised with nothing behind it.
 
-- **`features.presentationMode` is `true` and there is no presentation mode.** No route, no
-  component. Build it — a big-screen wall for a venue projector is genuinely wanted and mostly
-  a layout — or set the flag false.
-- **`vanityLink`**, as above.
+- **`vanityLink`**, which the Pro plan sells and nothing implements. Build it or stop selling it;
+  do not launch a paid plan with a claim behind it that is not true.
 
 ### 2. The post-event ask
 
@@ -205,7 +208,6 @@ rather than buried, and an accountant on the platform fee's tax treatment **befo
 ## Cheap things worth doing whenever
 
 - Reactions on posts — small, and the most reliable driver of return visits.
-- A "who's coming" avatar row on the invitation; social proof measurably lifts RSVP.
 - Occasion-specific wall prompts in config — "share a photo of them from that decade" for a
   40th, "guess the first word" for a 1st birthday.
 - ~20 more templates, milestone-weighted. Config rows only. This is the answer to "should we

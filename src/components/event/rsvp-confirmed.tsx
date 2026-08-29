@@ -2,6 +2,7 @@
 import { Check, MessageCircle, Users } from 'lucide-react';
 import { occasionById, rsvpCopy, type RsvpStatus } from '@/config';
 import { AddToCalendar } from '@/components/event/add-to-calendar';
+import { SocialProof, type SocialProofAttendee } from '@/components/event/social-proof';
 import type { EventDoc } from '@/types/domain';
 
 /**
@@ -23,6 +24,7 @@ export function RsvpConfirmed({
   event,
   status,
   partySize,
+  confirmedAttendees,
   onChange,
   onOpenWall,
 }: {
@@ -31,6 +33,7 @@ export function RsvpConfirmed({
   status: Exclude<RsvpStatus, 'pending'>;
   /** How many the reply covers, so "others" can exclude them. */
   partySize: number;
+  confirmedAttendees?: readonly SocialProofAttendee[];
   onChange: () => void;
   onOpenWall: () => void;
 }) {
@@ -72,10 +75,19 @@ export function RsvpConfirmed({
       )}
 
       {status === 'yes' && (
-        <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
-          <Users className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
-          {others > 0 ? rsvpCopy.othersComing(others) : rsvpCopy.firstToReply}
-        </p>
+        <div className="mt-3">
+          {confirmedAttendees && confirmedAttendees.length > 0 ? (
+            <SocialProof
+              attendees={confirmedAttendees}
+              totalAttending={event.rsvpTally.attending}
+            />
+          ) : (
+            <p className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
+              <Users className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+              {others > 0 ? rsvpCopy.othersComing(others) : rsvpCopy.firstToReply}
+            </p>
+          )}
+        </div>
       )}
 
       {/*

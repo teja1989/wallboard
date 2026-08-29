@@ -61,8 +61,8 @@ Read them rather than re-deriving:
   whatever was there. Four data-loss bugs so far. Define the field once, build two schemas
   from it: `.default(…)` for create, `.optional()` for patch.
 - **A permission, flag or plan claim with nothing behind it is a bug, not a placeholder.** Five
-  `admin:*` permissions were enforced and reachable from nowhere; `features.presentationMode`
-  is `true` with no implementation; the Pro plan sells `vanityLink`, which does not exist.
+  `admin:*` permissions were enforced and reachable from nowhere (resolved); `features.presentationMode`
+  was `true` with no implementation (resolved); the Pro plan sells `vanityLink`, which does not exist.
   Either wire it or say plainly, in config, that it is not wired.
 
 ## Commands

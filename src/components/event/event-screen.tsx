@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence } from 'framer-motion';
-import { Clock, Loader2, Settings2, Sparkles, Users } from 'lucide-react';
-import { brand, occasionById, templateById } from '@/config';
+import { Clock, Loader2, Settings2, Sparkles, Tv, Users } from 'lucide-react';
+import { brand, featureFlags, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { GiftList } from '@/components/event/gift-list';
@@ -25,6 +25,7 @@ import type { EventDoc, EventRole, ResolvedMedia, RsvpStatus } from '@/types/dom
 interface EventResponse {
   event: EventDoc;
   role: EventRole | null;
+  confirmedAttendees?: { displayName: string; photoUrl: string | null }[];
   rsvp: { status: RsvpStatus; partySize: number; adults: number; children: number };
   permissions: {
     canPost: boolean;
@@ -207,6 +208,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               status={rsvp.status}
               adults={rsvp.adults}
               childGuests={rsvp.children}
+              confirmedAttendees={detail.confirmedAttendees}
               onAnswered={onAnswered}
               // Somebody who has just replied — including somebody who cannot come — is one
               // tap from the wall rather than at the end of the road.
@@ -237,6 +239,16 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   ? `Wall closes ${formatTimeRemaining(event.expiresAt, now).replace(' left', '')} from now`
                   : `This event has ${event.status}`}
               </span>
+              {featureFlags.presentationMode && (
+                <Link
+                  href={`/e/${eventId}/present`}
+                  className="glass inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--accent-soft)]"
+                  title="Open full-screen presentation mode for venue projectors"
+                >
+                  <Tv className="size-3.5" aria-hidden />
+                  Projector view
+                </Link>
+              )}
             </div>
 
             {isLive && permissions.canPost && (

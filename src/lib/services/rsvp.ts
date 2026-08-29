@@ -209,6 +209,37 @@ export async function listGuests(eventId: string, includePrivate: boolean): Prom
   });
 }
 
+export interface ConfirmedAttendee {
+  uid: string;
+  displayName: string;
+  photoUrl: string | null;
+}
+
+/**
+ * Returns a lightweight preview of confirmed guests for social proof on invitations.
+ * Uses the pre-existing composite index on (rsvp.status ASC, joinedAt ASC).
+ */
+export async function listConfirmedAttendees(
+  eventId: string,
+  limitCount = 6,
+): Promise<ConfirmedAttendee[]> {
+  const snapshot = await eventRef(eventId)
+    .collection(collections.members)
+    .where('rsvp.status', '==', 'yes')
+    .orderBy('joinedAt', 'asc')
+    .limit(limitCount)
+    .get();
+
+  return snapshot.docs.map((doc) => {
+    const member = doc.data() as MemberDoc;
+    return {
+      uid: member.uid,
+      displayName: member.displayName,
+      photoUrl: member.photoUrl,
+    };
+  });
+}
+
 async function loadNotes(eventId: string): Promise<Map<string, RsvpNoteDoc>> {
   const snapshot = await eventRef(eventId).collection(collections.rsvpNotes).limit(500).get();
   return new Map(snapshot.docs.map((doc) => [doc.id, doc.data() as RsvpNoteDoc]));
