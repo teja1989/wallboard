@@ -339,3 +339,34 @@ to change one of them.
   validated a date, a venue, a dress code, who the invitation is from and every RSVP setting,
   then mapped five fields and dropped the rest — so a host who typed the wrong date could not
   fix it, and the request came back 200. If a schema names a field, grep the handler for it.
+
+- **A permission with no route is a promise nobody kept.** Five `admin:*` permissions sat in
+  `roles.config.ts` being enforced by `can()` and reachable from nowhere. The worst was
+  `admin:suspendUser`: `requireActor()` refuses a suspended account on every write, `can()` has
+  a rule for it, `firestore.rules` protects the field — and nothing in the product could set
+  it. Every layer of a feature existed except the one that triggers it, and each layer looked
+  complete on its own.
+
+  `tests/unit/admin-console.test.ts` now holds the whole `admin:*` set against the console's
+  section config and fails on anything reachable from nowhere that is not *named* as
+  deliberately parked. Adding a permission means wiring it or explaining it.
+
+- **`docs/` can be more permissive than the code, and that reads as a promise.**
+  `SECURITY.md` said "a suspended account can still read", which is what `can()` says — but
+  `requireActor()` throws for a suspended caller several layers earlier, so `can()` is never
+  reached and every API call fails, reads included. The doc described a rule as behaviour.
+  When they disagree, find out which one runs before you decide which one is wrong.
+
+- **Firestore lists phantom parents, and `.data()` on one is `undefined`.** A deleted event
+  whose `funnel` subcollection still exists keeps appearing in a query over `events` as a
+  document that does not exist. Casting `snapshot.data()` to a domain type and reading a field
+  off it threw, and took the whole console screen down with a 500 the first time somebody
+  deleted an event. Any code that reads a *collection* rather than a known document must skip
+  a snapshot with no data and coerce the rest — a console is the tool you reach for when the
+  data is wrong, so it has to survive the data being wrong.
+
+- **A strict-mode violation in Playwright is not retried.** `expect(locator).toBeVisible()` on
+  a locator matching many elements throws immediately instead of waiting, so asserting on a
+  control inside a list that has not finished narrowing turns "not yet" into a hard failure.
+  Wait for the list with `toHaveCount(n)`, which does retry, and then reach inside it. This
+  passes by hand and fails under a loaded suite, which is the signature.

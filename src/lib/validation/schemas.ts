@@ -3,6 +3,7 @@ import {
   MILESTONE_CATEGORY_IDS,
   POST_KINDS,
   IMAGE_VARIANT_IDS,
+  adminLimits,
   contentLimits,
   defaultTemplateId,
   emailConfig,
@@ -515,6 +516,38 @@ export const updateAccountSchema = z.object({
   ),
 });
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
+/**
+ * Suspending an account, or lifting a suspension.
+ *
+ * The reason is required in both directions and has a floor on its length, because the point
+ * of writing it down is that somebody reading the audit log in six weeks can tell whether the
+ * call was right. "x" satisfies a required field and answers nothing.
+ *
+ * No defaults on either key — see the `.partial()`/`.default()` trap in the dev skill. This
+ * is a two-field body where both fields are the whole request, so an absent one has to fail
+ * rather than quietly resolve to `false`, which would turn a mis-shaped suspend request into
+ * a silent un-suspend.
+ */
+export const suspendUserSchema = z.object({
+  suspended: z.boolean(),
+  reason: cleanText(adminLimits.maxReasonLength).pipe(
+    z
+      .string()
+      .min(adminLimits.minReasonLength, 'Say why, so this is reviewable later.')
+      .max(adminLimits.maxReasonLength),
+  ),
+});
+export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+
+/**
+ * A console search box.
+ *
+ * Bounded and stripped like every other free text that reaches a query. It is compared, never
+ * interpolated — Firestore has no query language to inject into — but an unbounded string
+ * still becomes an unbounded document id lookup.
+ */
+export const adminQuerySchema = cleanText(200);
 
 export const sessionSchema = z.object({ idToken: z.string().min(20).max(8192) });
 

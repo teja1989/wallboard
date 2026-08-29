@@ -64,6 +64,16 @@ locals {
         { path = "at", order = "DESCENDING" },
       ]
     }
+    # The console's audit filter takes one box and tries it as an event id, then as an
+    # actor id. The emulator will happily serve the second without this; production
+    # will not.
+    audit_by_actor = {
+      collection = "auditLogs"
+      fields = [
+        { path = "actorUid", order = "ASCENDING" },
+        { path = "at", order = "DESCENDING" },
+      ]
+    }
     members_by_role = {
       collection = "members"
       fields = [

@@ -561,6 +561,68 @@ describe('server-only collections', () => {
     await assertFails(getDoc(doc(member(), 'rateLimits', 'bucket-1')));
     await assertFails(setDoc(doc(member(), 'rateLimits', 'bucket-1'), { count: 0 }));
   });
+
+  it('keep an audit query unrunnable, not merely a single document unreadable', async () => {
+    /*
+      The console filters the log by actor. The rule denies the whole collection, but a
+      collection query is a separate evaluation from a document get, and "you cannot read
+      log-1" would not by itself stop somebody listing every action a named host has taken.
+    */
+    await assertFails(
+      getDocs(query(collection(member(), 'auditLogs'), where('actorUid', '==', 'host-uid'))),
+    );
+    await assertFails(
+      getDocs(query(collection(staff('owner'), 'auditLogs'), where('eventId', '==', EVENT_ID))),
+    );
+  });
+});
+
+describe('suspension', () => {
+  /*
+    Suspension is enforced in the API, and the API is the only thing that can write. These
+    assert the flank: a suspended account still holds a valid Firebase token, so the question
+    is what that token can do to Firestore directly while the app is refusing it.
+  */
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'member-uid'), {
+        uid: 'member-uid',
+        role: 'user',
+        suspendedAt: Date.now(),
+        suspendedReason: 'reported for abuse',
+      });
+    });
+  });
+
+  it('cannot be lifted by the account it was applied to', async () => {
+    // The whole mechanism would be decorative if the suspended party could clear the field
+    // from a browser console.
+    await assertFails(
+      setDoc(
+        doc(member(), 'users', 'member-uid'),
+        { suspendedAt: null, suspendedReason: null },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('cannot be applied to somebody else by an ordinary account', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'users', 'outsider-uid'), { suspendedAt: Date.now() }, { merge: true }),
+    );
+  });
+
+  it('cannot be applied by staff directly either — it goes through the audited route', async () => {
+    // Staff read any profile. Nobody writes one: a suspension with no audit entry behind it
+    // is a suspension nobody can explain later, so the rules refuse the shortcut.
+    await assertFails(
+      setDoc(doc(staff('owner'), 'users', 'member-uid'), { suspendedAt: null }, { merge: true }),
+    );
+  });
+
+  it('leaves the account still able to read its own profile, which is the design', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'users', 'member-uid')));
+  });
 });
 
 describe('unknown paths', () => {

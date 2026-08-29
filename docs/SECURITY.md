@@ -46,8 +46,27 @@ only `post:create` and `post:deleteOwn` — never moderation.
 
 ### Suspended accounts
 
-A suspended account can still read. Every write and every admin permission is refused,
-regardless of role. This is checked first in `can()`.
+**The API refuses a suspended account entirely** — reads included. `requireActor()` in
+`src/lib/server/api.ts` throws `forbidden` before any handler runs, and every route funnels
+through it, so `can()` is never consulted for a suspended caller.
+
+`can()` has its own narrower rule — a suspended actor keeps read permissions and loses every
+write and every `admin:*` — and it is checked first there. That is defence in depth for any
+future call site that resolves an actor without going through `requireActor()`; it is not the
+behaviour anybody observes today. This page previously described the `can()` rule as the
+product's behaviour, which was wrong in the direction that matters: it read as more permissive
+than the code.
+
+What a suspended account *does* keep is whatever the Firestore rules allow their token
+directly — their own profile, and events they are a member of. That is deliberate. Suspension
+is meant to stop somebody posting, not to confiscate their own photographs, and the rules test
+in `tests/rules/` asserts both halves: they can still read their profile, and they cannot lift
+their own suspension.
+
+Set through `POST /api/admin/users/{uid}/suspend` (`admin:suspendUser`), which refuses to
+suspend the caller or anyone at or above their own platform rank, and audits both directions.
+Nothing writes `suspendedAt` from a client; the rules deny it to staff too, so a suspension
+without an audit entry behind it cannot exist.
 
 ## Sessions
 

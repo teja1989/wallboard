@@ -984,9 +984,223 @@ async function main() {
       (rollup.payload?.data?.totals?.rsvpAnswered ?? 0) >= 2,
       JSON.stringify(rollup.payload?.data?.totals),
     );
+    // --- the rest of the console ------------------------------------------
+    /*
+      Five `admin:*` permissions were declared, enforced by `can()`, and reachable from
+      nowhere — `admin:suspendUser` among them, which meant `Actor.suspended` gated every
+      write in the product and nothing could set the field.
+
+      These assert the whole console at the owner, and each route again at a host and a
+      code-only guest below. The negative cases matter more than the positive one: a console
+      that works is worth less than a console that cannot be opened by the wrong person.
+    */
+    const adminEvents = await call(owner.session, '/api/admin/events');
+    check(
+      'the owner lists every event',
+      adminEvents.status === 200 && Array.isArray(adminEvents.payload?.data?.events),
+      JSON.stringify(adminEvents.payload).slice(0, 200),
+    );
+    check(
+      'the list reaches events the owner does not host',
+      (adminEvents.payload?.data?.events ?? []).some((row) => row.hostUid !== owner.actor?.uid),
+      'no event from another host in the list',
+    );
+
+    const byId = await call(owner.session, `/api/admin/events?q=${encodeURIComponent(eventId)}`);
+    check(
+      'pasting an event id finds exactly that event',
+      byId.payload?.data?.events?.length === 1 && byId.payload.data.events[0].id === eventId,
+      JSON.stringify(byId.payload?.data?.events?.map((row) => row.id)),
+    );
+
+    const noMatch = await call(owner.session, '/api/admin/events?q=zzz-nothing-matches-this');
+    check(
+      'a search with no match is an empty list, not an error',
+      noMatch.status === 200 && noMatch.payload?.data?.events?.length === 0,
+      `status ${noMatch.status}`,
+    );
+
+    const adminUsers = await call(owner.session, '/api/admin/users');
+    check(
+      'the owner lists accounts',
+      adminUsers.status === 200 && Array.isArray(adminUsers.payload?.data?.users),
+      JSON.stringify(adminUsers.payload).slice(0, 200),
+    );
+
+    const hostRow = await call(
+      owner.session,
+      `/api/admin/users?q=${encodeURIComponent(host.actor.email)}`,
+    );
+    check(
+      'an exact email address finds the account',
+      hostRow.payload?.data?.users?.length === 1 &&
+        hostRow.payload.data.users[0].email === host.actor.email,
+      JSON.stringify(hostRow.payload?.data?.users),
+    );
+
+    const hostUid = hostRow.payload?.data?.users?.[0]?.uid;
+
+    // --- suspension, the one write the console has ------------------------
+    const noReason = await call(owner.session, `/api/admin/users/${hostUid}/suspend`, {
+      method: 'POST',
+      body: { suspended: true },
+    });
+    check(
+      'suspending without saying why is refused',
+      noReason.status === 400,
+      `status ${noReason.status}`,
+    );
+
+    const suspendSelf = await call(owner.session, `/api/admin/users/${owner.actor?.uid}/suspend`, {
+      method: 'POST',
+      body: { suspended: true, reason: 'testing the guard' },
+    });
+    check(
+      'an operator cannot suspend themselves out of the console',
+      suspendSelf.status === 400,
+      `status ${suspendSelf.status}`,
+    );
+
+    const suspended = await call(owner.session, `/api/admin/users/${hostUid}/suspend`, {
+      method: 'POST',
+      body: { suspended: true, reason: 'smoke test, lifted immediately' },
+    });
+    check(
+      'the owner suspends an account',
+      suspended.status === 200 && suspended.payload?.data?.user?.suspendedAt !== null,
+      JSON.stringify(suspended.payload).slice(0, 200),
+    );
+
+    /*
+      The assertion the whole feature exists for. `currentActor` re-reads the profile every
+      request, so this takes effect on the suspended account's very next call — with no
+      sign-out, so they get an explanation rather than a mysterious logout.
+    */
+    const blocked = await call(host.session, '/api/events/create', {
+      method: 'POST',
+      body: {
+        title: 'Should never exist',
+        occasion: 'party',
+        hostedBy: 'A suspended host',
+        expiryPresetId: '24h',
+        allowedKinds: ['text'],
+      },
+    });
+    check(
+      'a suspended account can no longer write',
+      blocked.status === 403,
+      `status ${blocked.status}`,
+    );
+
+    /*
+      Reads are refused too, and this assertion is here because it is the opposite of what
+      docs/SECURITY.md used to claim.
+
+      `can()` does keep read permissions for a suspended actor — but `requireActor()` throws
+      `forbidden` before any handler runs, so nothing ever reaches that rule. The docs
+      described the matrix rule as the product's behaviour, which read as more permissive than
+      the code actually is. Both have been corrected to say this; the assertion is what stops
+      them drifting apart again.
+    */
+    const stillReads = await call(host.session, '/api/events/mine');
+    check(
+      'a suspended account is refused reads through the API as well',
+      stillReads.status === 403,
+      `status ${stillReads.status}`,
+    );
+
+    const lifted = await call(owner.session, `/api/admin/users/${hostUid}/suspend`, {
+      method: 'POST',
+      body: { suspended: false, reason: 'smoke test finished' },
+    });
+    check(
+      'the suspension lifts',
+      lifted.status === 200 && lifted.payload?.data?.user?.suspendedAt === null,
+      JSON.stringify(lifted.payload).slice(0, 200),
+    );
+
+    const writesAgain = await call(host.session, `/api/events/${eventId}/settings`, {
+      method: 'PATCH',
+      body: { description: 'Writing again after the suspension lifted.' },
+    });
+    check(
+      'and the account writes again straight away',
+      writesAgain.status === 200,
+      `status ${writesAgain.status}`,
+    );
+
+    // --- the audit trail ---------------------------------------------------
+    const audit = await call(owner.session, '/api/admin/audit');
+    check(
+      'the owner reads the audit trail',
+      audit.status === 200 && Array.isArray(audit.payload?.data?.entries),
+      JSON.stringify(audit.payload).slice(0, 200),
+    );
+    check(
+      'both halves of the suspension are in it',
+      ['user.suspended', 'user.unsuspended'].every((action) =>
+        (audit.payload?.data?.entries ?? []).some((entry) => entry.action === action),
+      ),
+      JSON.stringify((audit.payload?.data?.entries ?? []).slice(0, 5).map((e) => e.action)),
+    );
+
+    // Promised in docs/SECURITY.md since v1 and never implemented until now: reading the log
+    // leaves an entry of its own, so an operator browsing everyone's activity is on the record.
+    const auditAgain = await call(owner.session, '/api/admin/audit');
+    check(
+      'reading the log is itself recorded',
+      (auditAgain.payload?.data?.entries ?? []).some(
+        (entry) => entry.action === 'admin.auditViewed',
+      ),
+      JSON.stringify((auditAgain.payload?.data?.entries ?? []).slice(0, 3).map((e) => e.action)),
+    );
+
+    const filtered = await call(
+      owner.session,
+      `/api/admin/audit?q=${encodeURIComponent(eventId)}`,
+    );
+    check(
+      'the filter narrows to one event and nothing else',
+      filtered.status === 200 &&
+        filtered.payload?.data?.entries?.length > 0 &&
+        filtered.payload.data.entries.every((entry) => entry.eventId === eventId),
+      JSON.stringify(filtered.payload?.data?.entries?.slice(0, 3)),
+    );
   } else {
-    console.log('  SKIP  owner rollup (OWNER_EMAILS not set in this environment)');
+    console.log('  SKIP  owner console (OWNER_EMAILS not set in this environment)');
   }
+
+  // --- who cannot reach the console ----------------------------------------
+  // Asserted outside the owner block, because these are the checks that must run in every
+  // environment. A missing OWNER_EMAILS should never skip the refusals.
+  for (const path of ['/api/admin/events', '/api/admin/users', '/api/admin/audit']) {
+    const asHost = await call(host.session, path);
+    check(`a host is refused ${path}`, asHost.status === 403, `status ${asHost.status}`);
+
+    const asGuest = await call(guest.session, path);
+    check(
+      `a code-only visitor is refused ${path}`,
+      asGuest.status === 401 || asGuest.status === 403,
+      `status ${asGuest.status}`,
+    );
+
+    const asStranger = await call(newSession(), path);
+    check(
+      `a signed-out visitor is refused ${path}`,
+      asStranger.status === 401,
+      `status ${asStranger.status}`,
+    );
+  }
+
+  const hostSuspends = await call(host.session, `/api/admin/users/${host.actor.uid}/suspend`, {
+    method: 'POST',
+    body: { suspended: true, reason: 'trying it on' },
+  });
+  check(
+    'a host cannot suspend anybody, including themselves',
+    hostSuspends.status === 403,
+    `status ${hostSuspends.status}`,
+  );
 
   // --- the gift list --------------------------------------------------------
   // The whole point of this feature is one number — do guests click? — so the read path,

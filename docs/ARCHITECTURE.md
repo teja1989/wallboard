@@ -462,9 +462,22 @@ their wall back intact.
 - **No video transcoding.** Files are stored as uploaded, with duration and size caps
   instead. `features.transcoding` reserves the seam; enabling it will not change the post
   schema.
-- **No admin console yet.** The role model, audit log, and `can()` matrix that it needs all
-  ship now, because retrofitting those is how gaps get left behind. See
-  [ROADMAP.md](./ROADMAP.md).
+- **The operator console is deliberately small.** `/admin` has four screens — events, people,
+  the audit trail and the funnel — behind `features.adminConsole` and, individually, behind
+  `admin:*` permissions that no event role can satisfy. Everything reads except suspension,
+  which is reversible and audited both ways.
+
+  Three admin permissions stay unreachable on purpose, and `tests/unit/admin-console.test.ts`
+  fails if any of them quietly grows a route: `admin:manageFeatureFlags` (a flag belongs in a
+  reviewed commit, not a console toggle at 2am), `admin:grantRole` (a console that can rewrite
+  authorization is a far larger security surface than one that can read and suspend — the
+  operator arrives through `OWNER_EMAILS`), and `admin:purgeStorage` (destructive, and served
+  by the existing delete flow).
+
+  That test exists because of what it found: five `admin:*` permissions were declared,
+  enforced by `can()`, and reachable from nowhere. `admin:suspendUser` was among them, which
+  meant `Actor.suspended` gated every write in the product while nothing could set the field —
+  the launch-day answer to an abuse report was to edit a Firestore document by hand.
 - **No payment path.** The entitlement gates are written and tested; only Stripe is missing.
   See [PRICING.md](./PRICING.md) for what turning it on involves.
 - **No email delivery.** Invitations are shared as a link or a code. Sending them by email is

@@ -1,5 +1,7 @@
+export * from './admin.config';
 export * from './analytics.config';
 export * from './app.config';
+export * from './audit.config';
 export * from './billing.config';
 export * from './branding.config';
 export * from './calendar.config';

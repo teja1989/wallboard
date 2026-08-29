@@ -1424,6 +1424,145 @@ test.describe('the no-ads promise', () => {
   });
 });
 
+/*
+  The operator console.
+
+  Until this landed the console had no end-to-end coverage of any kind — and for most of its
+  life it had nothing to cover, because five `admin:*` permissions were enforced and reachable
+  from nowhere. The refusals are asserted unconditionally; the positive path needs an account
+  the *server* calls an owner, so it is skipped rather than guessed when the address is not
+  known to this process, exactly as the smoke script does.
+
+  Locally:  OWNER_EMAILS=$(grep OWNER_EMAILS .env.local | cut -d= -f2) npx playwright test
+*/
+const OWNER_EMAIL = (process.env.OWNER_EMAILS ?? '').split(',')[0]?.trim() ?? '';
+const OWNER_EMAILS_MISSING = OWNER_EMAIL.length === 0;
+
+test.describe('the operator console', () => {
+  test('turns an ordinary account away, with a reason rather than a blank screen', async ({
+    page,
+  }) => {
+    await signIn(page, uniqueEmail('nosy'));
+
+    for (const path of ['/admin/events', '/admin/users', '/admin/audit', '/admin/funnel']) {
+      await page.goto(path);
+      // The page renders — the gate is the API, not the route — and says why it is empty.
+      // A spinner that never resolves would be the failure mode worth catching here.
+      await expect(page.getByRole('alert')).toBeVisible();
+    }
+  });
+
+  test('turns a signed-out visitor away too', async ({ page }) => {
+    await page.goto('/admin/users');
+    await expect(page.getByRole('alert')).toBeVisible();
+    // And never renders a row of somebody's account while it does so.
+    await expect(page.getByRole('button', { name: 'Suspend', exact: true })).toHaveCount(0);
+  });
+
+  test('is not linked from anywhere a guest or host would find it', async ({ page }) => {
+    await signIn(page, uniqueEmail('host'));
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /operations/i })).toHaveCount(0);
+    await expect(page.locator('a[href^="/admin"]')).toHaveCount(0);
+  });
+
+  test.describe('as the operator', () => {
+    test.skip(OWNER_EMAILS_MISSING, 'OWNER_EMAILS is not set in this environment');
+
+    test('opens on the sections, each described by the job it does', async ({ page }) => {
+      await signIn(page, OWNER_EMAIL);
+      await page.goto('/admin');
+
+      await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
+      for (const label of ['Events', 'People', 'Audit', 'Funnel']) {
+        await expect(page.getByRole('navigation', { name: 'Operations' })).toContainText(label);
+      }
+      // The takedown path, said out loud on the card rather than left to be inferred.
+      await expect(page.getByText(/where a post can be taken down/i)).toBeVisible();
+    });
+
+    test('finds an event by its id and links through to it', async ({ page }) => {
+      await signIn(page, OWNER_EMAIL);
+      // Unique per run: the emulator keeps its data between runs, so a fixed title finds
+      // yesterday's event as well as today's and the assertion goes ambiguous.
+      const title = `Console lookup ${Date.now()}`;
+      const event = await createEvent(page, title);
+
+      await page.goto('/admin/events');
+      await page.getByPlaceholder(/paste an event id/i).fill(event.eventId);
+      await page.getByRole('button', { name: 'Search' }).click();
+
+      // Exactly one: an id match short-circuits rather than also matching titles.
+      const link = page.getByRole('link', { name: title });
+      await expect(link).toHaveCount(1);
+      await expect(link).toHaveAttribute('href', `/e/${event.eventId}`);
+    });
+
+    test('will not suspend anybody until a reason is typed', async ({ page }) => {
+      await signIn(page, OWNER_EMAIL);
+      const target = uniqueEmail('tobesuspended');
+
+      // Give the account a session so it exists to be found.
+      const other = await page.context().browser()!.newContext();
+      const otherPage = await other.newPage();
+      await signIn(otherPage, target);
+
+      await page.goto('/admin/users');
+      await page.getByPlaceholder(/paste a user id/i).fill(target);
+      await page.getByRole('button', { name: 'Search' }).click();
+
+      /*
+        Wait for the list to narrow before reaching for a control inside it.
+
+        `toBeVisible` on a locator matching many elements is a strict-mode violation, and a
+        strict-mode violation throws immediately rather than being retried — so asserting on
+        the button first turns "the results have not arrived yet" into a hard failure instead
+        of a wait. `toHaveCount` retries, so it is the right way to wait for a list to settle.
+      */
+      const suspend = page.getByRole('button', { name: 'Suspend', exact: true });
+      await expect(suspend).toHaveCount(1);
+      // A suspension with no reason is unreviewable six weeks later, so the control is
+      // inert until there is one — the server refuses it as well.
+      await expect(suspend).toBeDisabled();
+
+      await page.getByPlaceholder(/reported for abuse/i).fill('e2e test, lifted immediately');
+      await expect(suspend).toBeEnabled();
+      await suspend.click();
+
+      await expect(page.getByText('Suspended', { exact: true })).toBeVisible();
+
+      // Put it back, so the run leaves nothing suspended behind it.
+      await page.getByPlaceholder(/reported for abuse/i).fill('e2e test finished');
+      await page.getByRole('button', { name: /lift suspension/i }).click();
+      await expect(page.getByText('Suspended', { exact: true })).toHaveCount(0);
+
+      await other.close();
+    });
+
+    test('shows the audit trail, including the read of it', async ({ page }) => {
+      await signIn(page, OWNER_EMAIL);
+      await page.goto('/admin/audit');
+
+      await expect(page.getByRole('cell', { name: 'admin.auditViewed' }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      // IP and user agent are stored on every entry and deliberately not rendered.
+      await expect(page.getByRole('columnheader', { name: 'Detail' })).toBeVisible();
+      await expect(page.getByRole('columnheader', { name: /ip/i })).toHaveCount(0);
+    });
+
+    test('reads the funnel, with a denominator beside every ratio', async ({ page }) => {
+      await signIn(page, OWNER_EMAIL);
+      await page.goto('/admin/funnel');
+
+      await expect(page.getByRole('heading', { name: 'What these decide' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'The counters themselves' })).toBeVisible();
+      // A percentage with no denominator beside it is the thing this board exists not to show.
+      await expect(page.getByText(/\d+ of \d+/).first()).toBeVisible();
+    });
+  });
+});
+
 test.describe('accessibility and theming', () => {
   test('every page renders in dark mode without console errors', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });

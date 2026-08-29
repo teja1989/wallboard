@@ -70,7 +70,11 @@ export interface AuthzContext {
  * Decides a single permission.
  *
  * Ordering matters:
- *  1. A suspended account can do nothing but read.
+ *  1. A suspended account can do nothing but read. Note that no API route reaches this rule
+ *     with a suspended actor: `requireActor()` refuses one outright, several layers earlier.
+ *     Kept as defence in depth for any call site that resolves an actor another way — and so
+ *     that the matrix stays true on its own terms — but see `docs/SECURITY.md`, which used to
+ *     describe this rule as the product's observable behaviour and no longer does.
  *  2. Anonymous (code-only) identities never get write or admin permissions.
  *  3. `admin:*` permissions are satisfiable only by a platform role, never by being a host.
  *  4. Otherwise platform role and event role are both consulted.

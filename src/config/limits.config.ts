@@ -245,6 +245,14 @@ export const rateLimits = {
   // The one route in the app that costs money per call. Generous enough for someone
   // typing an address a few times, tight enough that a loop cannot run up a bill.
   placesSearchPerUser: { limit: 100, windowMs: HOUR },
+  /*
+    Operator screens. Limited despite being staff-only, because the account holding an
+    operator role is the most valuable one to steal and a stolen session should not be able
+    to enumerate the whole user table at machine speed. Loose enough that nobody doing the
+    job ever meets it.
+  */
+  adminReadPerUser: { limit: 300, windowMs: 10 * MINUTE },
+  adminSuspendPerUser: { limit: 30, windowMs: HOUR },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof rateLimits;

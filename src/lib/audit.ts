@@ -1,53 +1,22 @@
 import 'server-only';
-import { collections } from '@/config';
+import { AUDIT_ACTIONS, collections, type AuditAction } from '@/config';
 import { db } from '@/lib/firebase/admin';
 import type { Actor, AuditLogDoc } from '@/types/domain';
 
 /**
  * Append-only audit trail. Written for every privileged action from v1, before the admin
- * console exists — a log that starts when the console ships would have no history to show,
- * and retrofitting call sites is how gaps get left behind.
+ * console existed — a log that starts when its console does has nothing to show about the
+ * incident that made somebody open it, and retrofitting call sites is how gaps get left
+ * behind.
  *
- * Clients cannot read this collection (see firestore.rules); the phase-2 console reads it
- * through an admin API so that reading the log is itself an auditable action.
+ * Clients cannot read this collection (see firestore.rules); the console reads it through
+ * `/api/admin/audit`, which records the read.
+ *
+ * The action names themselves live in `audit.config.ts`: this module is `server-only`, and the
+ * console and its tests need the list.
  */
-
-export const AUDIT_ACTIONS = [
-  'event.create',
-  'event.update',
-  'event.end',
-  'event.extend',
-  'event.delete',
-  'event.archive',
-  'event.join',
-  'event.joinFailed',
-  'event.codeViewed',
-  'event.codeRotated',
-  'rsvp.respond',
-  'rsvp.change',
-  'rsvp.export',
-  'invite.add',
-  'invite.remove',
-  'invite.send',
-  'invite.remind',
-  'invite.unsubscribe',
-  'registry.add',
-  'registry.remove',
-  'billing.checkoutStarted',
-  'billing.eventUnlocked',
-  'billing.subscriptionActive',
-  'billing.subscriptionEnded',
-  'post.create',
-  'post.delete',
-  'member.mute',
-  'member.remove',
-  'user.renamed',
-  'user.roleGranted',
-  'user.suspended',
-  'system.cleanup',
-] as const;
-
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export { AUDIT_ACTIONS };
+export type { AuditAction };
 
 export interface AuditEntry {
   action: AuditAction;

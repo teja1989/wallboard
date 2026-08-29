@@ -13,7 +13,14 @@ export interface FeatureFlags {
    * Turning it on activates the plan gates with no other code change.
    */
   billing: boolean;
-  /** Phase 2 — owner/admin console at /admin. */
+  /**
+   * The operator console at `/admin`.
+   *
+   * On, because the thing it gates now exists. It is a kill switch rather than a permission:
+   * every screen under it is gated again by `admin:*` at its own API, and by Firestore rules
+   * denying the collections to clients outright. Turning this off makes the console 404 —
+   * useful if something under there ever misbehaves — and takes no authorization with it.
+   */
   adminConsole: boolean;
   /** Phase 3 — Cloud Vision SafeSearch on uploaded media. */
   safetyScan: boolean;
@@ -32,7 +39,7 @@ export interface FeatureFlags {
 
 export const defaultFeatureFlags: FeatureFlags = {
   billing: false,
-  adminConsole: false,
+  adminConsole: true,
   safetyScan: false,
   contentReporting: false,
   ads: false,
