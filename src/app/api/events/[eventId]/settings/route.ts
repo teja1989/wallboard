@@ -34,7 +34,7 @@ export const PATCH = route(async (request, { params }: Params) => {
   if (input.whoCanPost !== undefined) assertWhoCanPostAllowed(input.whoCanPost);
 
   const update: Record<string, unknown> = {};
-  const set = <T,>(path: string, value: T | undefined) => {
+  const set = <T>(path: string, value: T | undefined) => {
     if (value !== undefined) update[path] = value;
   };
 

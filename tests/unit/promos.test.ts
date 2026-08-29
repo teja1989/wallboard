@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activePromo, bestPlan, promos, type Promo } from '@/config';
+import { activePromo, anyActivePromo, bestPlan, promoCopy, promos, type Promo } from '@/config';
 
 /**
  * Promos.
@@ -78,5 +78,60 @@ describe('bestPlan', () => {
 
   it('is order-independent', () => {
     expect(bestPlan('free', 'pro')).toBe(bestPlan('pro', 'free'));
+  });
+});
+
+/**
+ * Being seen.
+ *
+ * A promo used to be resolved at creation, recorded in the audit log, and mentioned to
+ * nobody: a host got a free upgrade without being told, and the pricing page said nothing
+ * while a window was open. A promo nobody notices attracts nobody, which is the only reason
+ * to run one — so the marketing surfaces need a resolver that does not require an event.
+ */
+describe('a promo the world can see', () => {
+  it('finds one without being told an occasion', () => {
+    const table = [promo({ occasions: ['birthday'] })];
+    // The pricing page has no event and therefore no occasion, and still has to say this.
+    expect(anyActivePromo(NOW, table)?.id).toBe('launch');
+  });
+
+  it('respects the window exactly as the per-event resolver does', () => {
+    const table = [promo()];
+    expect(anyActivePromo(NOW - 2 * DAY, table)).toBeNull();
+    expect(anyActivePromo(NOW + 2 * DAY, table)).toBeNull();
+    // Half-open, so two back-to-back windows are never both live.
+    expect(anyActivePromo(table[0]!.endsAt, table)).toBeNull();
+    expect(anyActivePromo(table[0]!.startsAt, table)?.id).toBe('launch');
+  });
+
+  it('picks the same winner as the per-event resolver when both apply', () => {
+    // Two surfaces disagreeing about which promo is on would be worse than neither showing.
+    const table = [
+      promo({ id: 'small', grantsPlanId: 'event' }),
+      promo({ id: 'big', grantsPlanId: 'pro' }),
+    ];
+    expect(anyActivePromo(NOW, table)?.id).toBe('big');
+    expect(activePromo('birthday', NOW, table)?.id).toBe('big');
+  });
+
+  it('says what a scoped promo is scoped to, and stays quiet when it is not', () => {
+    // A partial offer read as a general one is a promise we would then have to break.
+    const scoped = promo({ occasions: ['birthday'] });
+    expect(promoCopy.limitedTo(scoped, ['birthdays'])).toContain('birthdays');
+    expect(promoCopy.limitedTo(promo({ occasions: null }), [])).toBe('');
+  });
+
+  it('explains a grant in terms of the plan the host actually got', () => {
+    expect(promoCopy.granted(promo(), 'One event')).toContain('One event');
+  });
+});
+
+describe('the shipped promo table', () => {
+  it('is empty, so nothing here is live by accident', () => {
+    // The machinery is exercised by the tables above. This asserts the *shipped* one is
+    // deliberate — a promo has real storage costs and belongs in a reviewed commit.
+    expect(promos).toEqual([]);
+    expect(anyActivePromo()).toBeNull();
   });
 });

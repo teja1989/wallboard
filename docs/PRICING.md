@@ -141,3 +141,44 @@ the question that decides whether people trust us with the event at all.
 - **Ads on the free tier, for now.** See `ADS_MARKETING.md`. The free tier's job is to make
   hosts, and hosts become customers; monetising their guests' attention directly would earn
   pennies and cost the thing that actually works.
+
+## Running a promo
+
+Promos are a config table, not a console. A window has real costs — granting the `event` plan
+means 5 GB for 30 days per event created in it, billed whether or not the host returns — so it
+belongs in a commit somebody reviewed rather than behind a button at 2am.
+
+To run one, add an entry to `promos` in `src/config/promos.config.ts` and push. The deploy is
+automatic on the working branch, so the round trip is a couple of minutes.
+
+```ts
+export const promos: readonly Promo[] = [
+  {
+    id: 'launch-week',
+    label: 'Launch week',
+    grantsPlanId: 'event',
+    startsAt: Date.UTC(2026, 8, 1),
+    endsAt: Date.UTC(2026, 8, 8),
+    // Null for everyone. Naming occasions makes it an experiment rather than a discount.
+    occasions: ['birthday', 'graduation'],
+  },
+];
+```
+
+**Keep the window short.** It is the only thing bounding how many grants go out; the plan's
+own lifetime bounds what each one costs.
+
+What a live promo does, once it is there:
+
+- **The pricing page** carries a banner naming it, and says what it is limited to when it is
+  scoped. Resolved per request, so opening a window does not wait on a rebuild.
+- **The create form** already asks `grantedPlanForNewEvent`, so themes and expiry options that
+  the promo unlocks are selectable while it runs.
+- **The screen after publishing** explains the upgrade — "One event is on us for this one".
+  Without that a host reads a free upgrade as a billing mistake.
+- **The audit log** records the promo id against `event.create`, which is what makes "did that
+  window produce retained hosts or just cheap events" answerable afterwards.
+
+A grant is stamped on the event at creation and never revisited. When the window closes,
+events made inside it keep what they were given — see `entitlements.ts` for why anything else
+would be the dated landmine that shipped once already.

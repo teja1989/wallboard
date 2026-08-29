@@ -281,7 +281,6 @@ export async function createEvent(actor: Actor, input: CreateEventInput): Promis
     settings: {
       whoCanPost: input.whoCanPost,
       allowedKinds: input.allowedKinds,
-      moderated: false,
     },
     plan,
     createdAt: now,

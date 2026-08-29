@@ -16,6 +16,9 @@ import {
   occasions,
   createGate,
   partySizeChoices,
+  activePromo,
+  promoCopy,
+  planById,
   type PostKind,
 } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -162,6 +165,13 @@ export default function CreateEventPage() {
   // billing is off, plus any promo running today. Asked rather than assumed, because a form
   // that greys out a theme the server would have accepted is worse than no lock at all.
   const planId = useMemo(() => grantedPlanForNewEvent(occasionId), [occasionId]);
+
+  /*
+    Why the plan is what it is. The grant was resolved silently and recorded in the audit log,
+    so a host got a free upgrade and was never told — and a promo nobody notices attracts
+    nobody, which is the only reason to run one.
+  */
+  const promo = useMemo(() => activePromo(occasionId), [occasionId]);
 
   /**
    * The same fields, shaped the way the real invitation component wants them, so the preview
@@ -478,6 +488,7 @@ export default function CreateEventPage() {
       <CreatedPanel
         title={created.event.title}
         code={created.joinCode}
+        promoNote={promo ? promoCopy.granted(promo, planById(planId).label) : null}
         onCopied={() => notify('Copied', 'success')}
         onOpen={() => router.push(`/e/${created.event.id}`)}
         // Straight to the guest list, which is the next thing a host actually needs to do.
@@ -813,6 +824,8 @@ export default function CreateEventPage() {
 interface CreatedPanelProps {
   title: string;
   code: string;
+  /** Explains a granted upgrade. Null when the plan was not raised by a promo. */
+  promoNote: string | null;
   onCopied: () => void;
   onOpen: () => void;
   /** The primary action: the guest list, which is where the tracked path starts. */
@@ -823,7 +836,14 @@ interface CreatedPanelProps {
  * The code is shown once, here. Re-reading it later is a separate audited call from inside
  * the event, so it never turns up in a payload someone could stumble across.
  */
-function CreatedPanel({ title, code, onCopied, onOpen, onAddGuests }: CreatedPanelProps) {
+function CreatedPanel({
+  title,
+  code,
+  promoNote,
+  onCopied,
+  onOpen,
+  onAddGuests,
+}: CreatedPanelProps) {
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
   // The invitation link, not the event URL: `/e/{id}` turns away everyone who is not
   // already a member, which is every person this gets shared with.
@@ -855,6 +875,13 @@ function CreatedPanel({ title, code, onCopied, onOpen, onAddGuests }: CreatedPan
         Add the people you are inviting and everyone gets their own link — so you can see who opened
         it and who has not.
       </p>
+
+      {/* An upgrade nobody explained reads as a billing mistake rather than a gift. */}
+      {promoNote && (
+        <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+          {promoNote}
+        </p>
+      )}
 
       {/*
         The primary action is the guest list, and it was not.

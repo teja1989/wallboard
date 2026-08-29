@@ -81,3 +81,49 @@ export function activePromo(
 
   return best;
 }
+
+/**
+ * Any promo live right now, regardless of occasion.
+ *
+ * `activePromo` needs an occasion because a grant is per event; a marketing surface has no
+ * event yet and still has to be able to say "this is on". Returns the most generous, matching
+ * `activePromo`'s tie-break so the two can never advertise different things.
+ */
+export function anyActivePromo(
+  now: number = Date.now(),
+  table: readonly Promo[] = promos,
+): Promo | null {
+  let best: Promo | null = null;
+
+  for (const promo of table) {
+    if (now < promo.startsAt || now >= promo.endsAt) continue;
+    if (!best || rank(promo.grantsPlanId) > rank(best.grantsPlanId)) best = promo;
+  }
+
+  return best;
+}
+
+/**
+ * What a promo says out loud.
+ *
+ * A promo that nobody notices attracts nobody, which was the state of this until now: the
+ * grant was resolved at creation, recorded in the audit log, and mentioned to no one. A host
+ * got a free upgrade without being told, and nothing anywhere said a window was open.
+ */
+export const promoCopy = {
+  /** On the pricing page, above the table. */
+  banner: (promo: Promo) => `${promo.label} — on us right now.`,
+
+  /** On the create form, before they commit, when their occasion qualifies. */
+  applies: (promo: Promo) => `${promo.label}. Nothing to enter — it is already applied.`,
+
+  /** After publishing, so the upgrade is explained rather than mysterious. */
+  granted: (promo: Promo, planLabel: string) =>
+    `${planLabel} is on us for this one — ${promo.label.toLowerCase()}.`,
+
+  /** Said where a promo is scoped, so nobody reads a partial offer as a general one. */
+  limitedTo: (promo: Promo, occasionLabels: readonly string[]) =>
+    occasionLabels.length === 0 || promo.occasions === null
+      ? ''
+      : `Applies to ${occasionLabels.join(', ')}.`,
+} as const;

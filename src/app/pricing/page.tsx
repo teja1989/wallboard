@@ -1,7 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Check } from 'lucide-react';
-import { adFreePromiseHolds, brand, formatPrice, planOrder, plans } from '@/config';
+import {
+  adFreePromiseHolds,
+  anyActivePromo,
+  brand,
+  formatPrice,
+  occasionById,
+  planOrder,
+  plans,
+  promoCopy,
+} from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { cn } from '@/lib/utils';
@@ -24,6 +33,13 @@ export const metadata: Metadata = {
  */
 export default function PricingPage() {
   const preview = isPreviewPricing();
+  /*
+    A promo that nobody notices attracts nobody, and that was exactly the state of this: a
+    window could be open, grants could be going out, and the page anyone came to read said
+    nothing about it. Resolved per request rather than at build, so a window opening does not
+    wait for a deploy to become visible.
+  */
+  const promo = anyActivePromo();
 
   return (
     <>
@@ -45,6 +61,17 @@ export default function PricingPage() {
             <p className="mx-auto mt-6 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-5 py-2.5 text-sm font-medium">
               <BadgeCheck className="size-4 text-[var(--accent)]" aria-hidden />
               {brand.noAds.badge}
+            </p>
+          )}
+
+          {/* Above the preview note, because a dated window is the more urgent of the two. */}
+          {promo && (
+            <p className="mx-auto mt-6 max-w-2xl rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed">
+              <strong className="font-semibold">{promoCopy.banner(promo)}</strong>{' '}
+              {promoCopy.limitedTo(
+                promo,
+                (promo.occasions ?? []).map((id) => occasionById(id).label.toLowerCase()),
+              )}
             </p>
           )}
 

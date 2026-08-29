@@ -91,7 +91,7 @@ export function previewEventFromDraft(draft: InvitationDraft): EventDoc {
       autoRemind: true,
     },
     rsvpTally: { yes: 0, no: 0, maybe: 0, pending: 0, attending: 0 },
-    settings: { whoCanPost: 'members', allowedKinds: draft.allowedKinds, moderated: false },
+    settings: { whoCanPost: 'members', allowedKinds: draft.allowedKinds },
     // The plan the event would actually be created on, so a host on a plan that removes the
     // branding line sees it gone here too rather than being surprised in either direction.
     plan: draft.planId,

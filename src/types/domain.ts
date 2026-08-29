@@ -67,8 +67,17 @@ export interface EventSettings {
   /** Who may post: members only, or anyone holding the code. */
   whoCanPost: 'members' | 'anyone';
   allowedKinds: readonly PostKind[];
-  /** Require host approval before a post appears. Reserved for phase 3. */
-  moderated: boolean;
+  /*
+    `moderated` used to sit here, written `false` on every event and read by nothing —
+    a field that implied a capability the product did not have.
+
+    Removed rather than implemented. The intent it stood for lives in
+    `features.config.ts` as `safetyScan` and `contentReporting`, which is the documented
+    place for planned-but-unshipped; a boolean on every stored document is not a plan, it
+    is residue. Approval queues need a post state, a queue and a notification when they
+    arrive, so the boolean would not have survived the feature anyway. Old documents keep
+    a harmless orphan copy: nothing reads it.
+  */
 }
 
 /** Where the event happens. All optional — plenty of invitations are "ours, 8pm". */

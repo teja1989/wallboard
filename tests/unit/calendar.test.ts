@@ -43,7 +43,7 @@ function event(overrides: Partial<EventDoc> = {}): EventDoc {
       question: null,
     },
     rsvpTally: { yes: 0, no: 0, maybe: 0, pending: 0, attending: 0 },
-    settings: { whoCanPost: 'members', allowedKinds: ['text'], moderated: false },
+    settings: { whoCanPost: 'members', allowedKinds: ['text'] },
     plan: 'free',
     createdAt: NOW,
     expiresAt: NOW + 30 * 24 * 60 * 60 * 1000,
