@@ -2,9 +2,10 @@
 
 What is built, what is next, and what was deliberately not done.
 
-**If you are picking this work up cold**, read this file and [DECISIONS.md](./DECISIONS.md)
-first. This one tells you where the product is; that one tells you which choices are settled
-and which are yours to make.
+**If you are picking this work up cold**, read this file, then
+**[NEXT.md](./NEXT.md) — the next action plan** — then [DECISIONS.md](./DECISIONS.md). This one
+tells you where the product is; `NEXT.md` tells you what to pick up and how to know it is done;
+`DECISIONS.md` tells you which choices are settled and which are yours to make.
 
 ---
 
@@ -16,7 +17,7 @@ a manual verification nobody can automate — see [Before billing](#before-billi
 
 |            |                                                                                |
 | ---------- | ------------------------------------------------------------------------------ |
-| Test suite | 377 unit · 67 Firestore rules · 251 API smoke · 82 Playwright e2e              |
+| Test suite | 404 unit · 67 Firestore rules · 259 API smoke · 84 Playwright e2e              |
 | Live at    | `https://marqueersvp.com` on Cloud Run, provisioned by Terraform               |
 | Charging   | No. `features.billing` is `false`; every event runs on `previewPlanId` (`pro`) |
 | Ads        | No, and none coming — see [DECISIONS.md](./DECISIONS.md)                       |
@@ -141,69 +142,26 @@ Then, in order:
 
 ---
 
-## Next, in the order I would do it
+## Next
 
-### 1. Close the open loop in the shipped product
+**➡️ [docs/NEXT.md](./NEXT.md) — the next action plan.** Tracks in priority order, each with a
+_Done when_ you can check, plus the competitive research behind them.
 
-Small, and the same class of problem as the admin gap: something advertised with nothing behind it.
+This file says where the product is and what is already built. `NEXT.md` says what to pick up
+on Monday. It lives separately because a roadmap describes a direction and outlives any one
+decision, while a next-action list is meant to be worked through and emptied — and keeping both
+in one document is how the second one silently goes stale.
 
-- **`vanityLink`**, which the Pro plan sells and nothing implements. Build it or stop selling it;
-  do not launch a paid plan with a claim behind it that is not true.
+The short version, current as of the Partiful/Paperless Post research in `NEXT.md`:
 
-### 2. The post-event ask
-
-The one credible moment to ask a guest for anything is **after the event, when they want the
-photos**. Let a guest take a low-resolution copy of photos they appear in, free, and put "make
-one of your own" on that screen.
-
-This is the compounding loop the business does not otherwise have: it converts a guest into a
-host at the only instant they care. Explicitly **not** referral discounts — this category is
-occasion-triggered, not price-triggered, and "give $5 get $5" does not fire when nobody is
-having a birthday.
-
-### 3. Discoverability
-
-There is no SEO surface at all: no sitemap, and `robots.txt` correctly closes everything but
-four marketing pages. Occasion-specific planning pages ("what to put on a 40th birthday
-invitation") are the honest version of this — real content the templates and planning config
-already half-write.
-
-The competitive read: this does not beat Evite at being Evite, and twenty years of SEO is
-unwinnable. The winnable ground is the **50–250 guest milestone event**, where Evite's premium
-tier is the incumbent and Zola and The Knot are absent because it is not a wedding.
-
-### 4. The wishes board
-
-Agreed as the next product direction and deliberately deferred until the RSVP work was
-finished. A tribute board — a colleague's retirement, a leaving card, a milestone birthday —
-where people leave messages, audio and video for one recipient.
-
-Most of it exists: posts, media, a wall, and presentation mode. What is missing is framing plus
-one mechanic:
-
-- `occasion.kind: 'tribute'` with a recipient, distinct from a host.
-- **Sealed until the day.** An event-level `revealAt`, with posts hidden from everyone but
-  their author until it passes — enforced server-side in the wall query **and in
-  `firestore.rules`**. A client-side hide would be a lie: guests can read the wall directly,
-  and this is the one to test hardest, as a rules test rather than only an e2e.
-
-Kudoboard is an entire business doing roughly this at $6–25 a board. GIF picking is parked.
-
-### 5. Cash and group gifting — only if the click data supports it
-
-Stripe Connect Express, host as merchant of record, application fee, **never a wallet**.
-`gifts/{giftId}` with a `contributions/` subcollection, extending `BillingGateway` rather than
-starting a parallel payments stack.
-
-Gate this on the registry probe's numbers. It is a three-month bet whose modelled revenue
-assumes a guest will send $85 through a site they have never heard of; the probe cost days and
-tells you whether that is real.
-
-If it ships: idempotency keys on every charge, velocity limits (gifting is a known
-card-testing and laundering vector), disputes disclosed plainly to the host at onboarding
-rather than buried, and an accountant on the platform fee's tax treatment **before** it ships.
-
----
+1. **Show the product on the site.** The landing page contains no image of the invitation it
+   sells, and the attribution link on every invitation is the only organic channel this product
+   has — so that page is the conversion surface for the one growth loop that exists.
+2. **Widen the occasions.** Config rows; directly widens the market; also the bridge to the
+   tribute board.
+3. **AI invitation drafting**, plus the create-funnel counters that make it falsifiable.
+4. **Turn revenue on** — see [Before billing](#before-billing). Deferred for several sessions
+   now; it is what converts everything above into a business.
 
 ## Cheap things worth doing whenever
 

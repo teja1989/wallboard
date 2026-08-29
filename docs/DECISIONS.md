@@ -34,6 +34,14 @@ more expensive to reverse than a config change, which is intentional.
 Reverse only if: the paid conversion rate is measured, over real volume, and is low enough
 that the product cannot fund itself any other way. `features.ads` reserves the seam.
 
+**The decision stands; the marketing claim built on it does not.** This entry was written
+against Evite's ad-supported free tier, and that framing is now out of date: **Partiful is free,
+ad-free and VC-backed ($27.3M)** — so being ad-free is table stakes against the competitor
+actually taking share, not a differentiator. Keep the promise, stop leading with it. The line
+that *is* differentiating is one we already have and barely say: **no per-guest fees.**
+Paperless Post charges roughly $0.50–$1.44 per guest — $75–216 for the 150-guest wedding we
+charge $19 for. See [NEXT.md](./NEXT.md) for the full competitive picture and what it changes.
+
 ### The plan is stamped on the event at creation, never derived from global state
 
 `planForNewEvent()` resolves the account plan plus any promo grant once and writes the answer

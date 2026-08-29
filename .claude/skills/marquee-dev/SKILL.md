@@ -45,8 +45,8 @@ over port 8080.
 confirm a backend change is genuinely working — 251 assertions covering the access model,
 uploads, moderation, code rotation, the admin console and security headers, in a few seconds.
 
-Roughly where the counts should sit, so a silent drop is noticeable: **377 unit · 67 rules ·
-251 smoke · 82 e2e**.
+Roughly where the counts should sit, so a silent drop is noticeable: **404 unit · 67 rules ·
+259 smoke · 84 e2e**.
 
 **Run the last two against a production build, not `npm run dev`.** Some assertions — the CSP,
 cache headers, static rendering — only tell the truth against `npm run build && npm start`.

@@ -8,13 +8,16 @@ account.
 
 **Picking this up cold?** In this order:
 
-1. **[docs/ROADMAP.md](docs/ROADMAP.md)** — what is built, what is next, what is deliberately
-   not done. Includes the one manual check that gates turning billing on.
-2. **[docs/DECISIONS.md](docs/DECISIONS.md)** — why the product is shaped this way. Which calls
+1. **[docs/ROADMAP.md](docs/ROADMAP.md)** — what is built, what is deliberately not done, and
+   the one manual check that gates turning billing on.
+2. **[docs/NEXT.md](docs/NEXT.md)** — the next action plan: what to pick up, in priority order,
+   each with a _Done when_ you can check, and the competitive research behind the ordering.
+   Start here if you are looking for something to do.
+3. **[docs/DECISIONS.md](docs/DECISIONS.md)** — why the product is shaped this way. Which calls
    are settled and what evidence would reopen them; which are genuinely yours to make; and the
    list of **things that look like bugs and are choices**. Read section 3 before "fixing"
    something that seems obviously wrong.
-3. The invariants below, then the skill covering whatever you are about to touch.
+4. The invariants below, then the skill covering whatever you are about to touch.
 
 Then verify against the code rather than trusting any of it. Documentation drifts; this repo
 has had docs describe a permission model more permissive than the code, and a roadmap listing
@@ -96,7 +99,8 @@ OWNER_EMAILS=$(grep OWNER_EMAILS .env.local | cut -d= -f2) npm run smoke
 
 ## Docs
 
-[ROADMAP](docs/ROADMAP.md) · [DECISIONS](docs/DECISIONS.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) ·
+[ROADMAP](docs/ROADMAP.md) · [NEXT](docs/NEXT.md) · [DECISIONS](docs/DECISIONS.md) ·
+[ARCHITECTURE](docs/ARCHITECTURE.md) ·
 [SECURITY](docs/SECURITY.md) · [DATA_MODEL](docs/DATA_MODEL.md) · [DEPLOYMENT](docs/DEPLOYMENT.md) ·
 [PRICING](docs/PRICING.md) · [BRAND](docs/BRAND.md) · [SETUP](docs/SETUP.md) ·
 [ADS_MARKETING](docs/ADS_MARKETING.md) · [CONTRIBUTING](CONTRIBUTING.md)
