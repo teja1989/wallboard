@@ -647,6 +647,98 @@ async function main() {
   const memberReadsList = await call(member.session, `/api/events/${eventId}/invites`);
   check('a member cannot read the invite list', memberReadsList.status === 403);
 
+  /*
+    --- sending to one named person ----------------------------------------
+
+    "Email everyone unsent" used to be the only send there was, which is the wrong
+    granularity for the way a guest list is actually built: people arrive in ones and twos,
+    and a bounced address needs one retry rather than a re-run over the whole list.
+
+    `inviteeIds` **narrows and cannot widen** — it filters the list the server reads for
+    itself, and every eligibility rule still runs on whatever survives. These assertions are
+    the second half of that claim; the schema half is in tests/unit/invites.test.ts.
+
+    A third guest, sent to alone, so the bulk send below still has exactly two to do and its
+    assertion keeps meaning what it meant.
+  */
+  const addThird = await call(host.session, `/api/events/${eventId}/invites`, {
+    method: 'POST',
+    body: { invitees: [{ email: `guest3-${stamp}@example.com`, name: 'Guest Three' }] },
+  });
+  check('a third guest joins the list', addThird.payload?.data?.added === 1);
+
+  const listBefore = await call(host.session, `/api/events/${eventId}/invites`);
+  const third = (listBefore.payload?.data?.invitees ?? []).find(
+    (row) => row.email === `guest3-${stamp}@example.com`,
+  );
+  check(
+    'the host can see the guest ids they would send to',
+    Boolean(third?.id),
+    'no id on the row',
+  );
+
+  const sendOne = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation', inviteeIds: [third.id] },
+  });
+  check(
+    'the host sends to one named guest',
+    sendOne.status === 200 && sendOne.payload?.data?.sent === 1,
+    JSON.stringify(sendOne.payload),
+  );
+
+  const afterOne = await call(host.session, `/api/events/${eventId}/invites`);
+  const stillPending = (afterOne.payload?.data?.invitees ?? []).filter(
+    (row) => row.status === 'pending',
+  );
+  check(
+    'and nobody else was touched',
+    stillPending.length === 2,
+    JSON.stringify((afterOne.payload?.data?.invitees ?? []).map((r) => [r.email, r.status])),
+  );
+
+  const sendOneAgain = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation', inviteeIds: [third.id] },
+  });
+  check(
+    'naming somebody does not get them a second invitation',
+    sendOneAgain.payload?.data?.sent === 0,
+    JSON.stringify(sendOneAgain.payload),
+  );
+
+  // An id from another event, or one invented outright, matches nothing on this list — which
+  // is also why it cannot be used to probe for ids belonging elsewhere.
+  const sendStranger = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation', inviteeIds: ['f'.repeat(32)] },
+  });
+  check(
+    'an id that is not on this list reaches nobody',
+    sendStranger.status === 200 && sendStranger.payload?.data?.sent === 0,
+    JSON.stringify(sendStranger.payload),
+  );
+
+  const sendMalformed = await call(host.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation', inviteeIds: ['not-an-id'] },
+  });
+  check(
+    'a malformed guest id is refused outright',
+    sendMalformed.status === 400,
+    `status ${sendMalformed.status}`,
+  );
+
+  const memberSendsOne = await call(member.session, `/api/events/${eventId}/invites/send`, {
+    method: 'POST',
+    body: { kind: 'invitation', inviteeIds: [third.id] },
+  });
+  check(
+    'and a member cannot send to a named guest either',
+    memberSendsOne.status === 403,
+    `status ${memberSendsOne.status}`,
+  );
+
   const sendInvites = await call(host.session, `/api/events/${eventId}/invites/send`, {
     method: 'POST',
     body: { kind: 'invitation' },
@@ -657,7 +749,7 @@ async function main() {
     JSON.stringify(sendInvites.payload),
   );
   check(
-    'both were sent',
+    'the bulk send takes the two who had not had one, and not the third again',
     sendInvites.payload?.data?.sent === 2,
     JSON.stringify(sendInvites.payload),
   );

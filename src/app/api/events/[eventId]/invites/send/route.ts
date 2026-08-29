@@ -40,7 +40,7 @@ export const POST = route(async (request, { params }: Params) => {
   const event = await requireEvent(id);
   assertCan('invite:send', { actor, eventRole: await eventRoleFor(id, actor.uid) });
 
-  const { kind } = await parseBody(request, sendInvitesSchema);
+  const { kind, inviteeIds } = await parseBody(request, sendInvitesSchema);
   await limitByUser(kind === 'reminder' ? 'remindInvitesPerUser' : 'sendInvitesPerUser', actor.uid);
 
   if (event.status === 'ended') {
@@ -50,7 +50,14 @@ export const POST = route(async (request, { params }: Params) => {
   // A reminder must never reach someone who has already replied — so the set of people who
   // have is gathered here rather than trusted from the request.
   const replied = kind === 'reminder' ? await repliedAddressesFor(id) : new Set<string>();
-  const summary = await sendToInvitees(event, kind, replied);
+  /*
+    `inviteeIds` narrows, and only narrows — see `sendToInvitees`. It exists because "send to
+    everyone unsent" was the only shape available, which is the wrong granularity for the way
+    a guest list is actually built: people arrive in ones and twos over a week, a host wants
+    to send to the four they just added without waiting, and a bounced address needs one
+    retry, not a re-run over the whole list.
+  */
+  const summary = await sendToInvitees(event, kind, replied, inviteeIds);
 
   // One per message actually sent, so the denominator matches what left the building rather
   // than what the host pressed the button for. Reminders count too: an invitation that only
@@ -65,7 +72,14 @@ export const POST = route(async (request, { params }: Params) => {
       targetType: 'event',
       targetId: id,
       eventId: id,
-      metadata: { sent: summary.sent, failed: summary.failed, skipped: summary.skipped },
+      metadata: {
+        sent: summary.sent,
+        failed: summary.failed,
+        skipped: summary.skipped,
+        // How many were named, not which — the log records the shape of the action, and a
+        // list of guest ids in an audit entry is a guest list in an audit entry.
+        named: inviteeIds?.length ?? 0,
+      },
     },
     requestContext(request),
   );

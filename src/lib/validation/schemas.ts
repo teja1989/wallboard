@@ -457,8 +457,24 @@ export const addInviteesSchema = z.object({
 });
 export type AddInviteesInput = z.infer<typeof addInviteesSchema>;
 
+/** 16 random bytes as hex. Defined once here; the delete route used to carry its own copy. */
+export const inviteeIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
+
+/**
+ * Sending the invitation, to everybody or to named people.
+ *
+ * `inviteeIds` can only ever **narrow**. Absent means "everyone eligible", which is what the
+ * bulk button has always done; present means "of those, only these". Every eligibility rule —
+ * unsubscribed, already sent, already replied, still inside the reminder cooldown — is applied
+ * server-side afterwards either way, so naming somebody cannot post them a second invitation
+ * or reach someone who has opted out. The host chooses *who*, never *whether the rules apply*.
+ *
+ * Bounded by the same per-request cap as adding people, so one call cannot become a mail run
+ * of arbitrary length.
+ */
 export const sendInvitesSchema = z.object({
   kind: z.enum(['invitation', 'reminder']).default('invitation'),
+  inviteeIds: z.array(inviteeIdSchema).min(1).max(emailConfig.maxInviteesPerRequest).optional(),
 });
 
 export const unsubscribeSchema = z.object({

@@ -523,7 +523,9 @@ export default function CreateEventPage() {
       */}
           {!loading && (!actor || isAnonymous) && (
             <p className="mt-3 text-sm text-[var(--text-muted)]">
-              You will sign in when you send it — one tap with Google.{' '}
+              {/* "when you send it" was the same untruth as the button: nothing is sent here,
+                  and the account is asked for when the invitation is created. */}
+              You will sign in when you create it — one tap with Google.{' '}
               <Link
                 href="/signin?next=/create"
                 className="underline underline-offset-4 transition-colors hover:text-[var(--text-primary)]"
@@ -803,8 +805,18 @@ export default function CreateEventPage() {
               loading={submitting}
               disabled={!title.trim() || allowedKinds.length === 0}
             >
-              {occasion.inviteVerb}
+              {occasion.createVerb}
             </Button>
+
+            {/*
+              Said under the button rather than only in the copy after it, because the fear
+              this answers is felt *before* pressing: a button that used to read "Send the
+              invitation" made a host with a half-finished guest list hesitate, or worse,
+              believe forty emails had just gone out.
+            */}
+            <p className="-mt-2 text-center text-xs text-[var(--text-muted)]">
+              Nothing is sent yet. You add guests next, and choose when each one hears from you.
+            </p>
           </form>
         </div>
 
@@ -909,12 +921,49 @@ function CreatedPanel({
         Or just look at it first
       </button>
 
-      <div className="mt-8 border-t border-[var(--border-subtle)] pt-6">
+      {/*
+        The link, as text somebody can actually read.
+
+        It was only ever reachable through `navigator.share` or a clipboard write, so on a
+        desktop browser without the Web Share API the host's own invitation URL was never once
+        displayed to them — "Share the link" silently became a copy, and a failed clipboard
+        write left nothing at all. A host who wants to paste it into a message to one person,
+        or simply see where their invitation lives, had no way to.
+
+        `select-all` so a tap selects the whole thing, and `break-all` because an origin plus a
+        code overflows a phone otherwise.
+      */}
+      <div className="mt-8 border-t border-[var(--border-subtle)] pt-6 text-left">
+        <p className="text-sm font-medium">The link to your invitation</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Anyone with this can open it and reply. Send it to one person, or paste it into a group
+          chat.
+        </p>
+        <p className="mt-3 rounded-2xl bg-[var(--surface-sunken)] px-4 py-3 font-mono text-xs break-all select-all">
+          {link}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="soft" size="sm" onClick={() => copy('link')}>
+            {copied === 'link' ? (
+              <Check className="size-4" aria-hidden />
+            ) : (
+              <Copy className="size-4" aria-hidden />
+            )}
+            {copied === 'link' ? 'Copied' : 'Copy link'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={share}>
+            <Share2 className="size-4" aria-hidden />
+            Share
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-[var(--border-subtle)] pt-6 text-left">
         <p className="text-sm text-[var(--text-secondary)]">
           In a hurry? Read this code out instead — anyone who has it can get in.
         </p>
         <p className="code-display mt-3 text-2xl font-semibold">{formatJoinCode(code)}</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="ghost" size="sm" onClick={() => copy('code')}>
             {copied === 'code' ? (
               <Check className="size-4" aria-hidden />
@@ -923,14 +972,11 @@ function CreatedPanel({
             )}
             {copied === 'code' ? 'Copied' : 'Copy code'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={share}>
-            <Share2 className="size-4" aria-hidden />
-            Share the link
-          </Button>
         </div>
         <p className="mt-3 text-xs text-[var(--text-muted)]">
-          A shared code has no name attached, so nothing sent this way can be tracked. You can find
-          the code again in the host panel any time.
+          Neither a shared code nor a shared link has a name attached, so nothing sent that way can
+          be tracked — that is what adding guests gives you. You can find both again in the host
+          panel any time.
         </p>
       </div>
     </main>

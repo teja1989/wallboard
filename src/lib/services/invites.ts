@@ -331,11 +331,17 @@ export interface SendSummary {
 }
 
 /**
- * Sends the invitation, or a reminder, to everyone eligible.
+ * Sends the invitation, or a reminder, to everyone eligible — or to named people.
  *
  * "Eligible" is doing real work: never someone who unsubscribed, never someone who already
  * replied when it is a reminder, and never someone nudged within the cooldown. A reminder
  * that arrives twice in a morning costs a guest's goodwill and our sending reputation.
+ *
+ * `only` **narrows and cannot widen**. It is applied as a filter over the list this function
+ * reads for itself, and `isEligible` still runs on whatever survives — so naming a guest is a
+ * way of sending to fewer people, never a way of reaching somebody the rules exclude. An id
+ * that is not on this event's list simply matches nothing, which is also why a host cannot use
+ * it to probe for ids belonging to another event.
  *
  * Sends are sequential rather than parallel. A batch of two hundred fired at once is what
  * rate-limits at the provider look like, and the difference to the host is a few seconds.
@@ -344,8 +350,11 @@ export async function sendToInvitees(
   event: EventDoc,
   kind: 'invitation' | 'reminder',
   repliedAddresses: ReadonlySet<string>,
+  only?: readonly string[],
 ): Promise<SendSummary> {
-  const invitees = await listInvitees(event.id);
+  const all = await listInvitees(event.id);
+  const wanted = only ? new Set(only) : null;
+  const invitees = wanted ? all.filter((invitee) => wanted.has(invitee.id)) : all;
   const now = Date.now();
   const summary: SendSummary = { attempted: 0, sent: 0, failed: 0, skipped: 0 };
 

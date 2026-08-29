@@ -62,6 +62,8 @@ export function InvitePanel({
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'add' | 'send' | 'remind' | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  /** The one guest a per-row send is in flight for, so only their button spins. */
+  const [sendingOne, setSendingOne] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -173,6 +175,37 @@ export function InvitePanel({
     }
   }
 
+  /**
+   * Sends to exactly one person.
+   *
+   * No confirm dialog: the row names them, the button sits on that row, and one email to one
+   * named person is not the irreversible-feeling act that "email 40 people" is. The bulk
+   * button keeps its confirm for that reason.
+   *
+   * The server still decides whether they are eligible — this only narrows who is considered,
+   * so a summary can legitimately come back `sent: 0` if their state changed underneath.
+   */
+  async function sendOne(invitee: InviteeDoc) {
+    setSendingOne(invitee.id);
+    try {
+      const result = await api.post<{ sent: number; failed: number; skipped: number }>(
+        `/api/events/${eventId}/invites/send`,
+        { kind: 'invitation', inviteeIds: [invitee.id] },
+      );
+      await load();
+      onEventChanged();
+      const who = invitee.name || invitee.email;
+      notify(
+        result.sent > 0 ? `Sent to ${who}.` : `Nothing sent — ${who} has already had theirs.`,
+        result.failed > 0 ? 'error' : 'success',
+      );
+    } catch (caught) {
+      notify(errorMessage(caught, 'Could not send that one.'), 'error');
+    } finally {
+      setSendingOne(null);
+    }
+  }
+
   async function remove(inviteeId: string) {
     try {
       await api.delete(`/api/events/${eventId}/invites/${inviteeId}`);
@@ -231,7 +264,8 @@ export function InvitePanel({
               {unsent.length > 0 && (
                 <Button size="sm" loading={busy === 'send'} onClick={() => send('invitation')}>
                   <Mail className="size-4" aria-hidden />
-                  Email {unsent.length} {unsent.length === 1 ? 'person' : 'people'}
+                  {/* "all" earns its place now that each row can be sent on its own. */}
+                  Email all {unsent.length}
                 </Button>
               )}
               {sent.length > 0 && (
@@ -247,6 +281,12 @@ export function InvitePanel({
               )}
               <EmailPreview eventId={eventId} />
             </div>
+          )}
+
+          {unsent.length > 0 && (
+            <p className="-mt-2 text-xs text-[var(--text-muted)]">
+              Or send to one person at a time with the ✉ beside their name.
+            </p>
           )}
 
           <ul className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
@@ -281,6 +321,35 @@ export function InvitePanel({
                     </span>
                   )}
                 </div>
+
+                {/*
+                  Send to this one person.
+
+                  "Email everyone unsent" was the only send there was, which is the wrong
+                  granularity for how a guest list is actually built: people arrive in ones and
+                  twos over a week, and a host who has just added their sister should not have
+                  to either wait or re-run the whole list. A failed address needs one retry,
+                  not a batch.
+
+                  Shown only where it would do something — an address on file, and a state the
+                  server would act on. The same `pending | failed` test the bulk button uses,
+                  so the two cannot disagree about who is owed one.
+                */}
+                {invitee.email && (invitee.status === 'pending' || invitee.status === 'failed') && (
+                  <button
+                    type="button"
+                    onClick={() => void sendOne(invitee)}
+                    disabled={sendingOne !== null}
+                    aria-label={`Email the invitation to ${invitee.name || invitee.email}`}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] disabled:opacity-40"
+                  >
+                    {sendingOne === invitee.id ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Mail className="size-4" aria-hidden />
+                    )}
+                  </button>
+                )}
 
                 <button
                   type="button"

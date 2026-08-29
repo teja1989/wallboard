@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { classifyContact, isMultiContactPaste, parseContacts, toContact } from '@/lib/contacts';
-import { addInviteesSchema, unsubscribeSchema } from '@/lib/validation/schemas';
+import { emailConfig } from '@/config';
+import {
+  addInviteesSchema,
+  inviteeIdSchema,
+  sendInvitesSchema,
+  unsubscribeSchema,
+} from '@/lib/validation/schemas';
 
 /**
  * Parsing is the first thing a host touches when inviting people, and it takes whatever
@@ -106,6 +112,63 @@ describe('addInviteesSchema', () => {
   it('caps how many can arrive at once', () => {
     const many = Array.from({ length: 500 }, (_, i) => ({ email: `a${i}@x.com` }));
     expect(addInviteesSchema.safeParse({ invitees: many }).success).toBe(false);
+  });
+});
+
+/**
+ * Sending to named people.
+ *
+ * The security property is one sentence — **`inviteeIds` narrows and cannot widen** — and it
+ * is held up by two things: the schema, which bounds and shapes the list, and
+ * `sendToInvitees`, which applies it as a filter over the list it reads for itself and then
+ * runs every eligibility rule on whatever survives. These cover the first half; the smoke run
+ * covers the second, against real documents.
+ */
+describe('sendInvitesSchema', () => {
+  const id = 'a'.repeat(32);
+
+  it('still means everybody when nothing is named — the bulk button sends no ids', () => {
+    const parsed = sendInvitesSchema.parse({ kind: 'invitation' });
+    expect(parsed.inviteeIds).toBeUndefined();
+  });
+
+  it('takes one id, which is the whole point of the per-row button', () => {
+    expect(sendInvitesSchema.parse({ kind: 'invitation', inviteeIds: [id] }).inviteeIds).toEqual([
+      id,
+    ]);
+  });
+
+  it('refuses an empty list rather than treating it as "everyone"', () => {
+    // The dangerous reading: `[]` filtering to nobody is safe, but a caller who meant "these
+    // none" and got "all of them" would be a mail run nobody asked for. Rejected at the edge.
+    expect(sendInvitesSchema.safeParse({ kind: 'invitation', inviteeIds: [] }).success).toBe(false);
+  });
+
+  it('refuses anything that is not an invitee id', () => {
+    for (const bad of ['', 'nope', 'A'.repeat(32), `${id}0`, '../../etc', id.slice(0, 31)]) {
+      expect(sendInvitesSchema.safeParse({ inviteeIds: [bad] }).success, bad).toBe(false);
+    }
+  });
+
+  it('caps one call at the same size as adding people', () => {
+    const many = Array.from({ length: emailConfig.maxInviteesPerRequest + 1 }, () => id);
+    expect(sendInvitesSchema.safeParse({ inviteeIds: many }).success).toBe(false);
+  });
+
+  it('has no default on inviteeIds, so absent stays absent', () => {
+    /*
+      The `.partial()`/`.default()` trap, in the one place it would be worst here: a default
+      of `[]` would turn every bulk send into a send to nobody, silently, and a host would
+      watch "0 sent" and conclude the product was broken.
+    */
+    expect(Object.keys(sendInvitesSchema.parse({}))).toEqual(['kind']);
+  });
+
+  it('shares its id shape with the route that removes a guest', () => {
+    // Both used to carry their own copy of the regex. One definition, so a change to the id
+    // format cannot leave one route accepting what the other rejects.
+    expect(inviteeIdSchema.safeParse(id).success).toBe(true);
+    expect(inviteeIdSchema.safeParse('ZZZ').success).toBe(false);
   });
 });
 

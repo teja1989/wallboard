@@ -150,8 +150,24 @@ describe('occasions', () => {
   it('keep celebratory language away from the somber ones', () => {
     const memorial = occasions.find((o) => o.id === 'memorial');
     expect(memorial?.somber).toBe(true);
-    expect(memorial?.inviteVerb.toLowerCase()).not.toContain('celebrate');
+    expect(memorial?.createVerb.toLowerCase()).not.toContain('celebrate');
     expect(memorial?.plusOnesByDefault).toBe(false);
+  });
+
+  it('never let the create button claim it sends something', () => {
+    /*
+      It said "Send the invitation" on every occasion, and creating an event sends nothing —
+      guests are added afterwards and each send is a separate, deliberate act. A host who
+      believed the button had every reason not to open the guest list, which is where the
+      tracked path begins, and some reason to think forty emails had just gone out.
+
+      Asserted across the whole table rather than fixed in ten places, because the next
+      occasion somebody adds will be copied from one of these rows.
+    */
+    for (const occasion of occasions) {
+      expect(occasion.createVerb.toLowerCase(), occasion.id).not.toContain('send');
+      expect(occasion.createVerb.length, occasion.id).toBeGreaterThan(0);
+    }
   });
 });
 

@@ -70,7 +70,7 @@ test.describe('creating an event', () => {
     await page.getByLabel('What are we calling it?').fill('Rooftop dinner');
     await page.getByLabel('Hosted by').fill('Priya & Sam');
     await page.getByLabel('Where?').fill('The Rooftop');
-    await page.getByRole('button', { name: /send the invitation/i }).click();
+    await page.getByRole('button', { name: /create the invitation/i }).click();
 
     await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible();
 
@@ -81,7 +81,18 @@ test.describe('creating an event', () => {
     // and "Share the link" and never mention guests, so the default path skipped per-guest
     // links, delivery status and reminders entirely.
     await expect(page.getByRole('button', { name: /add your guests/i })).toBeVisible();
-    await expect(page.getByText(/nothing sent this way can be tracked/i)).toBeVisible();
+    await expect(page.getByText(/nothing sent that way can be tracked/i)).toBeVisible();
+
+    /*
+      The link, readable rather than only copyable.
+
+      It used to exist solely behind `navigator.share` and a clipboard write, so on a desktop
+      browser without the Web Share API a host was never shown their own invitation URL —
+      "Share the link" silently became a copy, and a failed clipboard write left nothing.
+    */
+    const shown = page.getByText(new RegExp(`/i/${code.replace('-', '')}`, 'i'));
+    await expect(shown).toBeVisible();
+    await expect(page.getByRole('button', { name: /copy link/i })).toBeVisible();
 
     await page.getByRole('button', { name: /or just look at it first/i }).click();
     await expect(page.getByRole('heading', { name: 'Rooftop dinner' })).toBeVisible();
@@ -91,7 +102,21 @@ test.describe('creating an event', () => {
 
   test('the form says an account is still coming', async ({ page }) => {
     await browseCreateAnonymously(page);
-    await expect(page.getByText(/you will sign in when you send it/i)).toBeVisible();
+    await expect(page.getByText(/you will sign in when you create it/i)).toBeVisible();
+  });
+
+  test('the form never claims that creating an invitation sends it', async ({ page }) => {
+    /*
+      Every occasion's button said "Send the invitation", and pressing it sends nothing: it
+      creates the event, and guests are added afterwards. A host who believed it had a reason
+      to think forty emails had just gone out, and no reason to open the guest list — which is
+      where per-guest links, delivery status and reminders all live.
+    */
+    await browseCreateAnonymously(page);
+
+    await expect(page.getByRole('button', { name: /create the invitation/i })).toBeVisible();
+    await expect(page.getByText(/nothing is sent yet/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /^send the invitation$/i })).toHaveCount(0);
   });
 
   test('an account is asked for at publish, and the draft survives it', async ({ page }) => {
@@ -102,7 +127,7 @@ test.describe('creating an event', () => {
     await page.getByRole('button', { name: /dinner/i }).click();
     await page.getByLabel('What are we calling it?').fill('Anonymous rooftop dinner');
     await page.getByLabel('Hosted by').fill('Someone New');
-    await page.getByRole('button', { name: /send the invitation/i }).click();
+    await page.getByRole('button', { name: /create the invitation/i }).click();
 
     // The gate lands here, and explains itself rather than just refusing.
     await expect(page.getByRole('heading', { name: /almost there/i })).toBeVisible();
@@ -144,7 +169,7 @@ test.describe('creating an event', () => {
 
   test('the form refuses an invitation with no name', async ({ page }) => {
     await browseCreateAnonymously(page);
-    await expect(page.getByRole('button', { name: /send the invitation/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /create the invitation/i })).toBeDisabled();
   });
 
   test('the design gallery is browsable and grouped by occasion', async ({ page }) => {
@@ -268,7 +293,7 @@ test.describe('the address field', () => {
     await page.getByLabel('What are we calling it?').fill('Address journey');
     await page.getByLabel('Where?').fill('The back garden');
     await page.getByLabel(/where is it/i).fill('14 Bridge Street');
-    await page.getByRole('button', { name: /send the invitation/i }).click();
+    await page.getByRole('button', { name: /create the invitation/i }).click();
 
     await expect(page.getByRole('heading', { name: /your invitation is ready/i })).toBeVisible({
       timeout: 20_000,
@@ -787,14 +812,57 @@ test.describe('inviting people', () => {
     await expect(page.getByText('Not sent')).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /email 1 person/i }).click();
+    await page.getByRole('button', { name: /email all 1/i }).click();
     await expect(page.getByText('Sent', { exact: true })).toBeVisible({ timeout: 15_000 });
 
     // The invitation goes once; that is what the nudge button is for. The send control is
     // gone rather than greyed out — a disabled button offering to email nobody read as the
     // panel's primary action while being permanently dead.
-    await expect(page.getByRole('button', { name: /^email \d+ (person|people)$/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^email all \d+$/i })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /nudge non-repliers/i })).toBeVisible();
+  });
+
+  test('a host sends to one guest without sending to the rest', async ({ page }) => {
+    /*
+      "Email everyone unsent" was the only send there was, which is the wrong granularity for
+      the way a guest list is built: people arrive in ones and twos over a week, and a host
+      who has just added their sister should not have to wait or re-run the whole list.
+    */
+    await signIn(page, uniqueEmail('host'));
+    const { eventId } = await createEvent(page, 'One at a time');
+    const first = uniqueEmail('first');
+    const second = uniqueEmail('second');
+
+    const form = await openGuests(page, eventId);
+    for (const [name, address] of [
+      ['Ada First', first],
+      ['Grace Second', second],
+    ] as const) {
+      await form.getByLabel('Name').fill(name);
+      await form.getByLabel(/phone or email/i).fill(address);
+      await form.getByRole('button', { name: /^add/i }).click();
+      await expect(page.getByText(name)).toBeVisible();
+    }
+
+    await expect(page.getByRole('button', { name: /^email all 2$/i })).toBeVisible();
+
+    // No confirm dialog on a single named send: the row names them, and one email to one
+    // person is not the irreversible-feeling act that emailing forty is.
+    await page.getByRole('button', { name: `Email the invitation to Ada First` }).click();
+
+    await expect(page.getByText('Sent', { exact: true })).toHaveCount(1, { timeout: 15_000 });
+    // The other guest is untouched, and the bulk button now offers exactly the one left.
+    await expect(page.getByText('Not sent')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^email all 1$/i })).toBeVisible();
+
+    // Their row's send button is gone — the invitation goes once, and the control disappears
+    // rather than sitting there greyed out, matching how the bulk button behaves.
+    await expect(
+      page.getByRole('button', { name: 'Email the invitation to Ada First' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Email the invitation to Grace Second' }),
+    ).toBeVisible();
   });
 
   /**
@@ -818,7 +886,7 @@ test.describe('inviting people', () => {
     await expect(page.getByText('+14155550161')).toBeVisible();
 
     // Nobody can be emailed, so the email buttons have nothing to offer.
-    await expect(page.getByRole('button', { name: /^email \d+ (person|people)$/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^email all \d+$/i })).toHaveCount(0);
     // But the host can still send it themselves, which is the whole point.
     await expect(page.getByRole('button', { name: /copy every message/i })).toBeEnabled();
   });
@@ -1541,11 +1609,28 @@ test.describe('the operator console', () => {
 
     test('shows the audit trail, including the read of it', async ({ page }) => {
       await signIn(page, OWNER_EMAIL);
-      await page.goto('/admin/audit');
 
-      await expect(page.getByRole('cell', { name: 'admin.auditViewed' }).first()).toBeVisible({
+      /*
+        Cause the entry, then look for it — do not go looking through history for one.
+
+        The first version asserted that `admin.auditViewed` was somewhere on the page, which
+        only held while nothing had pushed it off: the log is newest-first and capped at a
+        page, and a suite that creates events, replies and posts writes plenty of entries.
+        Adding three tests earlier in the file was enough to break it, which is a test
+        depending on the volume of unrelated tests rather than on the behaviour it names.
+
+        Loading the page writes the entry. So load it, then reload: the read that just
+        happened is at the top, whatever else is in the log.
+      */
+      await page.goto('/admin/audit');
+      await expect(page.getByRole('columnheader', { name: 'Action' })).toBeVisible({
         timeout: 15_000,
       });
+
+      await page.reload();
+      const rows = page.getByRole('row');
+      await expect(rows.nth(1)).toContainText('admin.auditViewed', { timeout: 15_000 });
+
       // IP and user agent are stored on every entry and deliberately not rendered.
       await expect(page.getByRole('columnheader', { name: 'Detail' })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: /ip/i })).toHaveCount(0);

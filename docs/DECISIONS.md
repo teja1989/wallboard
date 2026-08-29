@@ -195,6 +195,13 @@ are resolved at render from the event in hand, so they cannot go stale and cost 
 funnel says whether guests click at all, the per-link count says which of the host's links they
 clicked.
 
+**`inviteeIds` on the send route only ever narrows.** It filters the list the server reads for
+itself, and every eligibility rule — unsubscribed, already sent, already replied, inside the
+reminder cooldown — still runs on whatever survives. So naming a guest sends to _fewer_ people;
+it is never a way to reach somebody the rules exclude, and an id that is not on this event's
+list matches nothing. Absent means "everyone eligible", which is what the bulk button does. An
+empty array is rejected rather than treated as either.
+
 **Post deletion is soft.** `state` becomes `removed` and `body`/`media` are cleared, but the
 bytes are destroyed immediately and the document survives — so moderation stays reviewable and
 the audit trail points at something real.

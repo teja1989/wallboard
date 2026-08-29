@@ -17,8 +17,18 @@ export interface Occasion {
   defaultTemplateId: TemplateId;
   /** Placeholder in the title field — an example, not an instruction. */
   titlePlaceholder: string;
-  /** Verb used on the host's primary button, e.g. "Send the invitation". */
-  inviteVerb: string;
+  /**
+   * The create form's submit button.
+   *
+   * It said "Send the invitation" on every occasion, and pressing it sends nothing: it
+   * creates the event. The host then adds guests and chooses when anything goes out — so the
+   * button was announcing an irreversible act, on a screen whose whole purpose is that
+   * nothing is irreversible yet. A host who believed it had no reason to open the guest list,
+   * which is where the entire tracked path begins.
+   *
+   * Named for what it does. If a value here ever contains "send", it is wrong.
+   */
+  createVerb: string;
   /** What the RSVP question sounds like for this occasion. */
   rsvpPrompt: string;
   /** Wording on the wall's composer, so it fits the room. */
@@ -47,7 +57,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🎂',
     defaultTemplateId: 'sunset',
     titlePlaceholder: "Priya's 30th",
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Can you make it?',
     wallPrompt: 'Say something…',
     asksDressCode: false,
@@ -61,7 +71,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '💍',
     defaultTemplateId: 'champagne',
     titlePlaceholder: 'Priya & Sam',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Will you be joining us?',
     wallPrompt: 'Share a photo or a message for the couple…',
     asksDressCode: true,
@@ -75,7 +85,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🎉',
     defaultTemplateId: 'aurora',
     titlePlaceholder: 'Rooftop summer party',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Coming?',
     wallPrompt: 'Say something…',
     asksDressCode: true,
@@ -89,7 +99,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🍽️',
     defaultTemplateId: 'linen',
     titlePlaceholder: 'Supper at ours',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Can you join us?',
     wallPrompt: 'Say something…',
     asksDressCode: false,
@@ -103,7 +113,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🍼',
     defaultTemplateId: 'blossom',
     titlePlaceholder: 'A shower for Ada',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Can you make it?',
     wallPrompt: 'Leave a wish for the little one…',
     asksDressCode: false,
@@ -117,7 +127,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🎓',
     defaultTemplateId: 'lagoon',
     titlePlaceholder: 'Sam graduates',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Can you come?',
     wallPrompt: 'Say something…',
     asksDressCode: false,
@@ -131,7 +141,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🫂',
     defaultTemplateId: 'meadow',
     titlePlaceholder: 'The 2015 lot, ten years on',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Are you in?',
     wallPrompt: 'Post a photo from back then…',
     asksDressCode: false,
@@ -145,7 +155,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '💼',
     defaultTemplateId: 'midnight',
     titlePlaceholder: 'Q4 offsite',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Will you attend?',
     wallPrompt: 'Share something from the day…',
     asksDressCode: true,
@@ -159,7 +169,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '🕊️',
     defaultTemplateId: 'linen',
     titlePlaceholder: 'Remembering Ada',
-    inviteVerb: 'Share the details',
+    createVerb: 'Create the notice',
     rsvpPrompt: 'Will you be attending?',
     wallPrompt: 'Share a memory…',
     asksDressCode: false,
@@ -173,7 +183,7 @@ export const occasions: readonly Occasion[] = [
     glyph: '✨',
     defaultTemplateId: 'sunset',
     titlePlaceholder: 'What are we calling it?',
-    inviteVerb: 'Send the invitation',
+    createVerb: 'Create the invitation',
     rsvpPrompt: 'Can you make it?',
     wallPrompt: 'Say something…',
     asksDressCode: false,

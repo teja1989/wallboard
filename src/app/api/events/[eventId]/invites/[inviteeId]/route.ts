@@ -5,15 +5,12 @@ import { requireEvent } from '@/lib/services/events';
 import { removeInvitee } from '@/lib/services/invites';
 import { ok, requireIdentifiedActor, route } from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
-import { eventIdSchema } from '@/lib/validation/schemas';
-import { z } from 'zod';
+import { eventIdSchema, inviteeIdSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ eventId: string; inviteeId: string }> };
-
-const inviteeIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 
 /**
  * Removes an address from the list.

@@ -45,6 +45,10 @@ number alone and can gain an address later without becoming a second guest. Ever
 personal link, which is what makes per-person status answerable at all; hosts who prefer to
 send it themselves get the same tracking through the relay panel.
 
+Sending works at both granularities: everyone who has not had one, or one named guest from
+their own row. A guest list is built in ones and twos over a week, so "email everyone unsent"
+alone was the wrong shape — and a bounced address needs one retry, not a re-run.
+
 Replies capture who is coming and how many, split into adults and children. The private half
 of a reply — the note and the custom answer — lives in its own subcollection, because a note
 written for the host is not for the rest of the guest list.
