@@ -1,4 +1,5 @@
 import { DAY, MB } from './limits.config';
+import { freeTemplates, templates } from './templates.config';
 
 /**
  * Plans and entitlements.
@@ -41,7 +42,20 @@ export interface Entitlements {
   guestListExport: boolean;
   /** Download everything posted before the wall expires. */
   archiveDownload: boolean;
-  /** A readable link, /e/priya-and-sam rather than an id. */
+  /**
+   * A readable link, /e/priya-and-sam rather than an id.
+   *
+   * **Declared and not implemented.** Nothing reads this — it was on the Pro plan's public
+   * highlights for months describing a feature that does not exist, which is worse than a
+   * missing feature because a pricing page is a promise. The bullet is gone until it is real.
+   *
+   * Whoever builds it should know the bullet also described the wrong surface. `/e/{id}` is
+   * the members-only page that turns away non-members, so `/e/priya-and-sam` would produce a
+   * pretty link that fails for exactly the people a host would share it with. The shareable
+   * path is `/i/{code}` — and a guessable vanity slug there weakens the "access needs your
+   * code" guarantee, so it has to be an opt-in the host makes knowingly rather than a
+   * cosmetic upgrade perk.
+   */
   vanityLink: boolean;
   /**
    * The planning list: tick things off, change them, add your own.
@@ -135,7 +149,7 @@ export const plans: Record<PlanId, Plan> = {
       'Up to 25 guests',
       'Invitation, RSVPs and the live wall',
       'Photos, video, voice notes and messages',
-      'Four invitation themes',
+      `${freeTemplates.length} invitation themes`,
       'Wall stays live for 7 days',
       // Last, and phrased as the promise rather than a feature, because it is the line that
       // answers "what is the catch" — which is the only real objection a free tier has.
@@ -154,7 +168,7 @@ export const plans: Record<PlanId, Plan> = {
     entitlements: eventEntitlements,
     highlights: [
       'Up to 250 guests',
-      'All ten invitation themes',
+      `All ${templates.length} invitation themes`,
       'Private notes with each RSVP',
       'One custom question on the RSVP',
       'Guest list export',
@@ -179,7 +193,6 @@ export const plans: Record<PlanId, Plan> = {
       '25 live events at once',
       'Walls stay live for 90 days',
       '20 GB of photos and video per event',
-      'Readable links, /e/priya-and-sam',
     ],
   },
 };

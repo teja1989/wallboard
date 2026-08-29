@@ -63,8 +63,10 @@ stationery rather than a dashboard.
 - OKLCH throughout, so the pastel ramp steps evenly by _perceived_ lightness.
 - Motion is springs (`branding.config.ts`), and every animation respects
   `prefers-reduced-motion`.
-- Ten invitation themes, four free and six paid. The free set is deliberately good — nobody
-  upgrades to escape something ugly, they upgrade to reach something better.
+- Fifteen invitation themes, five free and ten paid. The free set is deliberately good —
+  nobody upgrades to escape something ugly, they upgrade to reach something better.
+  (Counts drift: the pricing page derives them from `templates.config.ts` rather than
+  restating them, and this line is prose that has to be re-checked by hand.)
 
 ## Naming things inside the product
 
