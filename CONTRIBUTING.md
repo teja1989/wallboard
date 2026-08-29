@@ -15,10 +15,21 @@ For anything touching the API, rules, or auth, also:
 
 ```bash
 npm run test:rules
-npm run smoke          # needs emulators + dev running
+npm run smoke          # needs emulators + a running server
 ```
 
-CI runs all of it plus Playwright.
+Run `smoke` and `test:e2e` against a **production build** (`npm run build && npm start`),
+not the dev server: the CSP, cache headers and static rendering only tell the truth there.
+`scripts/smoke.mjs` refuses a server serving a different build than the one on disk, because a
+stale `next start` holding port 3000 otherwise looks exactly like a code failure.
+
+The owner-only assertions skip unless the process shares the server's `OWNER_EMAILS`:
+
+```bash
+OWNER_EMAILS=$(grep OWNER_EMAILS .env.local | cut -d= -f2) npm run smoke
+```
+
+CI runs all of it plus Playwright, with one `env:` block feeding both sides.
 
 ## The rules that matter
 
@@ -54,6 +65,23 @@ that asserts the **refusal** as well as the grant.
 Every mutation goes through a route handler. Rules deny all client writes and there is no
 exception, including for owners. See `.claude/skills/marquee-security/SKILL.md` for the
 route-handler shape.
+
+### Nothing is enforced that cannot be reached
+
+A permission, feature flag or plan claim with no implementation behind it is a bug, not a
+placeholder. Five `admin:*` permissions were declared and checked by `can()` with no route
+anywhere — including the one that suspends an abusive account, so every write in the product
+was gated on a field nothing could set.
+
+Each layer looked finished on its own, which is why this needs a rule rather than care. Either
+wire it, or say plainly in config that it is not wired — and where a test can hold the set of
+declared things against the set of reachable ones, write that test.
+
+### When a doc and the code disagree, the code wins
+
+Fix the doc in the same commit. `docs/SECURITY.md` described a permission model more permissive
+than what runs, and `docs/ROADMAP.md` listed shipped features as pending — both read as
+promises. If you change a guarantee, the doc stating it is part of the change.
 
 ### Comments explain why
 

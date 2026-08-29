@@ -1155,10 +1155,7 @@ async function main() {
       JSON.stringify((auditAgain.payload?.data?.entries ?? []).slice(0, 3).map((e) => e.action)),
     );
 
-    const filtered = await call(
-      owner.session,
-      `/api/admin/audit?q=${encodeURIComponent(eventId)}`,
-    );
+    const filtered = await call(owner.session, `/api/admin/audit?q=${encodeURIComponent(eventId)}`);
     check(
       'the filter narrows to one event and nothing else',
       filtered.status === 200 &&

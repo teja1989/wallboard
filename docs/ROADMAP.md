@@ -1,238 +1,270 @@
 # Roadmap
 
-## Shipped — v1: the marquee
+What is built, what is next, and what was deliberately not done.
 
-Everything needed to create an event, share a code, and post to a live wall that expires.
+**If you are picking this work up cold**, read this file and [DECISIONS.md](./DECISIONS.md)
+first. This one tells you where the product is; that one tells you which choices are settled
+and which are yours to make.
 
-- Anonymous bootstrap, Google and email-link sign-in, uid-preserving upgrade
-- Event lifecycle: create, join by code, host settings, rotate code, extend, end early
-- Posts: text, image, video, audio; direct-to-bucket upload with server-side re-validation
-- Live wall via Firestore listeners, lightbox, countdown, empty/expired states
-- Expiry: TTL policies, cleanup sweep, cleanup grace window
-- Guardrails: deny-by-default rules, `can()` policy engine, rate limits, audit log, CSP
-- Soft pastel design system, light and dark, reduced-motion honoured
-- Tests: unit, Firestore rules, Playwright e2e, API smoke
+---
 
-The security primitives the later phases depend on — role claims, audit log, permission
-matrix, rate limiting — shipped **inside** v1 deliberately. An audit log that starts when the
-admin console ships has no history to show, and retrofitting call sites is how gaps get left
-behind.
+## Where it stands
 
-## Phase 2 — the gaps that block a launch
+The RSVP product is **feature-complete for a launch** and has never taken a payment. Billing
+is written, tested and switched off. The one thing standing between here and turning it on is
+a manual verification nobody can automate — see [Before billing](#before-billing).
 
-Ordered by what actually stops revenue.
+|            |                                                                                |
+| ---------- | ------------------------------------------------------------------------------ |
+| Test suite | 377 unit · 67 Firestore rules · 251 API smoke · 82 Playwright e2e              |
+| Live at    | `https://marqueersvp.com` on Cloud Run, provisioned by Terraform               |
+| Charging   | No. `features.billing` is `false`; every event runs on `previewPlanId` (`pro`) |
+| Ads        | No, and none coming — see [DECISIONS.md](./DECISIONS.md)                       |
 
-### Email delivery — shipped
+---
 
-A transactional provider, an address list per event, and a reminder for guests who have not
-replied.
+## Shipped
 
-### Reaching people the way they actually reach each other — phase A shipped
+### The event, end to end
 
-Guests are identified by an opaque id rather than an email address, so someone can be added
-by phone number alone. Every guest gets a personal invitation link, which is what makes
-per-person tracking possible at all, and the host can send those links themselves from
-whatever thread they already talk to that person in — no carrier, no registration, no
-compliance exposure, and it still tracks.
+Create, join by code, a live wall that expires, and everything around it. Anonymous bootstrap
+with a uid-preserving upgrade to Google or an email link. Posts in text, image, video and
+audio, uploaded direct to the bucket and re-validated server-side. Expiry through TTL policies
+plus a cleanup sweep. Deny-by-default rules, the `can()` matrix, rate limits, an audit log and
+a CSP — all shipped inside v1 deliberately, because retrofitting security primitives is how
+gaps get left behind.
 
-Status climbs `queued → sent → delivered → seen → replied`. There is deliberately no
-"opened": see [ARCHITECTURE.md](./ARCHITECTURE.md) for why an open pixel measures Apple
-rather than a person.
+### Invitations and RSVPs
 
-**Phase B, blocked on paperwork not code:** SMS and WhatsApp behind one channel adapter,
-carrier delivery receipts, a global STOP suppression list, quiet hours, and per-plan
-metering — US SMS costs roughly thirty times what email does. US A2P 10DLC brand and
-campaign registration and Meta business verification each take one to three weeks and must
-be started before any of that code is worth writing.
+Per-occasion wording and templates, a live preview of the real invitation while the host
+types, an `.ics` and a Google Calendar link on every dated invitation, and email delivery
+through a provider adapter.
 
-### Add to calendar — shipped
+Guests are identified by an **opaque id**, not an address, so someone can be added by phone
+number alone and can gain an address later without becoming a second guest. Every guest gets a
+personal link, which is what makes per-person status answerable at all; hosts who prefer to
+send it themselves get the same tracking through the relay panel.
 
-Every invitation with a date offers a `.ics` download and a Google Calendar link, and the
-emailed invitation, reminder and confirmation carry the same link. The entry brings two
-reminders with it — the day before, and two hours before — which is the cheapest attendance
-lift available: the guest's own phone does the nagging, at no per-message cost.
+Replies capture who is coming and how many, split into adults and children. The private half
+of a reply — the note and the custom answer — lives in its own subcollection, because a note
+written for the host is not for the rest of the guest list.
 
-Times are written in UTC rather than tagged with the event's zone. A `TZID` is only legal
-alongside a `VTIMEZONE` block spelling out that zone's daylight-saving rules, and hand-rolling
-those means shipping a copy of the zone database that goes stale. A UTC instant is
-unambiguous, and it is what makes the entry land at the right moment for a guest reading it
-from anywhere.
+**What happens after somebody replies** is answered rather than dropped: the date into their
+calendar, whether anyone else is coming, a way into the wall. A "no" gets the wall too —
+someone who cannot come to a fortieth still wants to say something — and pointedly no calendar
+entry.
 
-### Reminders that send themselves — shipped
+### Reminders that send themselves
 
-The nudge to guests who had not replied went out only when a host pressed a button, on a tab
-inside a page they had to think to open. Most never will, and a reply that never arrives
-because nobody asked twice is indistinguishable, in the funnel, from an invitation that did
-not work.
+Two slots counted back from the event, a week and two days, claimed transactionally _before_
+sending. A slot that fell due before the invitation existed never fires, so publishing three
+days out does not immediately chase everybody. Hosts can switch it off.
 
-Two slots counted back from the event — a week, then two days — claimed transactionally
-_before_ sending, because a duplicate nudge costs more than a missed one: it burns a guest's
-goodwill and sending reputation that every host here shares. A slot that fell due before the
-invitation existed never fires, so publishing three days out does not immediately chase
-everybody. Hosts can switch it off beside the guest list.
+### The gift list
 
-Not yet: wallet passes (lock-screen presence on the day, and they update themselves if the
-venue moves).
+Host pastes links; guests see them on the invitation. No prices, no images, no stock —
+fetching those makes this a worse version of the shop the host already chose, and Amazon's
+terms forbid caching a price past 24 hours. Offered only where `occasion.giftsExpected`.
 
-### Host tools that a host can actually use — shipped
+It exists to answer one question — **will guests click through?** — and the click beacon feeds
+the funnel so the answer is falsifiable.
 
-Three complaints, one cause. The guest list, the join code, "add time", the plan, "end the
-event" and "delete everything" all lived in one 384px drawer, so the thing a host touches most
-sat in the same scroll as the thing they must never touch by accident.
+### The planning board
 
-- **Guests moved to their own tab**, beside the replies, because inviting someone and seeing
-  whether they answered is one job. The drawer keeps only the occasional controls.
-- **Guests are entered as rows** — a name and a phone number or address — replacing a paste
-  box whose only way to attach a name was `Name <address>`, unavailable to anyone entering a
-  number. A name typed beside a number was silently discarded. Pasting a list still fills the
-  rows in one go.
-- **Deleting works on a real guest wall**, and can be done from the account list without
-  opening the event. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the ordering that makes a
-  storage failure safe.
+Milestones seeded per occasion from config with dates counted back from the event, categories,
+budgets, and live numbers pulled off the event at render. Host-only in both directions:
+somebody's working notes about their own party, including what they are spending.
 
-### Knowing whether any of it works — shipped
+### Knowing whether any of it works
 
-First-party, server-side, aggregate. Counters per event per day for invitations sent, opened,
-replied to, said yes to, posted, and taken to checkout. No third-party script, no pixel, no
-per-visitor row, and nothing that outlives the event. `GET /api/events/{id}/funnel` is the
-host-only read; `docs/ARCHITECTURE.md` has the design.
+Counters per event per day for invitations sent, opened, replied to, said yes to, posted,
+gift-links clicked, milestones completed and checkout reached. Host-readable per event; summed
+across every event in the operator console, with each ratio printed beside the decision it
+settles and its denominator, because "12%" means nothing when the denominator is eight.
 
-This blocks the interesting decisions rather than following them. Where a paywall belongs and
-whether guests will click a gift link are both empirical questions, and until now every number
-in this document was a model rather than an observation.
+### The operator console
 
-Not yet: an "upgrade viewed" counter, which is the one moment in the funnel that only exists
-in the browser and would need a client beacon. Deliberately deferred — it is new write surface
-for one ratio, and the five server-side moments answer most of the question.
+`/admin` — events, people, the audit trail, the funnel. Everything reads except suspension,
+which refuses the caller themselves and anyone at or above their own rank, requires a reason,
+and audits both directions. Reading the audit log records the read.
 
-### Build, preview, invite, send — shipped
+This closed a real gap: five `admin:*` permissions were declared and enforced and reachable
+from nowhere, `admin:suspendUser` among them — so `Actor.suspended` gated every write in the
+product while nothing could set the field, and the launch-day answer to an abuse report was to
+edit a Firestore document by hand.
 
-The create flow had two holes that between them defeated the product's own differentiator.
+### Positioning and growth
 
-**There was no preview of anything.** A host chose a design from a swatch, typed a title, a
-date and a venue, and pressed publish having never seen the card — first sight of their own
-invitation came after it existed and had a code attached. And they never saw the _email_:
-`renderEmail` builds the HTML that lands in forty inboxes with no way to read it first.
+The no-ads promise said out loud, with the reason, on the landing and pricing pages. The
+"made with Marquee" mark on invitations, as a link rather than a footnote. Promos as config,
+granted at creation and visible where a host would look for one.
 
-**The screen after publish never mentioned guests.** It offered a code and "Share the link",
-so the default path was create → copy a code → paste it somewhere — and every host who took it
-gave up per-guest links, delivery status, reminders and any way to answer "did Priya see
-this?". The tracked path was opt-in, two navigations deep, on a tab inside a page they had not
-opened. On that tab sat a permanently disabled "Email 0 unsent", offering to send before there
-was anybody to send to.
+### Deployment
 
-Now: the real `Invitation` component renders live as the host types — reused rather than
-reimplemented, so preview and reality cannot drift — sticky beside the form on a wide screen
-and collapsible directly above the publish button on a phone. "Add your guests" is the primary
-action after publishing, landing on the Guests tab via `?tab=`; the code stays, demoted, with a
-line saying plainly that nothing shared that way can be tracked. The email can be read in a
-sandboxed frame before it goes anywhere, labelled with what it does and does not prove. Send
-controls appear only when they have something to do.
+Terraform for the bucket, IAM, CORS, lifecycle, Cloud Run, Scheduler, Secret Manager and every
+Firestore index. Deploy through GitHub Actions with Workload Identity Federation — no
+long-lived service account key anywhere.
 
-### What happens after somebody replies — shipped
+---
 
-The reply was the end of the road: a toast, and the same three buttons still sitting there.
-That is the wrong place to stop, because the instant after "yes" is the highest intent anyone
-has in this product — they have just committed to being somewhere, and the next thing in their
-head is when is it, what do I do, is anyone else going.
+## Before billing
 
-It answers those now: the date, straight into their calendar; whether anybody else is coming;
-and a way into the wall, worded by occasion. Nothing is sold there — they have just done what
-was asked.
+**The archive has never been verified against real Cloud Storage.** It works against the
+emulator and is covered by smoke and e2e, but the credential path for signing URLs in Cloud
+Run differs from the emulator's, and this is the thing being paid for.
 
-**A "no" is not a dead end either**, and this is the part most invitation products miss.
-Someone who cannot come to a fortieth still wants to say something to the person having it, so
-declining offers the wall too — "leave them a message anyway" — while pointedly not offering a
-calendar entry for an event they have just said they cannot attend.
+One real event, on production: post a photo, download the archive, open the zip. Nobody can
+automate it and nothing else should be turned on until it is done.
 
-A returning guest gets the confirmation rather than radio buttons they already used, and
-changing the answer stays one quiet tap away: a reply is not a contract.
+Then, in order:
 
-`postCreated` and `rsvpYes` are already counted, so whether this actually moves replies into
-participation is measurable without adding anything.
+1. `BILLING_DRIVER=stripe`; `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` into
+   `infra/terraform/secrets.tf`, following the `RESEND_API_KEY` pattern — and mind that a
+   `for_each` key may not derive from a sensitive value.
+2. Verify `stripe.gateway.ts` live in test mode: checkout → webhook → `events/{id}.plan`.
+   Assert an **unsigned** webhook is rejected, and that entitlements actually change.
+3. Enable Apple Pay, Google Pay and Link in Checkout — these move conversion measurably.
+4. Resolve `vanityLink`, which the Pro plan sells and nothing implements. Build it or stop
+   selling it; do not launch a paid plan with a claim behind it that is not true.
+5. Flip `features.billing`. Existing events keep the plan stamped on them, which is the whole
+   point of the stamp — verify that with the regression test before and after the flip.
 
-### Payments
+---
 
-The entitlement gates are written and tested. Missing: Stripe Checkout for the one-off,
-Stripe Billing for the subscription, a webhook that stamps `events/{id}.plan`, and an
-upgrade screen inside an existing event. See [PRICING.md](./PRICING.md).
+## Next, in the order I would do it
 
-### Archive download
+### 1. Close the two open loops in the shipped product
 
-Do not turn billing on without it. It is the answer to "what happens to my photos", which is
-the question that decides whether someone trusts us with the event at all.
+Small, and both are the same class of problem as the admin gap: something advertised with
+nothing behind it.
 
-### Real GCP provisioning
+- **`features.presentationMode` is `true` and there is no presentation mode.** No route, no
+  component. Build it — a big-screen wall for a venue projector is genuinely wanted and mostly
+  a layout — or set the flag false.
+- **`vanityLink`**, as above.
 
-Terraform for bucket, IAM, CORS, lifecycle, Cloud Run, Scheduler and Secret Manager. Manual
-steps are in [SETUP.md](./SETUP.md) today.
+### 2. The post-event ask
 
-## Phase 3 — owner and admin console
+The one credible moment to ask a guest for anything is **after the event, when they want the
+photos**. Let a guest take a low-resolution copy of photos they appear in, free, and put "make
+one of your own" on that screen.
 
-`/admin`, gated on `admin:accessConsole`, behind `features.adminConsole`.
+This is the compounding loop the business does not otherwise have: it converts a guest into a
+host at the only instant they care. Explicitly **not** referral discounts — this category is
+occasion-triggered, not price-triggered, and "give $5 get $5" does not fire when nobody is
+having a birthday.
 
-| Screen        | Needs                                                                 |
-| ------------- | --------------------------------------------------------------------- |
-| Events        | list, filter, force-end, extend, delete, storage per event            |
-| Users         | list, search, suspend with reason, view their events                  |
-| Content       | remove any post, cross-event search                                   |
-| Audit log     | filter by actor, action, event, date; reading it writes its own entry |
-| Feature flags | Firestore `config/features`, read through `isEnabled()`               |
-| Storage       | bytes by event, orphan report, manual sweep trigger                   |
+### 3. Discoverability
 
-Also: per-event host moderation UI — mute a member, remove a member, lock the wall.
+There is no SEO surface at all: no sitemap, and `robots.txt` correctly closes everything but
+four marketing pages. Occasion-specific planning pages ("what to put on a 40th birthday
+invitation") are the honest version of this — real content the templates and planning config
+already half-write.
 
-Most of the server side already exists. `can()` already answers every `admin:*` permission;
-what is missing is the read APIs and the screens.
+The competitive read: this does not beat Evite at being Evite, and twenty years of SEO is
+unwinnable. The winnable ground is the **50–250 guest milestone event**, where Evite's premium
+tier is the incumbent and Zola and The Knot are absent because it is not a wedding.
 
-**Done when:** an owner can find and remove any piece of content in under a minute, and every
-action they take is in the audit log.
+### 4. The wishes board
 
-## Phase 5 — content safety
+Agreed as the next product direction and deliberately deferred until the RSVP work was
+finished. A tribute board — a colleague's retirement, a leaving card, a milestone birthday —
+where people leave messages, audio and video for one recipient.
 
-Behind `features.safetyScan`.
+Most of it exists: posts, media, a wall, and presentation mode. What is missing is framing plus
+one mechanic:
 
-- Cloud Vision SafeSearch on images and sampled video frames, at finalize
-- Posts scoring above threshold enter `state: 'quarantined'` — invisible to members, visible
-  in the console
-- Member-facing "report this post", creating a review item
-- Appeal trail: who quarantined, who released, when
+- `occasion.kind: 'tribute'` with a recipient, distinct from a host.
+- **Sealed until the day.** An event-level `revealAt`, with posts hidden from everyone but
+  their author until it passes — enforced server-side in the wall query **and in
+  `firestore.rules`**. A client-side hide would be a lie: guests can read the wall directly,
+  and this is the one to test hardest, as a rules test rather than only an e2e.
 
-**Done when:** a host never has to be the first line of defence against an image nobody
-should have to look at.
+Kudoboard is an entire business doing roughly this at $6–25 a board. GIF picking is parked.
 
-## Phase 6 — ads and marketing
+### 5. Cash and group gifting — only if the click data supports it
 
-Behind `features.ads` and `features.analytics`. Design detail in
-[ADS_MARKETING.md](./ADS_MARKETING.md).
+Stripe Connect Express, host as merchant of record, application fee, **never a wallet**.
+`gifts/{giftId}` with a `contributions/` subcollection, extending `BillingGateway` rather than
+starting a parallel payments stack.
 
-- Consent banner (GDPR/CCPA), consent state gating every non-essential script
-- Typed analytics event schema — no free-form event names
-- Config-driven sponsor slots in the wall layout
-- GA4 → BigQuery export for funnel analysis
+Gate this on the registry probe's numbers. It is a three-month bet whose modelled revenue
+assumes a guest will send $85 through a site they have never heard of; the probe cost days and
+tells you whether that is real.
 
-The seams exist now: the flags, the layout hooks, and a wall that already renders a
-heterogeneous list. Only activation is deferred.
+If it ships: idempotency keys on every charge, velocity limits (gifting is a known
+card-testing and laundering vector), disputes disclosed plainly to the host at onboarding
+rather than buried, and an accountant on the platform fee's tax treatment **before** it ships.
+
+---
+
+## Cheap things worth doing whenever
+
+- Reactions on posts — small, and the most reliable driver of return visits.
+- A "who's coming" avatar row on the invitation; social proof measurably lifts RSVP.
+- Occasion-specific wall prompts in config — "share a photo of them from that decade" for a
+  40th, "guess the first word" for a 1st birthday.
+- ~20 more templates, milestone-weighted. Config rows only. This is the answer to "should we
+  run a template marketplace" — see [DECISIONS.md](./DECISIONS.md).
+- Guest feedback, weighted over host feedback, since guests are the untapped side. Honest
+  caveat: a form yields anecdotes and the funnel yields truth; do not let it substitute for
+  measurement.
+
+---
+
+## Later phases, with their flags
+
+### Content safety — `features.safetyScan`, `features.contentReporting`
+
+Cloud Vision SafeSearch on images and sampled video frames at finalize; posts over threshold
+enter `state: 'quarantined'`, invisible to members and visible in the console; a member-facing
+"report this post"; an appeal trail of who quarantined and who released.
+
+**Done when:** a host never has to be the first line of defence against an image nobody should
+have to look at.
+
+Note that the takedown path already exists — a platform admin can remove any post, and the
+console can find the event — so this is about not needing a human in the loop, not about
+having no answer at all.
+
+### Consent and third-party analytics — `features.ads`, `features.analytics`
+
+Only relevant if the no-ads decision is ever reversed, which needs the evidence named in
+[DECISIONS.md](./DECISIONS.md). The seams exist: the flags, the layout hooks, and a wall that
+already renders a heterogeneous list.
+
+### SMS and WhatsApp
+
+Blocked on paperwork, not code. One channel adapter, carrier delivery receipts, a global STOP
+suppression list, quiet hours and per-plan metering — US SMS costs roughly thirty times what
+email does. A2P 10DLC brand and campaign registration and Meta business verification each take
+one to three weeks and must be **started before** the code is worth writing.
+
+---
 
 ## Deferred, with reasons
 
-**Video transcoding.** Cloud Transcoder normalising to H.264/AAC with an HLS ladder. Deferred
-because it adds a worker service, async "processing" states in the UI, and real per-minute
-cost — for a v1 where a 60-second cap already keeps files playable. `features.transcoding`
-reserves the seam; enabling it will not change the storage layout or the post schema.
+**Video transcoding.** Cloud Transcoder normalising to H.264/AAC with an HLS ladder. It adds a
+worker service, async "processing" states in the UI, and real per-minute cost — for a product
+where a 60-second cap already keeps files playable. `features.transcoding` reserves the seam;
+enabling it will not change the storage layout or the post schema.
 
 **Native apps.** The web app handles mobile capture through the file input. A native shell
 would improve camera access and background upload, and is not worth it until usage says so.
+
+**An "upgrade viewed" counter.** The one funnel moment that exists only in the browser, so it
+needs a client beacon — new write surface for one ratio, when the server-side moments answer
+most of the question.
+
+**Wallet passes.** Lock-screen presence on the day, and they update themselves if the venue
+moves. Genuinely good; not ahead of anything above it.
+
+**A role-granting UI.** See [DECISIONS.md](./DECISIONS.md) — deliberately unreachable.
 
 ## Ideas not yet committed
 
 - Save-the-date, sent before the details are settled — the schema already allows a null date
 - Co-hosts, so a wedding is not owned by one person's account
 - Seating and meal choices, which is where the wedding market starts paying real money
-
-- Presentation mode for projecting a wall on a venue screen (`features.presentationMode` is
-  already true; the route does not exist yet)
-- Downloadable archive before an event expires — the obvious counterweight to ephemerality
-- Reactions
 - Multiple attachments per post (`contentLimits.mediaPerPost` already parameterises this)
 - Recurring events reusing a stable code

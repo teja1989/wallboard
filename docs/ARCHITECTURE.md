@@ -15,6 +15,9 @@ Browser ──┬─ Next.js pages (RSC + client components)
 One event, three surfaces — invitation, wall and guest list — served from one page and one
 Firestore document tree. A handful of decisions carry most of the design.
 
+This file is **how it works**. For _why_ — which of these are settled, what evidence would
+reopen one, and which apparent oversights are deliberate — see [DECISIONS.md](./DECISIONS.md).
+
 ### 1. Writes are server-only; reads can be direct
 
 Firestore security rules grant clients **read** access to documents they are a member of,
@@ -343,6 +346,63 @@ prefix is the authorisation: everything under `events/{id}/posts/` belongs to th
 and a member of that event may already see all of it. One batch costs two reads for any
 number of posts.
 
+### 14. The plan is a stamp, not a lookup
+
+`planForNewEvent()` resolves the account's plan and any promo grant **once, at creation**, and
+writes the answer to `events/{id}.plan`. `effectivePlanId()` reads the stamp.
+
+Entitlements used to be derived from global present state, and the consequence was a dated
+landmine rather than an inelegance: turning `features.billing` on would have retroactively
+downgraded every existing event. Live walls would drop from 30 days to 7 and lose
+`archiveDownload` — hosts watching their wall shorten and their photos become unkeepable,
+mid-event, having done nothing.
+
+The same shape is what makes promos safe. A grant is a fact recorded at a moment; a promo that
+re-evaluated would open everything up for a week and then close on people still using it.
+
+It also means **moving the paywall later is a config change rather than a rewrite**, which is
+what makes deferring the pricing decision a real option instead of procrastination. The
+regression test that matters: create an event with billing off, flip the flag, assert its
+entitlements are unchanged.
+
+### 15. Two host surfaces with opposite read rules, for the same reason
+
+The gift list and the planning board are both host-managed subcollections on the event, and
+they sit at opposite ends of the visibility question — which is the point.
+
+`registry/` is the one host-managed collection guests are _meant_ to read: it renders on the
+invitation, and a guest deciding what to bring is the entire audience. So members read it, and
+writes — `clickCount` included, which a browser must not be able to inflate — go through the
+host-only API.
+
+`milestones/` is `allow read, write: if false`, and unusually the **host is locked out too**.
+Reads because it is somebody's working notes about their own party, budget included, and a
+guest reading the catering spend for the party they are attending is a surprise this product
+must never produce. Writes because ticking a row is gated on the `eventPlanning` entitlement,
+and a Firestore rule cannot check one.
+
+The planning board also writes nothing until it is touched. A read renders the occasion's
+template from config with ids of the form `template:{key}`; the first mutation materialises the
+whole template and then applies itself. Reads stay pure, a host who never opens the tab has
+nothing written on their behalf, and the seeded wording stays editable in config right up until
+somebody uses it.
+
+### 16. Scheduled work claims before it acts
+
+Cloud Scheduler hits two internal routes behind a constant-time bearer check
+(`assertInternalTask`): the cleanup sweep and the reminder run.
+
+Reminders claim their slot **inside a transaction, before sending**, re-reading the event and
+re-checking the due decision. A job that recorded the send afterwards would double-send
+whenever a run died mid-flight, and a duplicate nudge costs more than a missed one — it burns a
+guest's goodwill and the sending reputation every host here shares. A claimed-then-failed slot
+deliberately stays claimed.
+
+The decision itself, `dueReminderSlot`, is a pure function in `reminders.config.ts` taking
+`now`, so the interesting cases — a slot that fell due before the invitation existed, a deadline
+already passed, an event too close to be worth chasing — are unit-testable without waiting for
+a Tuesday.
+
 ## Media is resized before it is uploaded
 
 Egress is the largest line on the bill for an app whose whole purpose is photos, and a wall
@@ -444,18 +504,28 @@ their wall back intact.
 
 ## Where things live
 
-| Path                | Holds                                                  |
-| ------------------- | ------------------------------------------------------ |
-| `src/config/*`      | every tunable — limits, flags, roles, tokens, env      |
-| `src/lib/authz/`    | `can()` policy engine, session resolution              |
-| `src/lib/services/` | events, posts, cleanup — logic shared across routes    |
-| `src/lib/storage/`  | the adapter and its two drivers                        |
-| `src/lib/calendar/` | the `.ics` builder, shared by the browser and email    |
-| `src/lib/storage/`  | see also `batch.ts` — bounded, retried object deletion |
-| `src/app/api/`      | route handlers; thin, they orchestrate services        |
-| `src/components/`   | UI, grouped by area                                    |
-| `src/proxy.ts`      | security headers and the CSP nonce                     |
-| `firestore.rules`   | the boundary a browser cannot cross                    |
+| Path                    | Holds                                                       |
+| ----------------------- | ----------------------------------------------------------- |
+| `src/config/*`          | every tunable — limits, flags, roles, tokens, env           |
+| `src/lib/authz/`        | `can()` policy engine, session resolution                   |
+| `src/lib/services/`     | events, posts, cleanup — logic shared across routes         |
+| `src/lib/storage/`      | the adapter and its two drivers                             |
+| `src/lib/calendar/`     | the `.ics` builder, shared by the browser and email         |
+| `src/lib/storage/`      | see also `batch.ts` — bounded, retried object deletion      |
+| `src/lib/billing/`      | the gateway interface, its drivers, and `entitlementsFor()` |
+| `src/lib/email/`        | the provider adapter and the development outbox             |
+| `src/app/api/`          | route handlers; thin, they orchestrate services             |
+| `src/app/api/internal/` | Scheduler targets, behind a shared bearer secret            |
+| `src/app/admin/`        | the operator console; the layout holds the flag gate        |
+| `src/components/`       | UI, grouped by area                                         |
+| `src/proxy.ts`          | security headers and the CSP nonce                          |
+| `firestore.rules`       | the boundary a browser cannot cross                         |
+| `infra/terraform/`      | what actually provisions production, indexes included       |
+
+Two files carry the same information and must not drift: `firestore.indexes.json` (emulator
+and Firebase CLI) and `infra/terraform/firestore.tf` (the real project). The emulator does not
+enforce composite indexes and production does, so a query that works locally can fail on deploy
+with nothing in between to warn you.
 
 ## Deliberate omissions
 
@@ -478,6 +548,7 @@ their wall back intact.
   enforced by `can()`, and reachable from nowhere. `admin:suspendUser` was among them, which
   meant `Actor.suspended` gated every write in the product while nothing could set the field —
   the launch-day answer to an abuse report was to edit a Firestore document by hand.
+
 - **No payment path.** The entitlement gates are written and tested; only Stripe is missing.
   See [PRICING.md](./PRICING.md) for what turning it on involves.
 - **No email delivery.** Invitations are shared as a link or a code. Sending them by email is

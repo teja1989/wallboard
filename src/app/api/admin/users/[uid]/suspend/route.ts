@@ -2,7 +2,14 @@ import { platformRoleRank } from '@/config';
 import { assertCan } from '@/lib/authz/policy';
 import { recordAudit } from '@/lib/audit';
 import { getUser, setSuspended } from '@/lib/services/admin';
-import { ApiError, limitByUser, ok, parseBody, requireIdentifiedActor, route } from '@/lib/server/api';
+import {
+  ApiError,
+  limitByUser,
+  ok,
+  parseBody,
+  requireIdentifiedActor,
+  route,
+} from '@/lib/server/api';
 import { requestContext } from '@/lib/server/request';
 import { suspendUserSchema, uidSchema } from '@/lib/validation/schemas';
 import type { PlatformRole } from '@/types/domain';

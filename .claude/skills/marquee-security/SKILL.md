@@ -28,6 +28,11 @@ Break any of these and the review fails, whatever else is true:
    because Firestore rules cannot restrict a field.
 9. **Entitlements are not permissions.** `can()` answers who you are, `entitlementsFor()`
    answers what was paid for. Neither may stand in for the other.
+10. **A permission that is enforced must be reachable, or explicitly parked.** Five `admin:*`
+    permissions were declared, checked by `can()`, and had no route — `admin:suspendUser`
+    among them, so every write in the product was gated on a field nothing could set. Each
+    layer looked complete alone. `tests/unit/admin-console.test.ts` now fails on any
+    `admin:*` that is neither wired to a console section nor named as deliberately unreachable.
 
 ## If you added an API route
 
@@ -48,9 +53,36 @@ Break any of these and the review fails, whatever else is true:
 - [ ] Tests assert the **refusals**, not just the grants
 - [ ] Anonymous path considered — does `ANONYMOUS_PERMISSIONS` need to change? (Almost always
       no; prefer a call-site flag like `anonymousPostingAllowed`)
-- [ ] Suspended-account path considered — writes must stay refused at every role
+- [ ] Suspended-account path considered — writes must stay refused at every role. Note that
+      **`requireActor()` refuses a suspended caller before `can()` is consulted**, so the API
+      is a full lockout including reads; `can()`'s read carve-out is defence in depth, not the
+      observable behaviour. Do not "fix" one to match the other without deciding which is right
 - [ ] UI and API both read the same `can()` result, so a button cannot promise what the API
       refuses
+- [ ] If it is an `admin:*`, it is reachable from the console or listed in that test's parked
+      set with a reason
+
+## If you touched the operator console
+
+`/admin` is the one surface that reads other people's data by design, so the questions are
+different from everywhere else.
+
+- [ ] The route re-checks the permission itself. A page gate is not authorization: every
+      screen renders for anybody and the API is what refuses
+- [ ] Rate-limited despite being staff-only. An operator account is the most valuable one to
+      steal, and a stolen session must not enumerate the user table at machine speed
+- [ ] Nothing new is rendered that the job does not need. IP and user agent are stored on every
+      audit entry and deliberately not shown — those are for an investigation somebody decided
+      to run, not for idle scrolling
+- [ ] A write here cannot disable the console. Suspension refuses the caller themselves and
+      anyone at or above their own platform rank; without both, one misclick or two operators
+      can lock everybody out of the screen that lifts it
+- [ ] Reading the audit log still writes `admin.auditViewed`. It is the only read in the
+      product that audits itself, and that is deliberate
+- [ ] **Reads over a collection tolerate a document that is not there.** Firestore lists
+      phantom parents — a deleted event whose `funnel` subcollection survives — and `.data()`
+      on one is `undefined`. A console is the tool you reach for when the data is wrong
+- [ ] Smoke asserts the refusal at signed-out, code-only guest, and host, not just the grant
 
 ## If you touched Firestore or Storage rules
 

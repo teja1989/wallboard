@@ -180,9 +180,9 @@ describe('the suspend request shape', () => {
 
   it('requires a reason to lift a suspension too, not only to apply one', () => {
     expect(suspendUserSchema.safeParse({ suspended: false, reason: '' }).success).toBe(false);
-    expect(
-      suspendUserSchema.safeParse({ suspended: false, reason: 'appeal upheld' }).success,
-    ).toBe(true);
+    expect(suspendUserSchema.safeParse({ suspended: false, reason: 'appeal upheld' }).success).toBe(
+      true,
+    );
   });
 
   it('strips invisible characters out of a reason, like every other stored text', () => {

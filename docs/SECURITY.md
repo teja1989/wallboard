@@ -57,7 +57,7 @@ behaviour anybody observes today. This page previously described the `can()` rul
 product's behaviour, which was wrong in the direction that matters: it read as more permissive
 than the code.
 
-What a suspended account *does* keep is whatever the Firestore rules allow their token
+What a suspended account _does_ keep is whatever the Firestore rules allow their token
 directly — their own profile, and events they are a member of. That is deliberate. Suspension
 is meant to stop somebody posting, not to confiscate their own photographs, and the rules test
 in `tests/rules/` asserts both halves: they can still read their profile, and they cannot lift
@@ -310,6 +310,19 @@ Tracked, not forgotten:
   must never point at anything but a local emulator.
 - **Rate limiting is per-instance-agnostic but Firestore-backed**, so it is correct but costs
   a write per check.
+- **Three `admin:*` permissions are enforced and deliberately unreachable** —
+  `manageFeatureFlags`, `grantRole`, `purgeStorage`. This is a decision, not an oversight, and
+  `tests/unit/admin-console.test.ts` fails if one quietly grows a route. Reasons in
+  [DECISIONS.md](./DECISIONS.md). The practical consequence: **there is no way to grant the
+  `support` or `admin` platform roles.** In effect the ladder is `user` and `owner`, the latter
+  through `OWNER_EMAILS`. Fine for a single operator; it needs solving before anyone is hired
+  to handle tickets.
+- **A platform admin can remove any post but cannot reach one directly.** The console finds the
+  event and the wall does the removal, which is two steps. Adequate for launch volume;
+  cross-event content search is the phase-3 item that fixes it.
+- **`features.presentationMode` is `true` with nothing behind it.** Not a security gap, but the
+  same class of defect as the one above and worth the same suspicion: the flag is the entire
+  feature.
 
 ## Reporting a vulnerability
 

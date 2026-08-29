@@ -42,22 +42,46 @@ npm run test:e2e      # Playwright through the real UI
 over port 8080.
 
 `smoke` and `test:e2e` expect both processes already running. `smoke` is the fastest way to
-confirm a backend change is genuinely working — 47 assertions covering the access model,
-uploads, moderation, code rotation, and security headers, in a couple of seconds.
+confirm a backend change is genuinely working — 251 assertions covering the access model,
+uploads, moderation, code rotation, the admin console and security headers, in a few seconds.
+
+Roughly where the counts should sit, so a silent drop is noticeable: **377 unit · 67 rules ·
+251 smoke · 82 e2e**.
+
+**Run the last two against a production build, not `npm run dev`.** Some assertions — the CSP,
+cache headers, static rendering — only tell the truth against `npm run build && npm start`.
+`scripts/smoke.mjs` checks the build id it is talking to and refuses a stale server, because an
+old `next start` holding port 3000 while the new one dies on `EADDRINUSE` otherwise looks
+exactly like a code failure.
+
+The owner-only paths in `smoke` and `e2e` need the address the **server** calls an owner, and
+both processes read their own environment. In CI one `env:` block feeds both. Locally:
+
+```bash
+OWNER_EMAILS=$(grep OWNER_EMAILS .env.local | cut -d= -f2) npm run smoke
+```
+
+They **skip** rather than guess when it is unset: an assertion that signed up the wrong address
+would "pass" by being refused, which is the worst kind of green.
 
 Signing in during development: request the link in the app, then open
 <http://localhost:4000/auth> and click the link the emulator shows.
 
 ## Where to make a change
 
-| Task                               | Place                                                                    |
-| ---------------------------------- | ------------------------------------------------------------------------ |
-| A limit, quota, window, or cap     | `src/config/limits.config.ts` — never inline                             |
-| A feature you are not shipping yet | `src/config/features.config.ts`, default `false`                         |
-| A permission                       | `src/config/roles.config.ts`, then a test in `tests/unit/policy.test.ts` |
-| A colour, radius, or spring        | `src/config/branding.config.ts` + `src/app/globals.css`                  |
-| Logic two routes both need         | `src/lib/services/`                                                      |
-| A new API route                    | `src/app/api/**/route.ts`, wrapped in `route()`                          |
+| Task                               | Place                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| A limit, quota, window, or cap     | `src/config/limits.config.ts` — never inline                                                                  |
+| A feature you are not shipping yet | `src/config/features.config.ts`, default `false`                                                              |
+| A permission                       | `src/config/roles.config.ts`, then a test in `tests/unit/policy.test.ts`                                      |
+| A colour, radius, or spring        | `src/config/branding.config.ts` + `src/app/globals.css`                                                       |
+| Logic two routes both need         | `src/lib/services/`                                                                                           |
+| A new API route                    | `src/app/api/**/route.ts`, wrapped in `route()`                                                               |
+| A string a guest or host reads     | the relevant `*.config.ts` — never inline in a component                                                      |
+| An audit action                    | `src/config/audit.config.ts` (not `lib/audit.ts` — that file is `server-only` and the console needs the list) |
+| An operator screen                 | `adminSections` in `src/config/admin.config.ts`, then the page and route                                      |
+| A funnel counter                   | `FUNNEL_EVENTS` in `src/config/analytics.config.ts`, and a ratio if it decides something                      |
+| A composite index                  | **both** `firestore.indexes.json` and `infra/terraform/firestore.tf`                                          |
 
 ### Adding an API route
 
@@ -326,7 +350,7 @@ to change one of them.
 
   It wiped a milestone's budget when a box was ticked; it reset `maxPartySize` and blanked a
   host's custom question when the reminder switch was flipped; and `location` and `timeZone`
-  both ended `.nullable().default(null)`, so *every* settings edit would have erased the venue
+  both ended `.nullable().default(null)`, so _every_ settings edit would have erased the venue
   and the event's timezone — the field that makes each guest see the right hour.
 
   So: **an update schema has no defaults anywhere.** Where creation genuinely wants them, define
@@ -348,7 +372,7 @@ to change one of them.
   complete on its own.
 
   `tests/unit/admin-console.test.ts` now holds the whole `admin:*` set against the console's
-  section config and fails on anything reachable from nowhere that is not *named* as
+  section config and fails on anything reachable from nowhere that is not _named_ as
   deliberately parked. Adding a permission means wiring it or explaining it.
 
 - **`docs/` can be more permissive than the code, and that reads as a promise.**
@@ -361,7 +385,7 @@ to change one of them.
   whose `funnel` subcollection still exists keeps appearing in a query over `events` as a
   document that does not exist. Casting `snapshot.data()` to a domain type and reading a field
   off it threw, and took the whole console screen down with a 500 the first time somebody
-  deleted an event. Any code that reads a *collection* rather than a known document must skip
+  deleted an event. Any code that reads a _collection_ rather than a known document must skip
   a snapshot with no data and coerce the rest — a console is the tool you reach for when the
   data is wrong, so it has to survive the data being wrong.
 

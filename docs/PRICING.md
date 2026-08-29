@@ -130,6 +130,16 @@ Do not turn billing on before the archive download works. It is the single featu
 justifies the price, because it is the answer to "what happens to my photos" — and that is
 the question that decides whether people trust us with the event at all.
 
+**"Works" means verified against real Cloud Storage, by hand, on production.** It passes
+against the emulator and is covered by smoke and e2e, but the credential path for signing URLs
+in Cloud Run differs from the emulator's, so those runs do not settle it. One real event: post
+a photo, download the archive, open the zip. Nobody can automate that step, and it is the last
+thing standing between here and charging.
+
+The other pre-flight item is `vanityLink`, which the Pro plan's own claims sell and nothing
+implements. Build it or stop selling it — do not launch a paid tier with an untrue bullet on
+it. See [ROADMAP.md](./ROADMAP.md#before-billing) for the full order.
+
 ## Deliberately not doing
 
 - **Per-guest pricing.** Wrong axis, punishes the events we want.
