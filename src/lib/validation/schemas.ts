@@ -15,6 +15,7 @@ import {
   occasions,
   planningLimits,
   registryLimits,
+  hostAssignableEventRoles,
   rsvpChoices,
   type MediaKind,
 } from '@/config';
@@ -570,3 +571,8 @@ export const sessionSchema = z.object({ idToken: z.string().min(20).max(8192) })
 export const displayNameSchema = z.object({
   displayName: cleanText(contentLimits.displayNameMaxLength).pipe(z.string().min(1)),
 });
+
+export const assignRoleSchema = z.object({
+  role: z.enum(hostAssignableEventRoles as unknown as [string, ...string[]]),
+});
+export type AssignRoleInput = z.infer<typeof assignRoleSchema>;

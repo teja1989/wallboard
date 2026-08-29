@@ -33,6 +33,8 @@ interface EventResponse {
     canManage: boolean;
     canViewCode: boolean;
     canExportGuests: boolean;
+    canAssignRole?: boolean;
+    canDelete?: boolean;
   };
 }
 
@@ -349,6 +351,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <GuestList
               eventId={eventId}
               canExport={permissions.canExportGuests}
+              canAssignRole={permissions.canAssignRole ?? false}
+              onMemberRoleChanged={loadEvent}
               refreshKey={guestRefreshKey}
             />
           </div>
@@ -364,6 +368,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
         eventId={eventId}
         title={event.title}
         plan={event.plan}
+        canDelete={permissions.canDelete ?? false}
         open={hostPanelOpen}
         onClose={() => setHostPanelOpen(false)}
         onChanged={loadEvent}

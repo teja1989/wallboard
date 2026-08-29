@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Loader2, Mail, Send, Share2, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Mail, MessageSquare, Send, Share2, Trash2 } from 'lucide-react';
 import { deliveryCopy, emailConfig, reminderCopy, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -108,6 +108,13 @@ export function InvitePanel({
     }
     // A cancelled share sheet rejects, and that is not an error worth showing anyone.
     await navigator.share({ text }).catch(() => undefined);
+  }
+
+  function sendSms(invitee: InviteeDoc) {
+    const text = relayCopy.message(hostedBy, eventTitle, linkFor(invitee));
+    const phone = invitee.phone ? invitee.phone.replace(/[^0-9+]/g, '') : '';
+    const url = `sms:${phone}?&body=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   }
 
   async function copyAll() {
@@ -348,6 +355,19 @@ export function InvitePanel({
                     ) : (
                       <Mail className="size-4" aria-hidden />
                     )}
+                  </button>
+                )}
+
+                {invitee.phone && (
+                  <button
+                    type="button"
+                    onClick={() => sendSms(invitee)}
+                    disabled={!code}
+                    aria-label={`Send SMS to ${invitee.name || invitee.phone}`}
+                    title={`Send text message to ${invitee.phone}`}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-40"
+                  >
+                    <MessageSquare className="size-4" aria-hidden />
                   </button>
                 )}
 

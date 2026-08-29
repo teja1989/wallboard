@@ -223,6 +223,8 @@ export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEm
       return renderReminder(context);
     case 'rsvpConfirmation':
       return renderConfirmation(context);
+    case 'welcomeHost':
+      return renderWelcomeHost(context);
   }
 }
 
@@ -332,6 +334,45 @@ ${url}`;
       preview: 'The details, so they are in your inbox when you need them.',
       bodyHtml,
       ctaLabel: 'See the invitation',
+      ctaUrl: url,
+    }),
+    text: text.trim(),
+  };
+}
+
+function renderWelcomeHost({ event, joinCode }: RenderContext): RenderedEmail {
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  const url = eventUrl(event.id);
+  const inviteUrl = joinCode ? joinUrl(joinCode) : url;
+
+  const bodyHtml = `
+    <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">Your Event is Ready</p>
+    <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
+    <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">Your invitation is ready to share with guests. You can open your host controls to invite friends, add co-hosts, or customize settings at any time.</p>
+    ${detailsHtml(event, joinCode)}
+    <div style="margin:24px 0 0 0;padding:16px;background:#f8f5f2;border-radius:12px;">
+      <p style="margin:0;font-size:13px;font-weight:600;color:#5c4f49;text-transform:uppercase;letter-spacing:0.08em;">Share with guests</p>
+      <p style="margin:6px 0 0 0;font-size:15px;color:#2b2320;word-break:break-all;"><a href="${inviteUrl}" style="color:#2b2320;text-decoration:underline;">${inviteUrl}</a></p>
+    </div>`;
+
+  const text = `Your event is ready: ${event.title}
+
+Manage your event, invite guests, and track RSVPs:
+${url}
+
+Share this invitation link with your guests:
+${inviteUrl}
+
+${detailsText(event, joinCode)}`;
+
+  return {
+    subject: emailSubjects.welcomeHost(event.title),
+    html: shell({
+      event,
+      preview: 'Your invitation is live and ready to share with guests.',
+      bodyHtml,
+      ctaLabel: 'Open Host Controls',
       ctaUrl: url,
     }),
     text: text.trim(),

@@ -12,7 +12,7 @@
 export const PLATFORM_ROLES = ['user', 'support', 'admin', 'owner'] as const;
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
-export const EVENT_ROLES = ['viewer', 'member', 'moderator', 'host'] as const;
+export const EVENT_ROLES = ['viewer', 'member', 'moderator', 'cohost', 'host'] as const;
 export type EventRole = (typeof EVENT_ROLES)[number];
 
 /** Higher wins. Used for "at least" comparisons, never for granting permissions directly. */
@@ -27,7 +27,8 @@ export const eventRoleRank: Record<EventRole, number> = {
   viewer: 0,
   member: 1,
   moderator: 2,
-  host: 3,
+  cohost: 3,
+  host: 4,
 };
 
 export const PERMISSIONS = [
@@ -51,6 +52,7 @@ export const PERMISSIONS = [
   'member:list',
   'member:mute',
   'member:remove',
+  'member:assignRole',
   // Posts
   'post:create',
   'post:view',
@@ -102,20 +104,17 @@ export const eventRolePermissions: Record<EventRole, readonly Permission[]> = {
   viewer: ['event:view', 'post:view', 'rsvp:respond', 'member:list'],
   member: ['post:create', 'post:deleteOwn'],
   moderator: ['post:deleteAny', 'member:mute', 'rsvp:viewAll'],
-  host: [
+  cohost: [
     'rsvp:export',
-    'invite:manage',
-    'invite:send',
-    // Sending
     'invite:manage',
     'invite:send',
     'event:update',
     'event:end',
     'event:extend',
     'event:viewJoinCode',
-    'event:rotateJoinCode',
     'member:remove',
   ],
+  host: ['event:rotateJoinCode', 'event:delete', 'member:assignRole'],
 };
 
 /**
@@ -127,4 +126,9 @@ export const platformOnlyPermissions: readonly Permission[] = PERMISSIONS.filter
 );
 
 /** Roles a host may assign to members of their own event. */
-export const hostAssignableEventRoles: readonly EventRole[] = ['viewer', 'member', 'moderator'];
+export const hostAssignableEventRoles: readonly EventRole[] = [
+  'viewer',
+  'member',
+  'moderator',
+  'cohost',
+];

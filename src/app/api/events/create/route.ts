@@ -1,5 +1,8 @@
+import { brand } from '@/config';
 import { can } from '@/lib/authz/policy';
 import { recordAudit } from '@/lib/audit';
+import { mailer } from '@/lib/email';
+import { renderEmail } from '@/lib/email/render';
 import { createEvent, toPreview } from '@/lib/services/events';
 import {
   ApiError,
@@ -49,6 +52,27 @@ export const POST = route(async (request) => {
     },
     requestContext(request),
   );
+
+  // Send a confirmation & welcome email with the event and host controls link.
+  if (actor.email) {
+    try {
+      const rendered = renderEmail('welcomeHost', {
+        event,
+        joinCode,
+      });
+      await mailer().send({
+        to: actor.email,
+        fromName: brand.name,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        kind: 'welcomeHost',
+        eventId: event.id,
+      });
+    } catch {
+      // Non-blocking: failure to deliver email must never roll back event creation
+    }
+  }
 
   return ok({ event: toPreview(event), joinCode });
 });

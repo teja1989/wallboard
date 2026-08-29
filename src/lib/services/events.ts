@@ -12,6 +12,8 @@ import {
   occasionById,
   previewPlanId,
   serverConfig,
+  hostAssignableEventRoles,
+  type EventRole,
   type TemplateId,
   type ExpiryPresetId,
   type OccasionId,
@@ -441,4 +443,48 @@ export async function readJoinCode(eventId: string): Promise<string> {
   const code = snapshot.exists ? String(snapshot.get('code') ?? '') : '';
   if (!code) throw new ApiError('not_found', 'This event has no code.');
   return code;
+}
+
+export async function assignMemberRole(
+  event: EventDoc,
+  targetUid: string,
+  newRole: EventRole,
+  actor: Actor,
+): Promise<{ previousRole: EventRole; newRole: EventRole }> {
+  if (!hostAssignableEventRoles.includes(newRole)) {
+    throw new ApiError('bad_request', `Cannot assign role '${newRole}'.`);
+  }
+
+  // The primary host of the event cannot be demoted
+  if (targetUid === event.hostUid) {
+    throw new ApiError('forbidden', 'The primary event creator cannot be demoted.');
+  }
+
+  // Caller cannot change their own role
+  if (targetUid === actor.uid) {
+    throw new ApiError('bad_request', 'You cannot change your own role.');
+  }
+
+  const memberDocumentRef = eventRef(event.id).collection(collections.members).doc(targetUid);
+  const snap = await memberDocumentRef.get();
+  if (!snap.exists) {
+    throw new ApiError('not_found', 'That person is not a member of this event.');
+  }
+
+  const member = snap.data() as MemberDoc;
+  if (member.isAnonymous && (newRole === 'cohost' || newRole === 'moderator')) {
+    throw new ApiError(
+      'bad_request',
+      'An anonymous guest must sign in with an account before being made a co-host or moderator.',
+    );
+  }
+
+  const previousRole = member.role;
+  await memberDocumentRef.update({
+    role: newRole,
+    roleUpdatedAt: Date.now(),
+    roleAssignedBy: actor.uid,
+  });
+
+  return { previousRole, newRole };
 }

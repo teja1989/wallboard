@@ -11,7 +11,7 @@ import { HOUR, MINUTE } from './limits.config';
  * So the limits below are not politeness. They are what keeps the product working.
  */
 
-export const EMAIL_KINDS = ['invitation', 'reminder', 'rsvpConfirmation'] as const;
+export const EMAIL_KINDS = ['invitation', 'reminder', 'rsvpConfirmation', 'welcomeHost'] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 export const emailConfig = {
@@ -69,4 +69,5 @@ export const emailSubjects = {
   invitation: (title: string, hostedBy: string) => `${hostedBy} invited you: ${title}`,
   reminder: (title: string) => `Still hoping you can make it — ${title}`,
   rsvpConfirmation: (title: string) => `You're on the list for ${title}`,
+  welcomeHost: (title: string) => `Your event is ready — ${title}`,
 } as const;

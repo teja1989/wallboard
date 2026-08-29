@@ -57,6 +57,8 @@ export const GET = route(async (_request, { params }: Params) => {
       canManage: can('event:update', eventAuthzContext(actor, event, eventRole)),
       canViewCode: can('event:viewJoinCode', eventAuthzContext(actor, event, eventRole)),
       canExportGuests: can('rsvp:export', eventAuthzContext(actor, event, eventRole)),
+      canAssignRole: can('member:assignRole', eventAuthzContext(actor, event, eventRole)),
+      canDelete: can('event:delete', eventAuthzContext(actor, event, eventRole)),
     },
   });
 });

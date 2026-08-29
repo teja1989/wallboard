@@ -16,6 +16,7 @@ interface HostPanelProps {
   title: string;
   /** The plan the event currently runs on, so the panel knows whether to offer an upgrade. */
   plan: string;
+  canDelete?: boolean;
   open: boolean;
   onClose: () => void;
   onChanged: () => void;
@@ -36,7 +37,15 @@ interface HostPanelProps {
  * The join code is not part of the event payload. It is fetched on demand here, which is
  * what makes each read auditable and keeps it out of any response a non-host could receive.
  */
-export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: HostPanelProps) {
+export function HostPanel({
+  eventId,
+  title,
+  plan,
+  canDelete = true,
+  open,
+  onClose,
+  onChanged,
+}: HostPanelProps) {
   const { notify } = useToast();
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reveal' | 'rotate' | 'extend' | 'end' | null>(null);
@@ -219,7 +228,7 @@ export function HostPanel({ eventId, title, plan, open, onClose, onChanged }: Ho
               </p>
             </section>
 
-            <DangerSection eventId={eventId} title={title} plan={plan} />
+            {canDelete && <DangerSection eventId={eventId} title={title} plan={plan} />}
           </motion.aside>
         </>
       )}
