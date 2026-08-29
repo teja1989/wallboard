@@ -54,7 +54,7 @@ Read them rather than re-deriving:
    handler is a bug, because the client's check and the server's enforcement would then read
    different numbers.
 
-## Two rules that have each cost real bugs
+## Three rules that have each cost real bugs
 
 - **An update schema has no defaults anywhere.** `.partial()` does not undo `.default()`, so a
   "partial" update parses an absent key into its default and the handler writes it over
@@ -64,6 +64,11 @@ Read them rather than re-deriving:
   `admin:*` permissions were enforced and reachable from nowhere (resolved); `features.presentationMode`
   was `true` with no implementation (resolved); the Pro plan sells `vanityLink`, which does not exist.
   Either wire it or say plainly, in config, that it is not wired.
+- **Do not roll custom encoders for external standards (barcodes, crypto, codecs).** Rolling an
+  in-tree ISO/IEC 18004 QR encoder to avoid packages caused polynomial division and format bit
+  errors that passed self-asserting unit tests while failing real phone cameras. Use battle-tested,
+  zero-subdependency packages (like `qrcode-generator`) that pass `dependencies.test.ts` rather
+  than hand-rolling binary specifications.
 
 ## Commands
 

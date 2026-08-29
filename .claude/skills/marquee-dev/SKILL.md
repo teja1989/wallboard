@@ -394,3 +394,11 @@ to change one of them.
   control inside a list that has not finished narrowing turns "not yet" into a hard failure.
   Wait for the list with `toHaveCount(n)`, which does retry, and then reach inside it. This
   passes by hand and fails under a loaded suite, which is the signature.
+
+- **Do not roll homebrewed encoders for external physical or binary standards (barcodes, crypto, codecs).**
+  Rolling an in-tree ISO/IEC 18004 QR encoder to avoid packages caused polynomial division and format bit
+  inversions that passed self-asserting unit tests while failing real phone cameras completely.
+  Furthermore, SVG viewBox translations clipped finder patterns because the test never tested the visual
+  or optical contract. Where an external interchange standard is required, use a battle-tested,
+  zero-subdependency package (like `qrcode-generator`) that passes `dependencies.test.ts`, ensure standard
+  quiet-zone margins, and test against independent decoder contracts.
