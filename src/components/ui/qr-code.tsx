@@ -9,21 +9,23 @@ interface QrCodeProps {
   className?: string;
   fgColor?: string;
   bgColor?: string;
+  margin?: number;
 }
 
 export function QrCode({
   value,
   size = 180,
   className,
-  fgColor = 'currentColor',
-  bgColor = 'transparent',
+  fgColor = '#000000',
+  bgColor = '#ffffff',
+  margin = 4,
 }: QrCodeProps) {
   const { matrixSize, path } = useMemo(() => {
     try {
       const matrix = generateQrMatrix(value);
       return {
         matrixSize: matrix.size,
-        path: qrMatrixToSvgPath(matrix),
+        path: qrMatrixToSvgPath(matrix, 0),
       };
     } catch {
       return { matrixSize: 21, path: '' };
@@ -32,8 +34,6 @@ export function QrCode({
 
   if (!path) return null;
 
-  // Margin of 2 modules around the QR code
-  const margin = 2;
   const viewBoxSize = matrixSize + margin * 2;
 
   return (
@@ -43,10 +43,11 @@ export function QrCode({
       viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
       width={size}
       height={size}
+      shapeRendering="crispEdges"
       className={cn('shrink-0 select-none', className)}
     >
       {bgColor !== 'transparent' && (
-        <rect width={viewBoxSize} height={viewBoxSize} fill={bgColor} rx={1} />
+        <rect width={viewBoxSize} height={viewBoxSize} fill={bgColor} />
       )}
       <g transform={`translate(${margin}, ${margin})`}>
         <path d={path} fill={fgColor} />

@@ -301,7 +301,13 @@ export function PresentationScreen({ eventId }: { eventId: string }) {
 
             {shareUrl && (
               <div className="mt-8 flex flex-col items-center rounded-3xl bg-white p-6 text-zinc-950 shadow-2xl">
-                <QrCode value={shareUrl} size={220} fgColor="#09090b" bgColor="#ffffff" />
+                <QrCode
+                  value={shareUrl}
+                  size={220}
+                  fgColor="#000000"
+                  bgColor="#ffffff"
+                  margin={3}
+                />
                 <p className="mt-4 text-sm font-semibold tracking-wide text-zinc-500 uppercase">
                   Scan to post
                 </p>
@@ -423,7 +429,7 @@ export function PresentationScreen({ eventId }: { eventId: string }) {
           className="absolute right-8 bottom-8 z-30 flex items-center gap-3.5 rounded-2xl bg-white p-3.5 text-zinc-950 shadow-2xl ring-2 ring-white/20"
           aria-label="Scan to post"
         >
-          <QrCode value={shareUrl} size={84} fgColor="#09090b" bgColor="#ffffff" />
+          <QrCode value={shareUrl} size={104} fgColor="#000000" bgColor="#ffffff" margin={2} />
           <div className="pr-1 text-left">
             <p className="text-xs font-extrabold tracking-wide text-zinc-800 uppercase">
               Scan to post

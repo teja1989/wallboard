@@ -23,13 +23,19 @@ describe('QR code generator', () => {
     expect(matrix.size).toBe(29);
     expect(matrix.modules.length).toBe(29);
 
-    const path = qrMatrixToSvgPath(matrix);
-    expect(path).toContain('M0,0h1v1h-1z');
-    expect(path.length).toBeGreaterThan(100);
+    const pathWithoutMargin = qrMatrixToSvgPath(matrix, 0);
+    expect(pathWithoutMargin).toContain('M0,0h1v1h-1z');
+
+    const pathWithMargin = qrMatrixToSvgPath(matrix, 4);
+    expect(pathWithMargin).toContain('M4,4h1v1h-1z');
+    expect(pathWithMargin.length).toBeGreaterThan(100);
   });
 
-  it('throws an error if content exceeds supported capacity', () => {
-    const tooLong = 'a'.repeat(200);
-    expect(() => generateQrMatrix(tooLong)).toThrow('QR content too long');
+  it('handles long text payloads by scaling QR version automatically', () => {
+    const longText =
+      'https://marqueersvp.com/i/very-long-test-invitation-path-with-extra-payload-query-params';
+    const matrix = generateQrMatrix(longText);
+    expect(matrix.size).toBeGreaterThan(29);
+    expect(matrix.modules.length).toBe(matrix.size);
   });
 });
