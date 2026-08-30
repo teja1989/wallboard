@@ -4,10 +4,13 @@ import { surfaceMoves } from '@/components/event/template-surface';
 
 describe('Showcase configuration & fixtures', () => {
   it('defines the required showcase event fixtures', () => {
-    expect(showcaseItems.length).toBeGreaterThanOrEqual(4);
+    expect(showcaseItems.length).toBeGreaterThanOrEqual(7);
     const ids = showcaseItems.map((item) => item.id);
     expect(ids).toContain('birthday');
+    expect(ids).toContain('graduation');
     expect(ids).toContain('wedding');
+    expect(ids).toContain('baby');
+    expect(ids).toContain('party');
     expect(ids).toContain('retirement');
     expect(ids).toContain('memorial');
   });

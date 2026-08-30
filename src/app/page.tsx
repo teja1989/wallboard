@@ -20,8 +20,8 @@ export const metadata: Metadata = {
 /**
  * The landing page.
  *
- * Showcases real live product invitations above the fold, tells the 3-step ease story,
- * and substantiates the commercial advantage: Flat $19 with zero per-guest fees.
+ * Full-width occasion discovery across the top, live interactive invitations,
+ * effortless 3-step creation flow, and uncompromising privacy & design quality.
  */
 export default function LandingPage() {
   return (
@@ -29,52 +29,47 @@ export default function LandingPage() {
       <SiteHeader />
 
       <main>
-        {/* --- hero ---------------------------------------------------- */}
-        <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-16 sm:pt-16">
-          <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
-            {/* Value Proposition Column */}
-            <div className="lg:col-span-6">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-sm font-medium text-[var(--text-secondary)]">
-                <Sparkles className="size-3.5 text-[var(--accent)]" aria-hidden />
-                Invitations, RSVPs and the live wall — one link
-              </p>
+        {/* --- hero header --------------------------------------------- */}
+        <section className="mx-auto w-full max-w-6xl px-6 pt-10 pb-10 text-center sm:pt-16 sm:pb-14">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] sm:text-sm">
+            <Sparkles className="size-3.5 text-[var(--accent)]" aria-hidden />
+            Invitations, RSVPs and the live wall — one link
+          </p>
 
-              <h1 className="text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
-                {brand.tagline}
-              </h1>
+          <h1 className="mx-auto max-w-4xl text-4xl leading-[1.08] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            {brand.tagline}
+          </h1>
 
-              <p className="mt-6 text-lg leading-relaxed text-pretty text-[var(--text-secondary)]">
-                {brand.promise}
-              </p>
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-pretty text-[var(--text-secondary)] sm:text-lg">
+            {brand.promise}
+          </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/create"
-                  className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-7 text-base font-medium text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
-                >
-                  Make an invitation
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-                <Link
-                  href="/join"
-                  className="inline-flex h-13 items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-7 text-base font-medium transition-colors hover:bg-[var(--accent-soft)]"
-                >
-                  I have a code
-                </Link>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-muted)]">
-                <span>✓ Free to start</span>
-                <span>✓ 100% ad-free experience</span>
-                <span>✓ No app or sign-up for guests</span>
-              </div>
-            </div>
-
-            {/* Live Interactive Invitation Preview Showcase */}
-            <div className="lg:col-span-6">
-              <InvitationShowcase />
-            </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/create"
+              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-7 text-base font-medium text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+            >
+              Make an invitation
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+            <Link
+              href="/join"
+              className="inline-flex h-13 items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-7 text-base font-medium transition-colors hover:bg-[var(--accent-soft)]"
+            >
+              I have a code
+            </Link>
           </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
+            <span>✓ Free to start</span>
+            <span>✓ 100% ad-free experience</span>
+            <span>✓ No app or sign-up for guests</span>
+          </div>
+        </section>
+
+        {/* --- full-width occasion showcase with top filter bar --------- */}
+        <section className="mx-auto w-full max-w-6xl px-6 pb-16">
+          <InvitationShowcase />
         </section>
 
         {/* --- 3-step ease story --------------------------------------- */}

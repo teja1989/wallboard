@@ -4,8 +4,8 @@ import type { EventDoc } from '@/types/domain';
  * Showcase fixture events.
  *
  * Real, complete EventDoc records used to render live `<Invitation />` components on the
- * marketing and landing pages. Because these are real components, the marketing showcase
- * cannot drift from the actual product UI.
+ * marketing and landing pages. Covers all high-frequency consumer occasions: Birthdays,
+ * Graduations, Weddings, Baby Showers, Parties, Dinners/Galas, and Memorials.
  */
 export interface ShowcaseItem {
   id: string;
@@ -19,8 +19,8 @@ const NOW = 1788000000000; // Static anchor timestamp for consistent SSR renderi
 export const showcaseItems: readonly ShowcaseItem[] = [
   {
     id: 'birthday',
-    label: '40th Birthday',
-    tagline: 'Lively, memorable milestone parties with live guest photo streams',
+    label: 'Birthday Party',
+    tagline: 'Milestone birthdays & celebrations with live guest photo sharing',
     event: {
       id: 'showcase-birthday',
       title: "Maya's 40th Birthday Celebration",
@@ -31,7 +31,7 @@ export const showcaseItems: readonly ShowcaseItem[] = [
       hostedBy: 'Maya & Sam',
       templateId: 'midnight',
       status: 'live',
-      startsAt: NOW + 86400000 * 14 + 3600000 * 19, // 14 days out at 7:00 PM
+      startsAt: NOW + 86400000 * 14 + 3600000 * 19,
       endsAt: NOW + 86400000 * 14 + 3600000 * 24,
       timeZone: 'America/New_York',
       location: {
@@ -72,9 +72,63 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     },
   },
   {
+    id: 'graduation',
+    label: 'Graduation',
+    tagline: 'High school & university commencement parties, honors & open houses',
+    event: {
+      id: 'showcase-graduation',
+      title: 'Class of 2026 Commencement & Celebration',
+      description:
+        'Celebrate Sam’s graduation from Columbia University! Join us for an afternoon garden reception and toasts.',
+      occasion: 'graduation',
+      hostUid: 'usr_showcase_grad',
+      hostName: 'The Miller Family',
+      hostedBy: 'David & Karen Miller',
+      templateId: 'lagoon',
+      status: 'live',
+      startsAt: NOW + 86400000 * 21 + 3600000 * 14,
+      endsAt: NOW + 86400000 * 21 + 3600000 * 19,
+      timeZone: 'America/New_York',
+      location: {
+        name: 'The Riverfront Pavilion & Gardens',
+        address: '150 Riverside Drive, New York, NY',
+        url: 'https://maps.google.com',
+      },
+      dressCode: 'Smart casual / garden party attire',
+      rsvp: {
+        enabled: true,
+        deadline: NOW + 86400000 * 14,
+        allowPlusOnes: true,
+        maxPartySize: 4,
+        askNote: true,
+        question: 'Will you be attending the campus ceremony beforehand?',
+        autoRemind: true,
+      },
+      rsvpTally: {
+        yes: 68,
+        no: 8,
+        maybe: 5,
+        pending: 15,
+        attending: 76,
+      },
+      settings: {
+        whoCanPost: 'anyone',
+        allowedKinds: ['text', 'image', 'video'],
+      },
+      plan: 'pro',
+      createdAt: NOW - 86400000 * 5,
+      expiresAt: NOW + 86400000 * 30,
+      endedAt: null,
+      remindersSent: [],
+      memberCount: 72,
+      postCount: 28,
+      storageBytes: 20971520,
+    },
+  },
+  {
     id: 'wedding',
     label: 'Wedding',
-    tagline: 'Elegant ceremonies & receptions with no per-guest fees',
+    tagline: 'Elegant ceremonies, receptions & rehearsal dinners',
     event: {
       id: 'showcase-wedding',
       title: 'Sophie & Liam',
@@ -126,9 +180,117 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     },
   },
   {
+    id: 'baby',
+    label: 'Baby Shower',
+    tagline: 'Warm family welcomes & registries with zero ads',
+    event: {
+      id: 'showcase-baby',
+      title: 'A Shower for Baby Charlotte',
+      description:
+        'Join us for afternoon tea, sweet treats, and celebrating mama-to-be Jessica.',
+      occasion: 'baby',
+      hostUid: 'usr_showcase_baby',
+      hostName: 'Hannah & Claire',
+      hostedBy: 'Hannah & Claire',
+      templateId: 'blossom',
+      status: 'live',
+      startsAt: NOW + 86400000 * 18 + 3600000 * 13,
+      endsAt: NOW + 86400000 * 18 + 3600000 * 16,
+      timeZone: 'America/New_York',
+      location: {
+        name: 'The Conservatory Garden Room',
+        address: '540 Park Avenue, New York, NY',
+        url: 'https://maps.google.com',
+      },
+      dressCode: 'Pastel / tea party attire',
+      rsvp: {
+        enabled: true,
+        deadline: NOW + 86400000 * 10,
+        allowPlusOnes: false,
+        maxPartySize: 1,
+        askNote: true,
+        question: 'Any dietary restrictions?',
+        autoRemind: true,
+      },
+      rsvpTally: {
+        yes: 32,
+        no: 4,
+        maybe: 2,
+        pending: 6,
+        attending: 32,
+      },
+      settings: {
+        whoCanPost: 'anyone',
+        allowedKinds: ['text', 'image'],
+      },
+      plan: 'free',
+      createdAt: NOW - 86400000 * 4,
+      expiresAt: NOW + 86400000 * 20,
+      endedAt: null,
+      remindersSent: [],
+      memberCount: 36,
+      postCount: 16,
+      storageBytes: 6291456,
+    },
+  },
+  {
+    id: 'party',
+    label: 'Party & Night Out',
+    tagline: 'High-energy gatherings, rooftop mixers & housewarming parties',
+    event: {
+      id: 'showcase-party',
+      title: 'Midsummer Sunset & DJ Set',
+      description:
+        'Live DJs, craft cocktails, and sunset views from the terrace. Come early, stay late.',
+      occasion: 'party',
+      hostUid: 'usr_showcase_party',
+      hostName: 'Julian & Alex',
+      hostedBy: 'Julian & Alex',
+      templateId: 'ember',
+      status: 'live',
+      startsAt: NOW + 86400000 * 9 + 3600000 * 20,
+      endsAt: NOW + 86400000 * 10 + 3600000 * 2,
+      timeZone: 'America/New_York',
+      location: {
+        name: 'The Highline Rooftop Terrace',
+        address: '500 West 24th St, New York, NY',
+        url: 'https://maps.google.com',
+      },
+      dressCode: 'Summer evening / chic',
+      rsvp: {
+        enabled: true,
+        deadline: NOW + 86400000 * 5,
+        allowPlusOnes: true,
+        maxPartySize: 2,
+        askNote: true,
+        question: 'Song requests for the DJ set?',
+        autoRemind: true,
+      },
+      rsvpTally: {
+        yes: 85,
+        no: 12,
+        maybe: 14,
+        pending: 20,
+        attending: 98,
+      },
+      settings: {
+        whoCanPost: 'anyone',
+        allowedKinds: ['text', 'image', 'video', 'audio'],
+      },
+      plan: 'pro',
+      createdAt: NOW - 86400000 * 2,
+      expiresAt: NOW + 86400000 * 14,
+      endedAt: null,
+      remindersSent: [],
+      memberCount: 92,
+      postCount: 42,
+      storageBytes: 31457280,
+    },
+  },
+  {
     id: 'retirement',
-    label: 'Retirement Gala',
-    tagline: 'Grown-up honors and tribute boards for distinguished milestones',
+    label: 'Dinner & Gala',
+    tagline: 'Distinguished milestones, retirement galas & formal banquets',
     event: {
       id: 'showcase-retirement',
       title: 'Dr. Harper’s Retirement Gala',
@@ -181,7 +343,7 @@ export const showcaseItems: readonly ShowcaseItem[] = [
   },
   {
     id: 'memorial',
-    label: 'Memorial Gathering',
+    label: 'Memorial',
     tagline: 'Dignified, ad-free notices with gentle memory sharing',
     event: {
       id: 'showcase-memorial',
