@@ -60,7 +60,7 @@ async function main(): Promise<void> {
       enabled: true,
       deadline: Date.now() + 3 * DAY_MS,
       allowPlusOnes: true,
-      maxPartySize: 2,
+      maxPartySize: 4,
       askNote: false,
       question: null,
       autoRemind: true,
