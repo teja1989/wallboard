@@ -1,5 +1,6 @@
 import { faceOf } from '@/config';
 import { TemplateMotifMark } from '@/components/event/template-motif';
+import { TemplateSurfaceField } from '@/components/event/template-surface';
 import type { InvitationLayoutProps } from './types';
 
 /**
@@ -20,11 +21,25 @@ export function ClassicLayout({
 
   return (
     <article className="card overflow-hidden">
+      {/*
+        The band, with a surface painted over the gradient rather than instead of it.
+
+        `relative` + an absolutely-positioned SVG rather than a CSS background, because the
+        surface has to stretch to the band's real size and a background-image cannot be given
+        the palette's colours without re-encoding it per template.
+      */}
       <div
         aria-hidden
-        className="h-28 w-full"
+        className="relative h-28 w-full overflow-hidden"
         style={{ background: `linear-gradient(135deg, ${palette.from}, ${palette.to})` }}
-      />
+      >
+        <TemplateSurfaceField
+          surface={template.surface}
+          palette={palette}
+          somber={occasion.somber}
+          className="absolute inset-0 size-full"
+        />
+      </div>
 
       <div className="px-6 pb-6 text-center sm:px-10">
         <span

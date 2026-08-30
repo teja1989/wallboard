@@ -1,5 +1,6 @@
 import { faceOf } from '@/config';
 import { TemplateMotifMark } from '@/components/event/template-motif';
+import { TemplateSurfaceField } from '@/components/event/template-surface';
 import type { InvitationLayoutProps } from './types';
 
 /**
@@ -19,14 +20,23 @@ export function EditorialLayout({
   const { palette } = template;
 
   return (
-    <article className="card overflow-hidden">
+    <article className="card relative overflow-hidden">
       <div
         aria-hidden
         className="h-1.5 w-full"
         style={{ background: `linear-gradient(90deg, ${palette.from}, ${palette.to})` }}
       />
 
-      <div className="px-6 py-8 sm:px-10 sm:py-10">
+      {/* Quiet: the hairline is the whole statement here, so the surface stays a whisper. */}
+      <TemplateSurfaceField
+        surface={template.surface}
+        palette={palette}
+        somber={occasion.somber}
+        intensity="quiet"
+        className="pointer-events-none absolute inset-0 size-full"
+      />
+
+      <div className="relative px-6 py-8 sm:px-10 sm:py-10">
         <div className="flex items-center gap-3">
           <span aria-hidden className="text-xl">
             {occasion.glyph}

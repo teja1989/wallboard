@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { surfaceMoves } from '@/components/event/template-surface';
 import {
   PERMISSIONS,
+  TEMPLATE_SURFACES,
   absoluteMaxEventLifetimeMs,
   eventRolePermissions,
-  templates,
   expiryPresets,
   mediaRules,
   occasions,
@@ -12,6 +13,7 @@ import {
   platformOnlyPermissions,
   platformRolePermissions,
   rateLimits,
+  templates,
 } from '@/config';
 
 /**
@@ -212,5 +214,44 @@ describe('permission tables', () => {
         expect(platformOnlyPermissions).toContain(permission);
       }
     }
+  });
+});
+
+describe('template surfaces', () => {
+  /*
+    Surfaces are the decorative field behind an invitation's header. Two things must hold, and
+    neither is visible from reading one template row.
+  */
+  it('every template names a real surface', () => {
+    for (const template of templates) {
+      expect(TEMPLATE_SURFACES, template.id).toContain(template.surface);
+    }
+  });
+
+  it('never animates on a somber occasion, whatever template is chosen', () => {
+    /*
+      The one that matters, and the reason this rule cannot live in the template row.
+
+      Three templates carry `occasions: null` — they suit anything, *including a memorial*.
+      So "does this design animate" is not answerable from the template alone: `sunset`
+      shimmering on a fortieth is right, and the same card shimmering on a funeral notice is
+      the worst thing this product could do. `surfaceMoves` resolves it at render, with the
+      occasion overriding the template, and this asserts every combination rather than the
+      few somebody thought to try.
+    */
+    const somber = occasions.filter((occasion) => occasion.somber);
+    expect(somber.length).toBeGreaterThan(0);
+
+    for (const template of templates) {
+      expect(surfaceMoves(template.surface, true), `${template.id} on a somber occasion`).toBe(
+        false,
+      );
+    }
+  });
+
+  it('still lets a celebratory occasion move, or the feature does nothing', () => {
+    // The other half: a rule that stopped everything would pass the test above and ship a
+    // set of surfaces that never animate at all.
+    expect(templates.some((template) => surfaceMoves(template.surface, false))).toBe(true);
   });
 });

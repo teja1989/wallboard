@@ -213,3 +213,100 @@
     scrollbar-color: var(--border-strong) transparent;
   }
 }
+
+/*
+  Invitation surfaces — the decorative field behind a card's header.
+
+  Kept here rather than inline so the `prefers-reduced-motion` rule above stops every one of
+  them at once. That rule is global and unconditional, which is what makes it safe to animate
+  an invitation at all: a reader who has asked their OS for stillness gets a still card, with
+  no per-component opt-in to forget.
+
+  Everything animates `transform` and `opacity` only — both composite off the main thread, so
+  a card that is scrolling past stays smooth on a mid-range phone. No filters, no box-shadow
+  transitions, nothing that forces layout.
+
+  Durations are deliberately long. A surface should be something you notice on the second
+  look, not motion competing with the host's own words.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes mq-surface-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(14px, -8px, 0);
+    }
+  }
+
+  @keyframes mq-surface-sweep {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(0, -6px, 0) scale(1.03);
+    }
+  }
+
+  @keyframes mq-surface-sway {
+    0%,
+    100% {
+      transform: translate3d(-8px, 0, 0);
+    }
+    50% {
+      transform: translate3d(8px, 0, 0);
+    }
+  }
+
+  @keyframes mq-surface-twinkle {
+    0%,
+    100% {
+      opacity: 0.18;
+      transform: scale(0.85);
+    }
+    50% {
+      opacity: 0.75;
+      transform: scale(1.15);
+    }
+  }
+
+  @keyframes mq-surface-fall {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, -14px, 0);
+    }
+    18%,
+    72% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(-6px, 26px, 0);
+    }
+  }
+
+  .tmpl-surface-drift {
+    animation: mq-surface-drift 18s ease-in-out infinite;
+  }
+  .tmpl-surface-drift-slow {
+    animation: mq-surface-drift 26s ease-in-out infinite reverse;
+  }
+  .tmpl-surface-sweep {
+    animation: mq-surface-sweep 22s ease-in-out infinite;
+    transform-origin: 200px 130px;
+  }
+  .tmpl-surface-sway {
+    animation: mq-surface-sway 20s ease-in-out infinite;
+  }
+  .tmpl-surface-sway-slow {
+    animation: mq-surface-sway 28s ease-in-out infinite reverse;
+  }
+  .tmpl-surface-twinkle {
+    animation: mq-surface-twinkle 5.5s ease-in-out infinite;
+  }
+  .tmpl-surface-fall {
+    animation: mq-surface-fall 11s linear infinite;
+  }
+}

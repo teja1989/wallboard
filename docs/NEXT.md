@@ -45,6 +45,32 @@ and their free tier cannot be undercut.
 
 ---
 
+## Done since this was written
+
+**Invitation surfaces.** Every template was one flat two-stop gradient plus a 120×24 line
+divider, so fifteen designs differed only in four colours. Each now carries a `surface` — a
+decorative field drawn as inline SVG from its own palette, with slow motion where the occasion
+suits it: `bloom`, `arcs`, `dusk`, `sparkle`, `drift`, `linen`, `none`
+(`src/components/event/template-surface.tsx`).
+
+Three rules hold it together, and the second is the one worth keeping:
+
+- Nothing in a surface is information — the whole field is `aria-hidden` and the invitation
+  reads identically without it. Email and the OG image draw their own thing and never import it.
+- **The occasion overrides the template on motion.** Three templates are `occasions: null`, so
+  a memorial can choose them; `surfaceMoves(surface, somber)` resolves it at render, and
+  `config.test.ts` asserts that no template animates on a somber occasion. A memorial notice
+  with confetti drifting down it is the worst thing this product could do, and it was one
+  config row away.
+- Motion is CSS on `transform`/`opacity` only, in `globals.css`, so the existing global
+  `prefers-reduced-motion` rule stops all of it at once with no per-component opt-in to forget.
+
+This is groundwork for Track 1a below rather than a substitute for it: the landing page still
+shows no invitation at all. What it does mean is that when the page does show one, there is
+something worth looking at.
+
+---
+
 ## Track 1 — Make the site show the product
 
 **Why this is first.** `src/app/page.tsx` is 341 lines and contains **not one image of the

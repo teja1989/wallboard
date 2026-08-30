@@ -1,5 +1,6 @@
 import { faceOf } from '@/config';
 import { TemplateMotifMark } from '@/components/event/template-motif';
+import { TemplateSurfaceField } from '@/components/event/template-surface';
 import type { InvitationLayoutProps } from './types';
 
 /**
@@ -20,10 +21,19 @@ export function MinimalLayout({
 
   return (
     <article
-      className="card overflow-hidden"
+      className="card relative overflow-hidden"
       style={{ borderColor: palette.accent, borderWidth: 1, opacity: 1 }}
     >
-      <div className="px-6 py-10 text-center sm:px-12 sm:py-14">
+      {/* Quiet, because restraint is what this layout is for — see `intensity`. */}
+      <TemplateSurfaceField
+        surface={template.surface}
+        palette={palette}
+        somber={occasion.somber}
+        intensity="quiet"
+        className="pointer-events-none absolute inset-0 size-full"
+      />
+
+      <div className="relative px-6 py-10 text-center sm:px-12 sm:py-14">
         <span aria-hidden className="text-lg opacity-70">
           {occasion.glyph}
         </span>

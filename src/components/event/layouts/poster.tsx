@@ -1,5 +1,6 @@
 import { faceOf } from '@/config';
 import { TemplateMotifMark } from '@/components/event/template-motif';
+import { TemplateSurfaceField } from '@/components/event/template-surface';
 import type { InvitationLayoutProps } from './types';
 
 /**
@@ -21,13 +22,25 @@ export function PosterLayout({
 
   return (
     <article
-      className="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-lift)]"
+      className="relative overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-lift)]"
       style={{
         background: `linear-gradient(150deg, ${palette.from}, ${palette.to})`,
         color: palette.onGradient,
       }}
     >
-      <div className="px-6 py-12 text-center sm:px-12 sm:py-16">
+      {/*
+        Poster is the one layout where the gradient *is* the whole card, so the surface covers
+        it edge to edge rather than sitting in a band. It stays behind the content — the text
+        is positioned above it, and the surface's own opacity keeps `onGradient` legible.
+      */}
+      <TemplateSurfaceField
+        surface={template.surface}
+        palette={palette}
+        somber={occasion.somber}
+        className="pointer-events-none absolute inset-0 size-full"
+      />
+
+      <div className="relative px-6 py-12 text-center sm:px-12 sm:py-16">
         <span aria-hidden className="text-2xl">
           {occasion.glyph}
         </span>

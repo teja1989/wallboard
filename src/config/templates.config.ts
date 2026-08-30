@@ -68,6 +68,44 @@ export type TypeFaceId = keyof typeof TYPE_FACES;
 export const TEMPLATE_MOTIFS = ['none', 'confetti', 'botanical', 'rings', 'stars', 'arch'] as const;
 export type TemplateMotif = (typeof TEMPLATE_MOTIFS)[number];
 
+/**
+ * The decorative field behind the card's header, drawn as inline SVG in `template-surface.tsx`.
+ *
+ * Before this every template was one flat two-stop gradient plus a 120×24 line divider, so
+ * fifteen designs differed only in four colours. A surface gives each one a texture of its
+ * own — depth and, where it suits the occasion, slow movement.
+ *
+ * Three rules hold it together:
+ *
+ *  - **It never carries meaning.** Every surface is `aria-hidden` and nothing in it is
+ *    information; the invitation reads identically with the surface removed.
+ *  - **It never touches contrast.** Surfaces paint under the header band at low opacity, and
+ *    the `onGradient` colour still clears 4.5:1 against both gradient endpoints — the
+ *    surface cannot darken text it is not behind.
+ *  - **Motion is a property of the surface, not a global setting.** `still` surfaces exist so
+ *    `linen` can be dignified rather than merely slower. `prefers-reduced-motion` stops the
+ *    rest — the global rule in `globals.css` covers every animation here for free.
+ */
+export const TEMPLATE_SURFACES = [
+  'none',
+  /** Soft overlapping radial glows that drift. The warm, general-purpose one. */
+  'bloom',
+  /** Concentric arcs sweeping across the band. Formal, architectural. */
+  'arcs',
+  /** Layered soft hills. Calm; reads as landscape rather than decoration. */
+  'dusk',
+  /** Slow twinkling points. For evening and celebration, never for a memorial. */
+  'sparkle',
+  /** Small shapes drifting down. The most playful; birthdays and parties only. */
+  'drift',
+  /** A fine woven weave. Deliberately **still** — the quiet one. */
+  'linen',
+] as const;
+export type TemplateSurface = (typeof TEMPLATE_SURFACES)[number];
+
+/** Surfaces that hold completely still, whatever the reader's motion preference. */
+export const STILL_SURFACES: readonly TemplateSurface[] = ['none', 'linen'] as const;
+
 export interface TemplatePalette {
   /** Gradient endpoints, used for the band, the poster ground and the page wash. */
   from: string;
@@ -86,6 +124,8 @@ export interface Template {
   layout: TemplateLayout;
   face: TypeFaceId;
   motif: TemplateMotif;
+  /** The decorative field behind the header. See `TEMPLATE_SURFACES`. */
+  surface: TemplateSurface;
   palette: TemplatePalette;
   /** Occasions this suits. `null` means it works for anything. */
   occasions: readonly OccasionId[] | null;
@@ -105,6 +145,7 @@ export const templates: readonly Template[] = [
     layout: 'classic',
     face: 'inter',
     motif: 'none',
+    surface: 'arcs',
     palette: {
       from: 'oklch(0.82 0.11 40)',
       to: 'oklch(0.78 0.1 330)',
@@ -121,6 +162,7 @@ export const templates: readonly Template[] = [
     layout: 'classic',
     face: 'inter',
     motif: 'botanical',
+    surface: 'bloom',
     palette: {
       from: 'oklch(0.85 0.09 150)',
       to: 'oklch(0.82 0.09 200)',
@@ -137,6 +179,7 @@ export const templates: readonly Template[] = [
     layout: 'minimal',
     face: 'inter',
     motif: 'none',
+    surface: 'dusk',
     palette: {
       from: 'oklch(0.83 0.09 220)',
       to: 'oklch(0.8 0.1 275)',
@@ -153,6 +196,7 @@ export const templates: readonly Template[] = [
     layout: 'classic',
     face: 'fraunces',
     motif: 'confetti',
+    surface: 'bloom',
     palette: {
       from: 'oklch(0.86 0.08 350)',
       to: 'oklch(0.83 0.08 300)',
@@ -169,6 +213,7 @@ export const templates: readonly Template[] = [
     layout: 'minimal',
     face: 'inter',
     motif: 'none',
+    surface: 'linen',
     palette: {
       from: 'oklch(0.95 0.01 90)',
       to: 'oklch(0.91 0.015 70)',
@@ -187,6 +232,7 @@ export const templates: readonly Template[] = [
     layout: 'poster',
     face: 'grotesk',
     motif: 'stars',
+    surface: 'sparkle',
     palette: {
       from: 'oklch(0.42 0.11 268)',
       to: 'oklch(0.28 0.09 300)',
@@ -203,6 +249,7 @@ export const templates: readonly Template[] = [
     layout: 'classic',
     face: 'garamond',
     motif: 'rings',
+    surface: 'arcs',
     palette: {
       from: 'oklch(0.9 0.055 88)',
       to: 'oklch(0.84 0.075 62)',
@@ -219,6 +266,7 @@ export const templates: readonly Template[] = [
     layout: 'editorial',
     face: 'garamond',
     motif: 'botanical',
+    surface: 'bloom',
     palette: {
       from: 'oklch(0.5 0.09 148)',
       to: 'oklch(0.62 0.08 118)',
@@ -235,6 +283,7 @@ export const templates: readonly Template[] = [
     layout: 'poster',
     face: 'grotesk',
     motif: 'none',
+    surface: 'dusk',
     palette: {
       from: 'oklch(0.66 0.16 28)',
       to: 'oklch(0.55 0.15 12)',
@@ -251,6 +300,7 @@ export const templates: readonly Template[] = [
     layout: 'minimal',
     face: 'garamond',
     motif: 'arch',
+    surface: 'linen',
     palette: {
       from: 'oklch(0.93 0.018 75)',
       to: 'oklch(0.88 0.025 55)',
@@ -267,6 +317,7 @@ export const templates: readonly Template[] = [
     layout: 'poster',
     face: 'grotesk',
     motif: 'stars',
+    surface: 'sparkle',
     palette: {
       from: 'oklch(0.7 0.14 190)',
       to: 'oklch(0.6 0.16 300)',
@@ -283,6 +334,7 @@ export const templates: readonly Template[] = [
     layout: 'editorial',
     face: 'garamond',
     motif: 'none',
+    surface: 'linen',
     palette: {
       from: 'oklch(0.96 0.008 80)',
       to: 'oklch(0.92 0.012 60)',
@@ -299,6 +351,7 @@ export const templates: readonly Template[] = [
     layout: 'poster',
     face: 'fraunces',
     motif: 'confetti',
+    surface: 'drift',
     palette: {
       from: 'oklch(0.78 0.14 350)',
       to: 'oklch(0.74 0.15 45)',
@@ -315,6 +368,7 @@ export const templates: readonly Template[] = [
     layout: 'editorial',
     face: 'fraunces',
     motif: 'none',
+    surface: 'arcs',
     palette: {
       from: 'oklch(0.9 0.02 250)',
       to: 'oklch(0.84 0.03 230)',
@@ -331,6 +385,7 @@ export const templates: readonly Template[] = [
     layout: 'classic',
     face: 'fraunces',
     motif: 'botanical',
+    surface: 'bloom',
     palette: {
       from: 'oklch(0.79 0.1 70)',
       to: 'oklch(0.68 0.11 40)',
