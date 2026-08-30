@@ -12,20 +12,19 @@ import {
   promoCopy,
 } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
-import { ComparisonTable } from '@/components/marketing/comparison-table';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Pricing — Flat $19, No Per-Guest Fees',
-  description: `${brand.name} is a flat $19 per event with zero per-guest fees. Full dietary RSVPs, custom questions, and the live photo wall included.`,
+  title: 'Pricing — Transparent, Simple Plans',
+  description: `${brand.name} is free to start. Simple flat pricing with zero per-guest fees, full RSVP tools, and live photo walls included.`,
   robots: { index: true, follow: true },
 };
 
 /**
  * Pricing.
  *
- * Bold, honest, and unambiguous: Flat $19 with no per-guest tax.
+ * Simple, elegant, and transparent.
  */
 export default function PricingPage() {
   const preview = isPreviewPricing();
@@ -38,11 +37,11 @@ export default function PricingPage() {
       <main className="mx-auto w-full max-w-6xl px-6 pb-8">
         <section className="pt-10 pb-14 text-center sm:pt-16">
           <h1 className="mx-auto max-w-3xl text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">
-            Flat $19. No per-guest fees.
+            Simple, transparent pricing.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-[var(--text-secondary)]">
-            Paperless Post charges $75–$216 for a 150-guest event. Marquee gives you complete event
-            control, full dietary questions, and the live photo wall for one simple flat fee.
+            No per-guest fees, no charge for the live wall, and nothing your guests ever have to pay
+            for or install.
           </p>
 
           {/* Above the table rather than buried in a bullet: for most people the last free
@@ -134,8 +133,6 @@ export default function PricingPage() {
             );
           })}
         </section>
-
-        <ComparisonTable />
 
         <section className="py-20">
           <h2 className="text-3xl font-semibold tracking-tight text-balance">

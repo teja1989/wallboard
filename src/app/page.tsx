@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import { adFreePromiseHolds, brand, templates } from '@/config';
-import { ComparisonTable } from '@/components/marketing/comparison-table';
 import { CreationStory } from '@/components/marketing/creation-story';
 import { InvitationShowcase } from '@/components/marketing/invitation-showcase';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
@@ -66,7 +65,7 @@ export default function LandingPage() {
 
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-muted)]">
                 <span>✓ Free to start</span>
-                <span>✓ Flat $19 upgrade (no per-guest fees)</span>
+                <span>✓ 100% ad-free experience</span>
                 <span>✓ No app or sign-up for guests</span>
               </div>
             </div>
@@ -80,9 +79,6 @@ export default function LandingPage() {
 
         {/* --- 3-step ease story --------------------------------------- */}
         <CreationStory />
-
-        {/* --- commercial comparison ----------------------------------- */}
-        <ComparisonTable />
 
         {/* --- the live wall differentiator ---------------------------- */}
         <section className="mx-auto w-full max-w-6xl px-6 py-16">
