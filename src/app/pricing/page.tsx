@@ -12,33 +12,23 @@ import {
   promoCopy,
 } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
+import { ComparisonTable } from '@/components/marketing/comparison-table';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Pricing',
-  description: `${brand.name} is free to start. Pay once for a single event, or yearly if you host often. No per-guest fees.`,
+  title: 'Pricing — Flat $19, No Per-Guest Fees',
+  description: `${brand.name} is a flat $19 per event with zero per-guest fees. Full dietary RSVPs, custom questions, and the live photo wall included.`,
   robots: { index: true, follow: true },
 };
 
 /**
  * Pricing.
  *
- * Three columns, one recommended, and the honest note at the top while billing is off. A
- * pricing page that quietly implies you are already charging when you are not is the
- * fastest way to lose the trust the rest of the product is trying to build.
- *
- * The FAQ answers the objections that actually stop a purchase — what happens to my photos,
- * do my guests need accounts, can I get a refund — rather than restating the feature list.
+ * Bold, honest, and unambiguous: Flat $19 with no per-guest tax.
  */
 export default function PricingPage() {
   const preview = isPreviewPricing();
-  /*
-    A promo that nobody notices attracts nobody, and that was exactly the state of this: a
-    window could be open, grants could be going out, and the page anyone came to read said
-    nothing about it. Resolved per request rather than at build, so a window opening does not
-    wait for a deploy to become visible.
-  */
   const promo = anyActivePromo();
 
   return (
@@ -48,11 +38,11 @@ export default function PricingPage() {
       <main className="mx-auto w-full max-w-6xl px-6 pb-8">
         <section className="pt-10 pb-14 text-center sm:pt-16">
           <h1 className="mx-auto max-w-3xl text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">
-            Pay for the one that matters. The rest are free.
+            Flat $19. No per-guest fees.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-pretty text-[var(--text-secondary)]">
-            No per-guest fees, no charge for the wall, and nothing your guests ever have to pay for
-            or sign up to.
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-[var(--text-secondary)]">
+            Paperless Post charges $75–$216 for a 150-guest event. Marquee gives you complete event
+            control, full dietary questions, and the live photo wall for one simple flat fee.
           </p>
 
           {/* Above the table rather than buried in a bullet: for most people the last free
@@ -144,6 +134,8 @@ export default function PricingPage() {
             );
           })}
         </section>
+
+        <ComparisonTable />
 
         <section className="py-20">
           <h2 className="text-3xl font-semibold tracking-tight text-balance">

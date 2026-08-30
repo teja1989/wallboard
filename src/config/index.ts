@@ -20,5 +20,6 @@ export * from './reminders.config';
 export * from './rsvp.config';
 export * from './plans.config';
 export * from './roles.config';
+export * from './showcase.config';
 export * from './templates.config';
 export { clientEnv, serverEnv } from './env.config';
