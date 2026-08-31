@@ -17,8 +17,8 @@ export function AudioPlayer({ media, authorName }: AudioPlayerProps) {
 
   // Static representative waveform amplitudes
   const waveformBars = [
-    0.3, 0.5, 0.8, 0.4, 0.9, 0.6, 0.3, 0.7, 0.9, 0.5, 0.8, 0.4, 0.6, 0.9, 0.7, 0.3, 0.5,
-    0.8, 0.4, 0.6, 0.3, 0.7, 0.5, 0.2,
+    0.3, 0.5, 0.8, 0.4, 0.9, 0.6, 0.3, 0.7, 0.9, 0.5, 0.8, 0.4, 0.6, 0.9, 0.7, 0.3, 0.5, 0.8, 0.4,
+    0.6, 0.3, 0.7, 0.5, 0.2,
   ];
 
   useEffect(() => {
@@ -85,21 +85,21 @@ export function AudioPlayer({ media, authorName }: AudioPlayerProps) {
           onClick={togglePlay}
           aria-label={isPlaying ? 'Pause voice toast' : 'Play voice toast'}
           className={cn(
-            'flex size-11 shrink-0 items-center justify-center rounded-full transition-all duration-200 shadow-md',
+            'flex size-11 shrink-0 items-center justify-center rounded-full shadow-md transition-all duration-200',
             isPlaying
-              ? 'bg-[var(--accent)] text-[var(--accent-contrast)] scale-105'
+              ? 'scale-105 bg-[var(--accent)] text-[var(--accent-contrast)]'
               : 'bg-[var(--surface-raised)] text-[var(--text-primary)] hover:bg-[var(--accent-soft)]',
           )}
         >
           {isPlaying ? (
             <Pause className="size-5 fill-current" />
           ) : (
-            <Play className="size-5 ml-0.5 fill-current" />
+            <Play className="ml-0.5 size-5 fill-current" />
           )}
         </button>
 
         {/* Waveform Scrubber & Readout */}
-        <div className="flex-1 space-y-1.5 min-w-0">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1 font-semibold text-[var(--accent)]">
               <Mic className="size-3" /> Voice Toast from {authorName}
@@ -111,7 +111,7 @@ export function AudioPlayer({ media, authorName }: AudioPlayerProps) {
 
           {/* Interactive Waveform Bars */}
           <div
-            className="flex h-8 w-full items-center gap-1 cursor-pointer py-1"
+            className="flex h-8 w-full cursor-pointer items-center gap-1 py-1"
             role="slider"
             aria-valuemin={0}
             aria-valuemax={duration}

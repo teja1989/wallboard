@@ -13,11 +13,7 @@ interface AudioRecorderModalProps {
 
 const MAX_RECORDING_SECONDS = 120; // 2 minutes max for a voice toast
 
-export function AudioRecorderModal({
-  isOpen,
-  onClose,
-  onAudioRecorded,
-}: AudioRecorderModalProps) {
+export function AudioRecorderModal({ isOpen, onClose, onAudioRecorded }: AudioRecorderModalProps) {
   const { notify } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -64,7 +60,10 @@ export function AudioRecorderModal({
       streamRef.current = stream;
 
       // Web Audio API for live frequency analysis
-      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const audioCtx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
@@ -177,7 +176,7 @@ export function AudioRecorderModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md duration-200">
       <div className="card w-full max-w-md overflow-hidden p-6 shadow-[var(--shadow-lift)] sm:p-8">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
@@ -222,9 +221,7 @@ export function AudioRecorderModal({
 
           {/* Time Readout */}
           <div className="mt-4 flex items-center gap-2 font-mono text-sm font-semibold text-[var(--text-primary)]">
-            {isRecording && (
-              <span className="size-2.5 rounded-full bg-rose-500 animate-pulse" />
-            )}
+            {isRecording && <span className="size-2.5 animate-pulse rounded-full bg-rose-500" />}
             <span>{formatDuration(recordingSeconds)}</span>
             <span className="text-xs text-[var(--text-muted)]">
               / {formatDuration(MAX_RECORDING_SECONDS)}
@@ -275,11 +272,7 @@ export function AudioRecorderModal({
                   className="flex-1 justify-center gap-2"
                   onClick={handlePlayPreview}
                 >
-                  {isPlayingPreview ? (
-                    <Pause className="size-4" />
-                  ) : (
-                    <Play className="size-4" />
-                  )}
+                  {isPlayingPreview ? <Pause className="size-4" /> : <Play className="size-4" />}
                   {isPlayingPreview ? 'Pause' : 'Listen Back'}
                 </Button>
 

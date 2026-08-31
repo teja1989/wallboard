@@ -52,7 +52,7 @@ export function PricingCards({ preview }: PricingCardsProps) {
             )}
           >
             <span>Annual Membership</span>
-            <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[0.65rem] font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="py-0.2 rounded-full bg-emerald-500/15 px-1.5 text-[0.65rem] font-bold text-emerald-600 dark:text-emerald-400">
               Save 65%
             </span>
           </button>
@@ -73,13 +73,13 @@ export function PricingCards({ preview }: PricingCardsProps) {
               className={cn(
                 'card relative flex flex-col justify-between overflow-hidden p-7 transition-all duration-300',
                 plan.featured
-                  ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.15)] scale-[1.02]'
+                  ? 'scale-[1.02] border-[var(--accent)] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.15)] ring-2 ring-[var(--accent)]/40'
                   : 'hover:border-[var(--border-focus)] hover:shadow-md',
                 isDimmed && 'opacity-40 grayscale-[50%]',
               )}
             >
               {plan.featured && (
-                <div className="absolute -top-px left-0 right-0 flex justify-center">
+                <div className="absolute -top-px right-0 left-0 flex justify-center">
                   <span className="inline-flex items-center gap-1 rounded-b-xl bg-[var(--accent)] px-4 py-1 text-xs font-bold text-[var(--accent-contrast)] shadow-sm">
                     <Sparkles className="size-3" />
                     MOST CHOSEN
@@ -119,7 +119,10 @@ export function PricingCards({ preview }: PricingCardsProps) {
                 {/* Highlights List */}
                 <ul className="mt-6 space-y-3">
                   {plan.highlights.map((highlight) => (
-                    <li key={highlight} className="flex items-start gap-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                    <li
+                      key={highlight}
+                      className="flex items-start gap-3 text-xs leading-relaxed text-[var(--text-secondary)]"
+                    >
                       <Check className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" />
                       <span>{highlight}</span>
                     </li>
@@ -128,13 +131,13 @@ export function PricingCards({ preview }: PricingCardsProps) {
               </div>
 
               {/* Conversion CTA Button */}
-              <div className="mt-8 pt-4 border-t border-[var(--border-subtle)]">
+              <div className="mt-8 border-t border-[var(--border-subtle)] pt-4">
                 <Link
                   href="/create"
                   className={cn(
-                    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-95 shadow-sm',
+                    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold shadow-sm transition-all duration-200 active:scale-95',
                     plan.featured
-                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] shadow-[var(--shadow-soft)]'
+                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] hover:bg-[var(--accent-hover)]'
                       : 'bg-[var(--surface-sunken)] text-[var(--text-primary)] hover:bg-[var(--accent-soft)]',
                   )}
                 >

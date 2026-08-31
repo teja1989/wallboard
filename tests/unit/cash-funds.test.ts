@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  calculateContributionFees,
-  FUND_PRESETS,
-} from '@/config';
-import {
-  createFundSchema,
-  contributeToFundSchema,
-} from '@/lib/validation/schemas';
+import { calculateContributionFees, FUND_PRESETS } from '@/config';
+import { createFundSchema, contributeToFundSchema } from '@/lib/validation/schemas';
 
 describe('Collective Cash Funds & Dream Gifting Rules', () => {
   it('calculates accurate 2.5% platform fees and host payouts', () => {

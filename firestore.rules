@@ -121,9 +121,21 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // The live wall. Removed and quarantined posts stay invisible to regular viewers.
+      // The live wall. Removed and quarantined posts stay invisible to members.
+      //
+      // Both halves of this condition are load-bearing and were each briefly lost:
+      //
+      // `isMemberOf` — without it, `state == 'visible'` alone makes every wall on the
+      // platform world-readable to anyone holding an event id. A wedding's guest photos are
+      // not public because they are un-moderated.
+      //
+      // `state == 'visible'` — without it, membership alone reveals removed and quarantined
+      // posts to the whole guest list, which is exactly the audience a host removes a post
+      // *from*. Moderation that the moderated-against can still read is not moderation.
+      //
+      // They are an AND for that reason. `isStaff` is the separate, audited escape hatch.
       match /posts/{postId} {
-        allow read: if resource.data.state == 'visible' || isMemberOf(eventId) || isStaff();
+        allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();
         allow write: if false;
       }
     }

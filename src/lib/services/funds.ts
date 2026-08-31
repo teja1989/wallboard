@@ -32,7 +32,10 @@ export async function createCashFund(
 ): Promise<CashFundDoc> {
   const existing = await listFundsForEvent(event.id);
   if (existing.length >= fundsConfig.maxFundsPerEvent) {
-    throw new ApiError('conflict', `You can create up to ${fundsConfig.maxFundsPerEvent} cash pots per event.`);
+    throw new ApiError(
+      'conflict',
+      `You can create up to ${fundsConfig.maxFundsPerEvent} cash pots per event.`,
+    );
   }
 
   const fundId = `fund_${randomUUID().slice(0, 12)}`;

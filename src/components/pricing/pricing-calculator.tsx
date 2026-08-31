@@ -9,8 +9,7 @@ export function PricingCalculator() {
   const [guestCount, setGuestCount] = useState<number>(75);
 
   // Determine recommended plan based on guest headcount
-  const recommendedPlanId: PlanId =
-    guestCount <= 25 ? 'free' : guestCount <= 250 ? 'event' : 'pro';
+  const recommendedPlanId: PlanId = guestCount <= 25 ? 'free' : guestCount <= 250 ? 'event' : 'pro';
 
   const plan = plans[recommendedPlanId];
 
@@ -35,15 +34,19 @@ export function PricingCalculator() {
       {/* Guest Headcount Slider & Counter */}
       <div className="mt-8 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-[var(--text-muted)]">Intimate Gathering (10)</span>
-          <div className="flex items-baseline gap-1.5 rounded-2xl bg-[var(--surface-page)] px-5 py-2 border border-[var(--border-subtle)] shadow-sm">
+          <span className="text-xs font-medium text-[var(--text-muted)]">
+            Intimate Gathering (10)
+          </span>
+          <div className="flex items-baseline gap-1.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-page)] px-5 py-2 shadow-sm">
             <Users className="size-4 text-[var(--accent)]" />
             <span className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
               {guestCount}
             </span>
-            <span className="text-xs text-[var(--text-secondary)] font-medium">Guests</span>
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Guests</span>
           </div>
-          <span className="text-xs font-medium text-[var(--text-muted)]">Grand Celebration (500)</span>
+          <span className="text-xs font-medium text-[var(--text-muted)]">
+            Grand Celebration (500)
+          </span>
         </div>
 
         <input
@@ -66,8 +69,8 @@ export function PricingCalculator() {
               className={cn(
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                 guestCount === preset
-                  ? 'bg-[var(--accent)] text-[var(--accent-contrast)] font-semibold'
-                  : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)] border border-[var(--border-subtle)]',
+                  ? 'bg-[var(--accent)] font-semibold text-[var(--accent-contrast)]'
+                  : 'border border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)]',
               )}
             >
               {preset} guests
@@ -81,7 +84,7 @@ export function PricingCalculator() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <span className="text-xs font-semibold tracking-wider text-[var(--text-muted)] uppercase">
                 Recommended Plan
               </span>
               <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-xs font-bold text-[var(--accent)]">
@@ -91,9 +94,7 @@ export function PricingCalculator() {
             <h3 className="mt-1 text-2xl font-bold text-[var(--text-primary)]">
               {plan.label} Plan
             </h3>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {plan.audience}
-            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{plan.audience}</p>
           </div>
 
           <div className="text-left sm:text-right">
@@ -101,7 +102,7 @@ export function PricingCalculator() {
               <span className="text-3xl font-extrabold text-[var(--text-primary)]">
                 {formatPrice(plan)}
               </span>
-              <span className="text-xs text-[var(--text-muted)] font-medium">
+              <span className="text-xs font-medium text-[var(--text-muted)]">
                 {plan.cadence === 'per-event'
                   ? 'flat one-time'
                   : plan.cadence === 'yearly'

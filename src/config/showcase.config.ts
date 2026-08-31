@@ -291,8 +291,7 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     event: {
       id: 'showcase-baby',
       title: 'A Shower for Baby Charlotte',
-      description:
-        'Join us for afternoon tea, sweet treats, and celebrating mama-to-be Jessica.',
+      description: 'Join us for afternoon tea, sweet treats, and celebrating mama-to-be Jessica.',
       occasion: 'baby',
       hostUid: 'usr_showcase_baby',
       hostName: 'Hannah & Claire',

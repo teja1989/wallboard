@@ -268,8 +268,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
             )}
 
             {isLive && !permissions.canPost && (
-              <div className="card mb-6 p-6 text-center space-y-4 shadow-sm border border-[var(--border-subtle)]">
-                <div className="mx-auto size-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
+              <div className="card mb-6 space-y-4 border border-[var(--border-subtle)] p-6 text-center shadow-sm">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
                   <Sparkles className="size-6" />
                 </div>
                 <div>
@@ -285,7 +285,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     if (!guestName.trim()) return;
                     setJoinBusy(true);
                     try {
-                      await api.post(`/api/events/${eventId}/join-direct`, { displayName: guestName.trim() });
+                      await api.post(`/api/events/${eventId}/join-direct`, {
+                        displayName: guestName.trim(),
+                      });
                       await loadEvent();
                     } catch (err) {
                       console.error('[join-direct]', err);
@@ -293,24 +295,26 @@ export function EventScreen({ eventId }: { eventId: string }) {
                       setJoinBusy(false);
                     }
                   }}
-                  className="max-w-md mx-auto flex flex-col sm:flex-row gap-2 pt-2"
+                  className="mx-auto flex max-w-md flex-col gap-2 pt-2 sm:flex-row"
                 >
                   <input
                     type="text"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     placeholder="Your name (e.g. Maya)"
-                    className="flex-1 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                    className="flex-1 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm focus:border-[var(--accent)] focus:outline-none"
                     required
                   />
                   <Button type="submit" variant="primary" loading={joinBusy}>
-                    <Sparkles className="size-4 mr-1" />
+                    <Sparkles className="mr-1 size-4" />
                     Join & Post
                   </Button>
                 </form>
 
-                <div className="pt-3 border-t border-[var(--border-subtle)]">
-                  <p className="text-xs text-[var(--text-muted)] mb-3">Or continue with an existing account:</p>
+                <div className="border-t border-[var(--border-subtle)] pt-3">
+                  <p className="mb-3 text-xs text-[var(--text-muted)]">
+                    Or continue with an existing account:
+                  </p>
                   <SignInPrompt compact />
                 </div>
               </div>

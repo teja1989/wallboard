@@ -64,7 +64,7 @@ export function RichTemplateCard({
           {/* Card Top Row: Date Pill & Status */}
           <div className="relative z-10 flex items-center justify-between">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider backdrop-blur-sm"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tracking-wider uppercase backdrop-blur-sm"
               style={{
                 background: layout === 'poster' ? 'rgba(0,0,0,0.2)' : 'var(--surface-sunken)',
                 color: layout === 'poster' ? palette.onGradient : palette.accent,
@@ -113,11 +113,10 @@ export function RichTemplateCard({
           <div
             className="relative z-10 flex items-center justify-between border-t pt-2 text-[0.65rem] opacity-80"
             style={{
-              borderColor:
-                layout === 'poster' ? 'rgba(255,255,255,0.15)' : 'var(--border-subtle)',
+              borderColor: layout === 'poster' ? 'rgba(255,255,255,0.15)' : 'var(--border-subtle)',
             }}
           >
-            <span className="truncate max-w-[65%]">{sample.sampleLocation}</span>
+            <span className="max-w-[65%] truncate">{sample.sampleLocation}</span>
             <span className="inline-flex items-center gap-1 font-medium">
               <Users className="size-2.5" />
               18+
@@ -179,9 +178,7 @@ export function RichTemplateCard({
               />
             </div>
           </div>
-          <p className="mt-1 line-clamp-1 text-xs text-[var(--text-secondary)]">
-            {template.blurb}
-          </p>
+          <p className="mt-1 line-clamp-1 text-xs text-[var(--text-secondary)]">{template.blurb}</p>
         </div>
 
         {/* Feature Tags */}

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  templates,
-  templateById,
-  templatesForOccasion,
-  sampleForTemplate,
-} from '@/config';
+import { templates, templateById, templatesForOccasion, sampleForTemplate } from '@/config';
 
 describe('Templates Gallery & Showcase Metadata', () => {
   it('contains exactly 15 signature templates', () => {

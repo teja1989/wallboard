@@ -1,13 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { LayoutGrid, Search, Sparkles, X } from 'lucide-react';
-import {
-  occasions,
-  sampleForTemplate,
-  templates,
-  type OccasionId,
-  type Template,
-} from '@/config';
+import { occasions, sampleForTemplate, templates, type OccasionId, type Template } from '@/config';
 import { RichTemplateCard } from '@/components/templates/rich-template-card';
 import { TemplatePreviewModal } from '@/components/templates/template-preview-modal';
 import { cn } from '@/lib/utils';
@@ -72,20 +66,20 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
       <div className="space-y-4 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-5 shadow-sm sm:p-6">
         {/* Top Controls: Search Bar & Quick Stats */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <div className="relative max-w-md flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, mood, or font (e.g. Midnight, Warm, Serif)..."
-              className="h-10 w-full rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] pl-10 pr-9 text-sm text-[var(--text-primary)] transition-all placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
+              className="h-10 w-full rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] pr-9 pl-10 text-sm text-[var(--text-primary)] transition-all placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] focus:outline-none"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 aria-label="Clear search"
               >
                 <X className="size-3.5" />
@@ -105,7 +99,7 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
 
         {/* Occasion Filter Pills */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+          <div className="text-xs font-semibold tracking-wider text-[var(--text-muted)] uppercase">
             Filter by Occasion
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -117,8 +111,8 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
                 className={cn(
                   'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all',
                   selectedOccasion === occ.id
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm font-semibold scale-105'
-                    : 'bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)]',
+                    ? 'scale-105 bg-[var(--accent)] font-semibold text-[var(--accent-contrast)] shadow-sm'
+                    : 'border border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)] hover:text-[var(--text-primary)]',
                 )}
               >
                 <span aria-hidden>{occ.glyph}</span>
@@ -129,8 +123,8 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
         </div>
 
         {/* Layout Style Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[var(--border-subtle)]">
-          <span className="text-xs font-medium text-[var(--text-muted)] mr-1 flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-1">
+          <span className="mr-1 flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
             <LayoutGrid className="size-3.5" />
             Layout:
           </span>
@@ -142,8 +136,8 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
               className={cn(
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                 selectedLayout === layout.id
-                  ? 'bg-[var(--surface-page)] text-[var(--text-primary)] font-semibold border border-[var(--accent)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-sunken)]',
+                  ? 'border border-[var(--accent)] bg-[var(--surface-page)] font-semibold text-[var(--text-primary)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]',
               )}
             >
               {layout.label}
@@ -155,7 +149,7 @@ export function TemplateGalleryClient({ preview }: TemplateGalleryClientProps) {
       {/* Grid of Rich Template Cards */}
       {filteredTemplates.length === 0 ? (
         <div className="card flex flex-col items-center justify-center p-12 text-center">
-          <span className="size-12 rounded-full bg-[var(--surface-sunken)] flex items-center justify-center text-lg mb-3">
+          <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-lg">
             🔍
           </span>
           <h3 className="text-base font-semibold">No designs match your filter</h3>

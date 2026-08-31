@@ -35,7 +35,11 @@ export function kindForFile(file: File): MediaKind | null {
     MediaKind,
     (typeof mediaRules)[MediaKind],
   ][]) {
-    if (rule.mimeTypes.includes(file.type) || (normalizedType && rule.mimeTypes.includes(normalizedType))) return kind;
+    if (
+      rule.mimeTypes.includes(file.type) ||
+      (normalizedType && rule.mimeTypes.includes(normalizedType))
+    )
+      return kind;
   }
   return null;
 }
@@ -44,7 +48,10 @@ export function kindForFile(file: File): MediaKind | null {
 export function validationError(file: File, kind: MediaKind): string | null {
   const rule = mediaRules[kind];
   const normalizedType = (file.type.split(';')[0] ?? '').trim().toLowerCase();
-  if (!rule.mimeTypes.includes(file.type) && !(normalizedType && rule.mimeTypes.includes(normalizedType)))
+  if (
+    !rule.mimeTypes.includes(file.type) &&
+    !(normalizedType && rule.mimeTypes.includes(normalizedType))
+  )
     return `${file.type || 'That file type'} is not supported.`;
   if (file.size > rule.maxBytes) {
     return `That file is ${(file.size / (1024 * 1024)).toFixed(1)} MB — the limit is ${Math.round(rule.maxBytes / (1024 * 1024))} MB.`;

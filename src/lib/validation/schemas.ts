@@ -242,7 +242,10 @@ export const uploadTargetSchema = z
   .superRefine((v, ctx) => {
     const rule = mediaRules[v.kind];
     const normalizedType = (v.mimeType.split(';')[0] ?? '').trim().toLowerCase();
-    if (!rule.mimeTypes.includes(v.mimeType) && !(normalizedType && rule.mimeTypes.includes(normalizedType))) {
+    if (
+      !rule.mimeTypes.includes(v.mimeType) &&
+      !(normalizedType && rule.mimeTypes.includes(normalizedType))
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['mimeType'],
@@ -435,19 +438,9 @@ export const registryLinkIdSchema = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
 export const registryClickSchema = z.object({ linkId: registryLinkIdSchema });
 
 export const createFundSchema = z.object({
-  title: cleanText(fundsConfig.titleMaxLength).pipe(
-    z.string().min(1, 'Give the cash pot a name.'),
-  ),
+  title: cleanText(fundsConfig.titleMaxLength).pipe(z.string().min(1, 'Give the cash pot a name.')),
   description: cleanText(fundsConfig.descriptionMaxLength).default(''),
-  category: z.enum([
-    'honeymoon',
-    'travel',
-    'home',
-    'baby',
-    'celebration',
-    'charity',
-    'custom',
-  ]),
+  category: z.enum(['honeymoon', 'travel', 'home', 'baby', 'celebration', 'charity', 'custom']),
   targetAmount: z
     .number()
     .int()
@@ -455,11 +448,7 @@ export const createFundSchema = z.object({
     .max(fundsConfig.maxTargetAmount)
     .nullable()
     .default(null),
-  suggestedPresets: z
-    .array(z.number().int().positive())
-    .min(1)
-    .max(6)
-    .default([25, 50, 100, 200]),
+  suggestedPresets: z.array(z.number().int().positive()).min(1).max(6).default([25, 50, 100, 200]),
 });
 export type CreateFundInput = z.infer<typeof createFundSchema>;
 

@@ -41,8 +41,15 @@ making them create an account before they can say "yes, I'll be there" loses rep
 security benefit. Posting to the wall still needs an account — that is where attribution
 starts to matter. A host
 may open posting to anyone holding the code, but that path is gated twice: the event setting
-_and_ the `allowAnonymousPosting` platform flag, which is off by default. Even then it grants
-only `post:create` and `post:deleteOwn` — never moderation.
+_and_ the `allowAnonymousPosting` platform flag. The flag is **on**, which makes
+`whoCanPost: 'anyone'` an option a host can choose; it grants nothing by itself, and an event
+left on the default `whoCanPost: 'members'` is unaffected by it. Even with both gates open it
+adds only `post:create` and `post:deleteOwn` — never moderation.
+
+Both gates are evaluated in exactly one place, `eventAuthzContext` in
+`src/lib/authz/event-context.ts`. A change there that lets membership alone satisfy the
+second gate silently repeals the host's setting for every members-only event on the platform,
+which has happened once — see the comment in that file.
 
 ### Suspended accounts
 

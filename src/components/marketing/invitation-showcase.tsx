@@ -32,10 +32,7 @@ export function InvitationShowcase() {
   const occasion = occasionById(activeItem.event.occasion);
   const template = templateById(activeItem.event.templateId);
 
-  const currentPosts = [
-    ...(customPosts[activeItem.id] ?? []),
-    ...activeItem.posts,
-  ];
+  const currentPosts = [...(customPosts[activeItem.id] ?? []), ...activeItem.posts];
   const activePost = currentPosts[activePostIndex % currentPosts.length] ?? currentPosts[0];
 
   // Auto-cycle posts when in wallboard mode
@@ -256,7 +253,7 @@ export function InvitationShowcase() {
               <>
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 uppercase">
-                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
                     On Event Night: Presentation Mode
                   </div>
 
@@ -265,8 +262,8 @@ export function InvitationShowcase() {
                   </h3>
 
                   <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
-                    Connect a laptop to any TV or projector at your venue. Guests scan the QR code on
-                    screen to post photos, toasts, and memories instantly with{' '}
+                    Connect a laptop to any TV or projector at your venue. Guests scan the QR code
+                    on screen to post photos, toasts, and memories instantly with{' '}
                     <strong>zero app download required</strong>.
                   </p>
                 </div>
@@ -283,8 +280,8 @@ export function InvitationShowcase() {
                   </div>
 
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    Tap below to simulate a guest taking a photo at the party and watch it appear live
-                    on the TV screen:
+                    Tap below to simulate a guest taking a photo at the party and watch it appear
+                    live on the TV screen:
                   </p>
 
                   <button
@@ -292,8 +289,7 @@ export function InvitationShowcase() {
                     onClick={handleSimulatePost}
                     className="mt-3.5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-xs font-bold text-[var(--accent-contrast)] shadow-sm transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
                   >
-                    <Sparkles className="size-3.5" />
-                    ⚡ Simulate Guest Photo Post
+                    <Sparkles className="size-3.5" />⚡ Simulate Guest Photo Post
                   </button>
                 </div>
 
@@ -352,7 +348,7 @@ export function InvitationShowcase() {
                 {/* TV Hardware Bezel Frame */}
                 <div className="overflow-hidden rounded-2xl border-4 border-zinc-800 bg-zinc-950 p-1 shadow-[var(--shadow-lift)] ring-2 ring-zinc-700/50">
                   <div
-                    className="relative min-h-[460px] flex flex-col justify-between overflow-hidden rounded-xl p-5 text-white"
+                    className="relative flex min-h-[460px] flex-col justify-between overflow-hidden rounded-xl p-5 text-white"
                     style={{
                       background: `linear-gradient(135deg, ${template.palette.from}33, ${template.palette.to}55), #09090b`,
                     }}
@@ -361,13 +357,13 @@ export function InvitationShowcase() {
                     <TemplateSurfaceField
                       surface={template.surface}
                       palette={template.palette}
-                      className="absolute inset-0 size-full opacity-40 pointer-events-none"
+                      className="pointer-events-none absolute inset-0 size-full opacity-40"
                     />
 
                     {/* TV Top Status Header Bar */}
                     <div className="relative z-10 flex items-center justify-between border-b border-white/10 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex size-2.5 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="flex size-2.5 animate-ping rounded-full bg-emerald-400" />
                         <span className="font-mono text-xs font-bold tracking-wider text-emerald-400 uppercase">
                           LIVE PRESENTATION MODE
                         </span>
@@ -385,7 +381,7 @@ export function InvitationShowcase() {
                     <div className="relative z-10 my-auto py-6">
                       <div className="animate-in fade-in zoom-in-95 duration-500">
                         {activePost && (
-                          <div className="card border-white/15 bg-zinc-900/80 p-6 backdrop-blur-xl shadow-2xl">
+                          <div className="card border-white/15 bg-zinc-900/80 p-6 shadow-2xl backdrop-blur-xl">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div
@@ -410,7 +406,7 @@ export function InvitationShowcase() {
 
                             {/* Post Body */}
                             <div className="mt-4">
-                              <p className="text-base font-medium leading-relaxed text-zinc-100 sm:text-lg">
+                              <p className="text-base leading-relaxed font-medium text-zinc-100 sm:text-lg">
                                 &ldquo;{activePost.caption}&rdquo;
                               </p>
                             </div>
@@ -418,7 +414,7 @@ export function InvitationShowcase() {
                             {/* Simulated Photo Thumbnail if image */}
                             {activePost.kind === 'image' && (
                               <div
-                                className="relative mt-4 h-32 w-full overflow-hidden rounded-xl shadow-inner flex items-center justify-center"
+                                className="relative mt-4 flex h-32 w-full items-center justify-center overflow-hidden rounded-xl shadow-inner"
                                 style={{
                                   background: `linear-gradient(135deg, ${activePost.accentColor}44, #18181b)`,
                                 }}

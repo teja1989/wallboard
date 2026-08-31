@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Gift, Loader2, Plus, X } from 'lucide-react';
-import { registryCopy, registryHostLabel, registryLimits } from '@/config';
+import { isEnabled, registryCopy, registryHostLabel, registryLimits } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
@@ -132,13 +132,20 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
   if (!allowed) return null;
 
   return (
-    <section className="card p-5 space-y-6" aria-labelledby="gift-panel-heading">
-      {/* 1. Collective Cash Pots & Dream Gifting Section */}
-      <GiftPotManager
-        eventId={eventId}
-        funds={funds}
-        onFundsChanged={() => setRefreshKey((k) => k + 1)}
-      />
+    <section className="card space-y-6 p-5" aria-labelledby="gift-panel-heading">
+      {/*
+        Collective cash pots. Hidden with the flag rather than left to fail against the API,
+        because the manager's empty state invites the host to create a pot and every create
+        would come back `not_found` — offering a host a feature and then refusing it is worse
+        than not offering it.
+      */}
+      {isEnabled('cashFunds') && (
+        <GiftPotManager
+          eventId={eventId}
+          funds={funds}
+          onFundsChanged={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
 
       <div className="border-t border-[var(--border-subtle)] pt-6">
         <div className="flex items-start gap-3">

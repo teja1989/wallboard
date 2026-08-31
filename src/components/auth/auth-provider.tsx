@@ -171,12 +171,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /**
+   * Backstop for the one readiness signal with no guaranteed resolution.
+   *
+   * `sessionChecked` is settled by the `finally` on the fetch above and `firebaseChecked` by
+   * the `finally` on `getRedirectResult` below, so neither can hang on a slow network — but
+   * `onIdTokenChanged` can genuinely never fire if IndexedDB is blocked outright, and then
+   * nothing releases the gate.
+   *
+   * **Deliberately not 1.2 seconds, and deliberately not touching `sessionChecked`.** A
+   * short timer that force-resolves both is worse than the hang it replaces: `/api/session`
+   * on a cold Cloud Run start regularly takes longer than that, and pre-empting it renders
+   * the signed-out header to a host who is signed in — the exact "quietly downgraded to a
+   * guest" failure the comment above says this provider exists to prevent. Eight seconds is
+   * past any real request and short of a visitor giving up.
+   */
   useEffect(() => {
-    // Safety guard: ensure loading state never hangs indefinitely if emulator or IndexedDB is slow
-    const safetyTimer = setTimeout(() => {
-      setSessionChecked(true);
-      setFirebaseChecked(true);
-    }, 1200);
+    const safetyTimer = setTimeout(() => setFirebaseChecked(true), 8000);
     return () => clearTimeout(safetyTimer);
   }, []);
 

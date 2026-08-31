@@ -66,47 +66,49 @@ export function GiftList({ eventId }: { eventId: string }) {
 
       {/* External Links */}
       {links.length > 0 && (
-    <section className="card p-5" aria-labelledby="gift-list-heading">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-          <Gift className="size-4" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <h2 id="gift-list-heading" className="font-semibold">
-            {registryCopy.guestHeading}
-          </h2>
-          <p className="mt-0.5 text-sm text-[var(--text-secondary)]">{registryCopy.guestHint}</p>
-        </div>
-      </div>
+        <section className="card p-5" aria-labelledby="gift-list-heading">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
+              <Gift className="size-4" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 id="gift-list-heading" className="font-semibold">
+                {registryCopy.guestHeading}
+              </h2>
+              <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                {registryCopy.guestHint}
+              </p>
+            </div>
+          </div>
 
-      <ul className="mt-4 space-y-2">
-        {links.map((link) => (
-          <li key={link.id}>
-            <a
-              href={link.url}
-              target="_blank"
-              // `noopener` keeps the shop from reaching back through `window.opener`; the
-              // referrer half also stops the destination learning which invitation sent them.
-              rel="noopener noreferrer"
-              onClick={() => countClick(eventId, link.id)}
-              className="flex items-center gap-3 rounded-2xl bg-[var(--surface-sunken)] px-4 py-3 transition-colors hover:bg-[var(--accent-soft)]"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{link.label}</span>
-                {/*
+          <ul className="mt-4 space-y-2">
+            {links.map((link) => (
+              <li key={link.id}>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  // `noopener` keeps the shop from reaching back through `window.opener`; the
+                  // referrer half also stops the destination learning which invitation sent them.
+                  rel="noopener noreferrer"
+                  onClick={() => countClick(eventId, link.id)}
+                  className="flex items-center gap-3 rounded-2xl bg-[var(--surface-sunken)] px-4 py-3 transition-colors hover:bg-[var(--accent-soft)]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{link.label}</span>
+                    {/*
                   The host's note if they left one, otherwise where the tap goes — but never
                   the destination when it is already the name above, which is what a host who
                   left the name blank gets. "Amazon / Amazon" reads like a bug.
                 */}
-                {subLine(link) !== '' && (
-                  <span className="block truncate text-xs text-[var(--text-muted)]">
-                    {subLine(link)}
+                    {subLine(link) !== '' && (
+                      <span className="block truncate text-xs text-[var(--text-muted)]">
+                        {subLine(link)}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <ExternalLink className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
-            </a>
-          </li>
+                  <ExternalLink className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+                </a>
+              </li>
             ))}
           </ul>
         </section>

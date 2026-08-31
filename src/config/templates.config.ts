@@ -566,4 +566,3 @@ export function sampleForTemplate(templateId: string): TemplateSample {
     }
   );
 }
-

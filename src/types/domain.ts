@@ -226,13 +226,7 @@ export interface RsvpNoteDoc {
 }
 
 export type FundCategory =
-  | 'honeymoon'
-  | 'travel'
-  | 'home'
-  | 'baby'
-  | 'celebration'
-  | 'charity'
-  | 'custom';
+  'honeymoon' | 'travel' | 'home' | 'baby' | 'celebration' | 'charity' | 'custom';
 
 export interface CashFundDoc {
   id: string;

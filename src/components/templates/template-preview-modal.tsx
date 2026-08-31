@@ -1,21 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowRight,
-  Laptop,
-  QrCode,
-  Smartphone,
-  Tv,
-  X,
-} from 'lucide-react';
-import {
-  faceOf,
-  occasions,
-  sampleForTemplate,
-  type OccasionId,
-  type Template,
-} from '@/config';
+import { ArrowRight, Laptop, QrCode, Smartphone, Tv, X } from 'lucide-react';
+import { faceOf, occasions, sampleForTemplate, type OccasionId, type Template } from '@/config';
 import { Invitation } from '@/components/event/invitation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -140,7 +127,7 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
 
           {/* View Mode Switcher */}
           <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-full bg-[var(--surface-sunken)] p-1 border border-[var(--border-subtle)]">
+            <div className="inline-flex rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-1">
               <button
                 type="button"
                 onClick={() => setPreviewMode('invite')}
@@ -171,12 +158,12 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
 
             {/* Device Switcher */}
             {previewMode === 'invite' && (
-              <div className="hidden sm:inline-flex rounded-full bg-[var(--surface-sunken)] p-1 border border-[var(--border-subtle)]">
+              <div className="hidden rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-1 sm:inline-flex">
                 <button
                   type="button"
                   onClick={() => setDeviceFrame('mobile')}
                   className={cn(
-                    'p-1.5 rounded-full transition-colors',
+                    'rounded-full p-1.5 transition-colors',
                     deviceFrame === 'mobile'
                       ? 'bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]',
@@ -189,7 +176,7 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                   type="button"
                   onClick={() => setDeviceFrame('desktop')}
                   className={cn(
-                    'p-1.5 rounded-full transition-colors',
+                    'rounded-full p-1.5 transition-colors',
                     deviceFrame === 'desktop'
                       ? 'bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]',
@@ -214,7 +201,7 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
 
         {/* Occasion Sample Bar */}
         <div className="flex items-center gap-2 overflow-x-auto border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-6 py-2.5 text-xs">
-          <span className="font-medium text-[var(--text-muted)] shrink-0">Try Occasion:</span>
+          <span className="shrink-0 font-medium text-[var(--text-muted)]">Try Occasion:</span>
           {(['birthday', 'wedding', 'graduation', 'dinner', 'party'] as OccasionId[]).map((occ) => {
             const occInfo = occasions.find((o) => o.id === occ);
             return (
@@ -223,10 +210,10 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                 type="button"
                 onClick={() => setSelectedOccasion(occ)}
                 className={cn(
-                  'flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all shrink-0',
+                  'flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all',
                   selectedOccasion === occ
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm font-semibold'
-                    : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)] border border-[var(--border-subtle)]',
+                    ? 'bg-[var(--accent)] font-semibold text-[var(--accent-contrast)] shadow-sm'
+                    : 'border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)]',
                 )}
               >
                 <span>{occInfo?.glyph}</span>
@@ -258,18 +245,16 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
               <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
                   <div
-                    className="size-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md"
+                    className="flex size-10 items-center justify-center rounded-xl font-bold text-white shadow-md"
                     style={{ background: gradient }}
                   >
                     🎉
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white tracking-tight">
+                    <h3 className="text-base font-bold tracking-tight text-white">
                       {mockEvent.title}
                     </h3>
-                    <p className="text-xs text-neutral-400">
-                      Live Guest Wallboard · 32 Attendees
-                    </p>
+                    <p className="text-xs text-neutral-400">Live Guest Wallboard · 32 Attendees</p>
                   </div>
                 </div>
 
@@ -278,8 +263,8 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                     <QrCode className="size-4 text-[var(--accent)]" />
                     <span>Scan to post</span>
                   </div>
-                  <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+                    <span className="size-2 animate-ping rounded-full bg-emerald-400" />
                     LIVE FEED
                   </span>
                 </div>
@@ -288,8 +273,8 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
               {/* Sample Live Feed Grid */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-xl border border-white/10 bg-neutral-900/90 p-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="size-7 rounded-full bg-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center justify-center">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex size-7 items-center justify-center rounded-full bg-indigo-500/30 text-xs font-bold text-indigo-300">
                       M
                     </div>
                     <div>
@@ -303,8 +288,8 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-neutral-900/90 p-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="size-7 rounded-full bg-pink-500/30 text-pink-300 text-xs font-bold flex items-center justify-center">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex size-7 items-center justify-center rounded-full bg-pink-500/30 text-xs font-bold text-pink-300">
                       S
                     </div>
                     <div>
@@ -313,7 +298,7 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                     </div>
                   </div>
                   <div
-                    className="flex items-center justify-between rounded-lg p-2.5 text-xs font-medium text-white mb-1.5"
+                    className="mb-1.5 flex items-center justify-between rounded-lg p-2.5 text-xs font-medium text-white"
                     style={{ background: gradient }}
                   >
                     <span>🎙️ Voice Toast (0:24)</span>
@@ -325,8 +310,8 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-neutral-900/90 p-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="size-7 rounded-full bg-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/30 text-xs font-bold text-amber-300">
                       D
                     </div>
                     <div>

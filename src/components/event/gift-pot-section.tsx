@@ -14,11 +14,7 @@ interface GiftPotSectionProps {
   onContributionSuccess?: () => void;
 }
 
-export function GiftPotSection({
-  eventId,
-  funds,
-  onContributionSuccess,
-}: GiftPotSectionProps) {
+export function GiftPotSection({ eventId, funds, onContributionSuccess }: GiftPotSectionProps) {
   const { notify } = useToast();
   const [activeFundForModal, setActiveFundForModal] = useState<CashFundDoc | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
@@ -82,16 +78,14 @@ export function GiftPotSection({
           return (
             <div
               key={fund.id}
-              className="card relative flex flex-col justify-between overflow-hidden p-5 border border-[var(--border-subtle)] bg-[var(--surface-raised)] transition-all hover:border-[var(--border-focus)] shadow-sm"
+              className="card relative flex flex-col justify-between overflow-hidden border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-5 shadow-sm transition-all hover:border-[var(--border-focus)]"
             >
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h4 className="text-base font-bold text-[var(--text-primary)]">
-                      {fund.title}
-                    </h4>
+                    <h4 className="text-base font-bold text-[var(--text-primary)]">{fund.title}</h4>
                     {fund.description && (
-                      <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
                         {fund.description}
                       </p>
                     )}
@@ -140,7 +134,7 @@ export function GiftPotSection({
               </div>
 
               {/* Action Button */}
-              <div className="mt-5 pt-3 border-t border-[var(--border-subtle)]">
+              <div className="mt-5 border-t border-[var(--border-subtle)] pt-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -163,13 +157,13 @@ export function GiftPotSection({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm duration-200"
         >
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-6 shadow-2xl sm:p-8">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+                <span className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase">
                   Gift Contribution
                 </span>
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">
@@ -253,7 +247,7 @@ export function GiftPotSection({
               </div>
 
               {/* Wallboard Tribute Toggle */}
-              <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+              <label className="flex cursor-pointer items-center gap-2.5 pt-1">
                 <input
                   type="checkbox"
                   checked={postToWall}
@@ -268,7 +262,7 @@ export function GiftPotSection({
 
             {/* Summary & Checkout Action */}
             <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
-              <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-3">
+              <div className="mb-3 flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span>Gift to Host:</span>
                 <span className="font-bold text-[var(--text-primary)]">
                   ${fees.giftAmount.toFixed(2)}
@@ -279,20 +273,30 @@ export function GiftPotSection({
                 type="button"
                 disabled={isSubmitting || currentAmountToPay < 5}
                 onClick={handleContribute}
-                className="w-full h-12 rounded-full font-bold shadow-md"
+                className="h-12 w-full rounded-full font-bold shadow-md"
               >
                 {isSubmitting ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="size-4" />
-                    Complete ${currentAmountToPay} Gift
+                    Pledge ${currentAmountToPay}
                   </span>
                 )}
               </Button>
 
+              {/*
+                Says what the button does, not what we wish it did.
+
+                This read "Secure 256-bit checkout · 100% of the gift goes directly to the
+                host" above a flow that takes no card and moves no money — three untrue
+                claims in one line, on the one screen where a guest is deciding to part with
+                $200. The honest line stays until Stripe Connect is behind the button, at
+                which point this becomes a real receipt and the `cashFunds` flag goes on.
+              */}
               <p className="mt-2 text-center text-[0.65rem] text-[var(--text-muted)]">
-                Secure 256-bit checkout · 100% of the gift goes directly to the host
+                Payments are not live yet — this records your pledge and tells the host. Nothing is
+                charged.
               </p>
             </div>
           </div>

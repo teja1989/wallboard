@@ -61,16 +61,16 @@ export function CompetitorComparison() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)]">
-                <th className="py-4 pl-6 pr-4 font-semibold text-[var(--text-primary)]">
+                <th className="py-4 pr-4 pl-6 font-semibold text-[var(--text-primary)]">
                   Feature & Experience
                 </th>
-                <th className="py-4 px-4 font-bold text-[var(--accent)]">
+                <th className="px-4 py-4 font-bold text-[var(--accent)]">
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="size-4" />
                     <span>{brand.name}</span>
                   </div>
                 </th>
-                <th className="py-4 px-4 font-medium text-[var(--text-muted)]">
+                <th className="px-4 py-4 font-medium text-[var(--text-muted)]">
                   Legacy Platforms (Evite / Paperless Post)
                 </th>
               </tr>
@@ -81,16 +81,16 @@ export function CompetitorComparison() {
                   key={row.feature}
                   className={row.highlight ? 'bg-[var(--surface-page)]/40' : undefined}
                 >
-                  <td className="py-4 pl-6 pr-4 font-medium text-[var(--text-primary)]">
+                  <td className="py-4 pr-4 pl-6 font-medium text-[var(--text-primary)]">
                     {row.feature}
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
                       <Check className="size-4 shrink-0" />
                       <span>{row.marquee}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-[var(--text-secondary)]">
+                  <td className="px-4 py-4 text-[var(--text-secondary)]">
                     <div className="flex items-center gap-2">
                       <X className="size-4 shrink-0 text-red-400" />
                       <span>{row.legacy}</span>

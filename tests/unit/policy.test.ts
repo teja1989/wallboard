@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { can, isAtLeastEventRole, isAtLeastPlatformRole } from '@/lib/authz/policy';
-import type { Actor } from '@/types/domain';
+import { eventAuthzContext } from '@/lib/authz/event-context';
+import type { Actor, EventDoc, EventRole } from '@/types/domain';
 import type { PlatformRole } from '@/config';
 
 /**
@@ -144,6 +145,52 @@ describe('can()', () => {
       const author = actor();
       expect(can('post:deleteAny', { actor: author, eventRole: 'member' })).toBe(false);
     });
+  });
+});
+
+describe('eventAuthzContext — the two gates on anonymous posting', () => {
+  /*
+    `can()` is told *whether* anonymous posting is open; `eventAuthzContext` is what decides
+    it. Every test above passes `anonymousPostingAllowed` in directly, so the decision itself
+    had no coverage — and it was quietly widened to `whoCanPost === 'anyone' || eventRole !==
+    null`, which repeals the host's setting for every members-only event on the platform: an
+    anonymous visitor joins as `viewer`, `'viewer' !== null` is true, and they can post.
+
+    These assert the gate from the outside, through `can()`, because that composition is the
+    thing that has to hold.
+  */
+  const guest = actor({ isAnonymous: true, uid: 'guest' });
+
+  function event(whoCanPost: 'members' | 'anyone'): Pick<EventDoc, 'settings'> {
+    return { settings: { whoCanPost } } as Pick<EventDoc, 'settings'>;
+  }
+
+  const roles: EventRole[] = ['viewer', 'member', 'moderator'];
+
+  it('refuses an anonymous member on a members-only event, whatever their role', () => {
+    for (const role of roles) {
+      expect(
+        can('post:create', eventAuthzContext(guest, event('members'), role)),
+        `anonymous ${role} on a members-only event`,
+      ).toBe(false);
+    }
+  });
+
+  it('allows one only where the host opened the event up', () => {
+    // The other half: a gate that refused everything would pass the test above while making
+    // `whoCanPost: 'anyone'` mean nothing at all.
+    expect(can('post:create', eventAuthzContext(guest, event('anyone'), 'member'))).toBe(true);
+  });
+
+  it('still never grants moderation on an opened-up event', () => {
+    expect(can('post:deleteAny', eventAuthzContext(guest, event('anyone'), 'moderator'))).toBe(
+      false,
+    );
+  });
+
+  it('leaves a signed-in member unaffected by the host’s posting setting', () => {
+    // Attribution is the thing `whoCanPost` protects, and a signed-in guest already has it.
+    expect(can('post:create', eventAuthzContext(actor(), event('members'), 'member'))).toBe(true);
   });
 });
 

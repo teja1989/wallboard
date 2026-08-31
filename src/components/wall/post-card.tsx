@@ -92,9 +92,11 @@ export function PostCard({ post, eventId, canDelete, onOpenImage }: PostCardProp
       </header>
 
       {post.giftTribute && (
-        <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-amber-500/15 border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 shadow-sm">
+        <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-700 shadow-sm dark:text-amber-300">
           <span className="text-base">🎁</span>
-          <span>Gift Contribution: ${post.giftTribute.amount} toward {post.giftTribute.fundTitle}</span>
+          <span>
+            Gift Contribution: ${post.giftTribute.amount} toward {post.giftTribute.fundTitle}
+          </span>
         </div>
       )}
 

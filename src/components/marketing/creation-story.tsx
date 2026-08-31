@@ -22,8 +22,8 @@ export function CreationStory() {
           Three steps. One link. Effortless hosting.
         </h2>
         <p className="mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
-          No mandatory app downloads or account walls for your guests. From blank page to live
-          RSVPs in under two minutes.
+          No mandatory app downloads or account walls for your guests. From blank page to live RSVPs
+          in under two minutes.
         </p>
       </div>
 
@@ -190,7 +190,7 @@ export function CreationStory() {
                             className={cn(
                               'relative flex flex-col items-center gap-1 rounded-xl p-1.5 transition-all duration-200',
                               isSelected
-                                ? 'bg-[var(--surface-sunken)] ring-2 ring-[var(--accent)] shadow-sm'
+                                ? 'bg-[var(--surface-sunken)] shadow-sm ring-2 ring-[var(--accent)]'
                                 : 'hover:bg-[var(--surface-sunken)]/60',
                             )}
                           >
@@ -310,7 +310,9 @@ export function CreationStory() {
                     <p className="text-[11px] font-medium text-emerald-700 sm:text-xs">Attending</p>
                   </div>
                   <div className="rounded-xl bg-zinc-500/10 p-2.5 sm:p-3">
-                    <span className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">6</span>
+                    <span className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">
+                      6
+                    </span>
                     <p className="text-[11px] font-medium text-[var(--text-muted)] sm:text-xs">
                       Can&apos;t Make It
                     </p>

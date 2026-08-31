@@ -77,8 +77,8 @@ export default function LandingPage() {
               Crafted for life&apos;s real moments.
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--text-secondary)] sm:text-base">
-              Explore live invitation designs across birthdays, school & college graduations, weddings,
-              parties, and memorials.
+              Explore live invitation designs across birthdays, school & college graduations,
+              weddings, parties, and memorials.
             </p>
           </div>
 
@@ -100,14 +100,14 @@ export default function LandingPage() {
                   The invitation that brings your entire event to life.
                 </h2>
                 <p className="mt-5 leading-relaxed text-pretty text-[var(--text-secondary)]">
-                  The same private link your guests opened to RSVP seamlessly becomes the interactive
-                  live wall they celebrate with on the night — sharing photos, videos, and heartfelt
-                  memories in real time. Everything captured in one beautiful place that everyone
-                  already has open.
+                  The same private link your guests opened to RSVP seamlessly becomes the
+                  interactive live wall they celebrate with on the night — sharing photos, videos,
+                  and heartfelt memories in real time. Everything captured in one beautiful place
+                  that everyone already has open.
                 </p>
                 <p className="mt-4 leading-relaxed text-pretty text-[var(--text-secondary)]">
-                  Plug a laptop into any TV or projector, tap <strong>Presentation Mode</strong>, and
-                  watch your guests&apos; photos and moments illuminate the room in real time.
+                  Plug a laptop into any TV or projector, tap <strong>Presentation Mode</strong>,
+                  and watch your guests&apos; photos and moments illuminate the room in real time.
                 </p>
 
                 <div className="mt-8">

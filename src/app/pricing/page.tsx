@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Sparkles } from 'lucide-react';
-import {
-  adFreePromiseHolds,
-  anyActivePromo,
-  brand,
-  occasionById,
-  promoCopy,
-} from '@/config';
+import { adFreePromiseHolds, anyActivePromo, brand, occasionById, promoCopy } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { PricingCalculator } from '@/components/pricing/pricing-calculator';
@@ -44,19 +38,19 @@ export default function PricingPage() {
             <span>Zero Per-Guest Fees</span>
           </div>
 
-          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-balance sm:text-5xl lg:text-6xl">
+          <h1 className="mx-auto mt-4 max-w-3xl text-4xl leading-tight font-extrabold tracking-tight text-balance sm:text-5xl lg:text-6xl">
             Simple, flat pricing for unforgettable gatherings.
           </h1>
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-pretty text-[var(--text-secondary)] sm:text-lg">
-            No per-stamp coins, no charge for the live wallboard, and zero ads on any plan.
-            Whether you are hosting 15 or 250 guests, what you see is what you pay.
+            No per-stamp coins, no charge for the live wallboard, and zero ads on any plan. Whether
+            you are hosting 15 or 250 guests, what you see is what you pay.
           </p>
 
           {/* Ad-Free Promise & Promo Callouts */}
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             {adFreePromiseHolds() && (
-              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-raised)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                 <BadgeCheck className="size-4 text-[var(--accent)]" aria-hidden />
                 {brand.noAds.badge}
               </span>
@@ -74,11 +68,12 @@ export default function PricingPage() {
           )}
 
           {preview && (
-            <p className="mx-auto mt-6 max-w-2xl rounded-2xl bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+            <p className="mx-auto mt-6 max-w-2xl rounded-2xl border border-[var(--border-subtle)] bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed text-[var(--text-secondary)]">
               <strong className="font-semibold text-[var(--text-primary)]">
                 Free during preview:
               </strong>{' '}
-              Every event gets access to all premium themes and live wallboard features. No card required.
+              Every event gets access to all premium themes and live wallboard features. No card
+              required.
             </p>
           )}
         </section>
@@ -90,7 +85,7 @@ export default function PricingPage() {
 
         {/* Section 2: Pricing Plan Cards with Cadence Toggle */}
         <section className="mb-20">
-          <div className="text-center mb-8">
+          <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               Choose the plan that fits your rhythm
             </h2>
@@ -118,20 +113,20 @@ export default function PricingPage() {
 
         {/* Section 6: Bottom Conversion Callout */}
         <section>
-          <div className="card relative overflow-hidden flex flex-col items-center gap-5 p-10 text-center sm:p-16 shadow-[var(--shadow-lift)] border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+          <div className="card relative flex flex-col items-center gap-5 overflow-hidden border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-10 text-center shadow-[var(--shadow-lift)] sm:p-16">
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-indigo-500/10 blur-3xl opacity-60"
+              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-indigo-500/10 opacity-60 blur-3xl"
             />
-            <span className="size-12 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center shadow-sm">
+            <span className="flex size-12 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm">
               <Sparkles className="size-6" />
             </span>
-            <h2 className="max-w-lg text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">
+            <h2 className="max-w-lg text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl">
               Start free. Upgrade anytime.
             </h2>
-            <p className="max-w-md text-pretty text-sm text-[var(--text-secondary)] sm:text-base">
-              Create your event invitation in 60 seconds, experience the live wallboard, and send
-              it to your guests when ready.
+            <p className="max-w-md text-sm text-pretty text-[var(--text-secondary)] sm:text-base">
+              Create your event invitation in 60 seconds, experience the live wallboard, and send it
+              to your guests when ready.
             </p>
             <Link
               href="/create"

@@ -31,10 +31,32 @@ export interface FeatureFlags {
   analytics: boolean;
   /** Deferred — Cloud Transcoder normalisation of uploaded video. */
   transcoding: boolean;
-  /** Lets a host allow anonymous (code-only) visitors to post. Off by default: attribution matters. */
+  /**
+   * Lets a host *choose* to allow anonymous (code-only) visitors to post.
+   *
+   * On, so that `whoCanPost: 'anyone'` is a real option rather than a setting that throws.
+   * It is the outer of two gates and grants nothing on its own: the host still has to opt
+   * their event in, and even then it adds only `post:create` and `post:deleteOwn`. Turning
+   * it off removes the option platform-wide.
+   */
   allowAnonymousPosting: boolean;
   /** Big-screen projection mode for the wall. */
   presentationMode: boolean;
+  /**
+   * Collective cash pots — guests chipping in toward a honeymoon, a nursery, a group gift.
+   *
+   * **Off, and it must stay off until a payment processor is behind it.** The UI, the
+   * schemas, the fee arithmetic and the Firestore writes are all built and all work; what
+   * does not exist is the charge. `recordContribution` increments `currentAmount` and posts
+   * a "🎁 Contributed $200" tribute to the wall having moved no money at all, so with this
+   * on, a guest is shown a checkout, told the gift is complete, and the host is shown a
+   * balance nobody can withdraw.
+   *
+   * Turning it on needs Stripe Connect Express with the host as merchant of record — see the
+   * "never hold funds" entry in `docs/DECISIONS.md`, which this feature is otherwise a
+   * direct violation of. Until then the flag is the thing standing between built and shipped.
+   */
+  cashFunds: boolean;
 }
 
 export const defaultFeatureFlags: FeatureFlags = {
@@ -47,6 +69,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   transcoding: false,
   allowAnonymousPosting: true,
   presentationMode: true,
+  cashFunds: false,
 };
 
 /**

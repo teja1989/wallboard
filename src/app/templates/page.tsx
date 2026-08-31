@@ -33,7 +33,7 @@ export default function TemplatesPage() {
             <span>Interactive Design Studio</span>
           </div>
 
-          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-balance sm:text-5xl lg:text-6xl">
+          <h1 className="mx-auto mt-4 max-w-3xl text-4xl leading-tight font-extrabold tracking-tight text-balance sm:text-5xl lg:text-6xl">
             {templates.length} signature designs. Four layouts. One unforgettable event.
           </h1>
 
@@ -50,8 +50,7 @@ export default function TemplatesPage() {
             </span>
             <span className="hidden sm:inline">·</span>
             <span className="flex items-center gap-1.5 font-medium text-[var(--text-primary)]">
-              <Layers className="size-4 text-[var(--accent)]" />
-              4 Architectural Layouts
+              <Layers className="size-4 text-[var(--accent)]" />4 Architectural Layouts
             </span>
             <span className="hidden sm:inline">·</span>
             <span className="flex items-center gap-1.5 font-medium text-[var(--text-primary)]">
@@ -66,20 +65,20 @@ export default function TemplatesPage() {
 
         {/* Bottom CTA Banner */}
         <section className="mt-20">
-          <div className="card relative overflow-hidden flex flex-col items-center gap-5 p-10 text-center sm:p-16 shadow-[var(--shadow-lift)] border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+          <div className="card relative flex flex-col items-center gap-5 overflow-hidden border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-10 text-center shadow-[var(--shadow-lift)] sm:p-16">
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-indigo-500/10 blur-3xl opacity-60"
+              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-indigo-500/10 opacity-60 blur-3xl"
             />
-            <span className="size-12 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center shadow-sm">
+            <span className="flex size-12 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm">
               <Sparkles className="size-6" />
             </span>
-            <h2 className="max-w-lg text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">
+            <h2 className="max-w-lg text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl">
               Ready to create your invitation?
             </h2>
-            <p className="max-w-md text-pretty text-sm text-[var(--text-secondary)] sm:text-base">
-              Choose any template, craft your details in 60 seconds, and share one magical link
-              with your guests. No credit card required.
+            <p className="max-w-md text-sm text-pretty text-[var(--text-secondary)] sm:text-base">
+              Choose any template, craft your details in 60 seconds, and share one magical link with
+              your guests. No credit card required.
             </p>
             <Link
               href="/create"

@@ -13,11 +13,7 @@ interface GiftPotManagerProps {
   onFundsChanged: () => void;
 }
 
-export function GiftPotManager({
-  eventId,
-  funds,
-  onFundsChanged,
-}: GiftPotManagerProps) {
+export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManagerProps) {
   const { notify } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -103,7 +99,7 @@ export function GiftPotManager({
               setCategory('custom');
               setIsModalOpen(true);
             }}
-            className="rounded-full shrink-0"
+            className="shrink-0 rounded-full"
           >
             <Plus className="size-3.5" />
             Create Cash Pot
@@ -114,7 +110,7 @@ export function GiftPotManager({
       {/* Quick 1-Click Preset Starters */}
       {funds.length === 0 && (
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-5">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-[var(--text-muted)] uppercase">
             <Sparkles className="size-3.5 text-[var(--accent)]" />
             <span>Popular Cash Pot Starters</span>
           </div>
@@ -127,7 +123,7 @@ export function GiftPotManager({
                 className="flex flex-col items-start gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left transition-all hover:border-[var(--accent)] hover:shadow-sm"
               >
                 <span className="text-xl">{preset.glyph}</span>
-                <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
+                <span className="text-xs leading-tight font-bold text-[var(--text-primary)]">
                   {preset.title.split(' ')[0]} {preset.title.split(' ')[1]}
                 </span>
                 <span className="text-[0.65rem] text-[var(--text-muted)]">
@@ -160,9 +156,7 @@ export function GiftPotManager({
                           : '🎁'}
                 </span>
                 <div>
-                  <h4 className="text-sm font-bold text-[var(--text-primary)]">
-                    {fund.title}
-                  </h4>
+                  <h4 className="text-sm font-bold text-[var(--text-primary)]">{fund.title}</h4>
                   <p className="text-xs text-[var(--text-muted)]">
                     ${fund.currentAmount.toLocaleString()} raised
                     {fund.targetAmount && ` of $${fund.targetAmount.toLocaleString()} goal`} ·{' '}
@@ -175,7 +169,7 @@ export function GiftPotManager({
                 type="button"
                 disabled={deletingId === fund.id}
                 onClick={() => handleDeleteFund(fund.id)}
-                className="flex size-8 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] transition-colors"
+                className="flex size-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
                 title="Remove cash pot"
               >
                 {deletingId === fund.id ? (
@@ -194,7 +188,7 @@ export function GiftPotManager({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm duration-200"
         >
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-6 shadow-2xl sm:p-8">
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
@@ -217,9 +211,7 @@ export function GiftPotManager({
 
             <form onSubmit={handleCreateFund} className="mt-5 space-y-4">
               <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  Fund Title
-                </label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Fund Title</label>
                 <input
                   type="text"
                   required
@@ -231,9 +223,7 @@ export function GiftPotManager({
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  Category
-                </label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Category</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as FundCategory)}
@@ -277,7 +267,7 @@ export function GiftPotManager({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-subtle)]">
+              <div className="flex items-center justify-end gap-3 border-t border-[var(--border-subtle)] pt-4">
                 <Button
                   type="button"
                   variant="soft"
@@ -286,17 +276,8 @@ export function GiftPotManager({
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    'Save Cash Pot'
-                  )}
+                <Button type="submit" variant="primary" size="sm" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : 'Save Cash Pot'}
                 </Button>
               </div>
             </form>

@@ -79,7 +79,7 @@ export function PricingFaq() {
                 />
               </button>
               {isOpen && (
-                <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-page)]/60 px-5 py-4 text-sm leading-relaxed text-[var(--text-secondary)] animate-in fade-in duration-200">
+                <div className="animate-in fade-in border-t border-[var(--border-subtle)] bg-[var(--surface-page)]/60 px-5 py-4 text-sm leading-relaxed text-[var(--text-secondary)] duration-200">
                   {faq.a}
                 </div>
               )}

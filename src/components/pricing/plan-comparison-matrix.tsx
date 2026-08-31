@@ -159,21 +159,21 @@ export function PlanComparisonMatrix() {
 
       {/* Expandable Table */}
       {isOpen && (
-        <div className="mt-8 overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-sm animate-in fade-in duration-300">
+        <div className="animate-in fade-in mt-8 overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-sm duration-300">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)]">
-                  <th className="py-4 pl-6 pr-4 font-semibold text-[var(--text-primary)] w-1/3">
+                  <th className="w-1/3 py-4 pr-4 pl-6 font-semibold text-[var(--text-primary)]">
                     Feature
                   </th>
-                  <th className="py-4 px-4 font-semibold text-[var(--text-primary)] text-center">
+                  <th className="px-4 py-4 text-center font-semibold text-[var(--text-primary)]">
                     {plans.free.label} ($0)
                   </th>
-                  <th className="py-4 px-4 font-bold text-[var(--accent)] text-center bg-[var(--accent-soft)]/30">
+                  <th className="bg-[var(--accent-soft)]/30 px-4 py-4 text-center font-bold text-[var(--accent)]">
                     {plans.event.label} ($19)
                   </th>
-                  <th className="py-4 px-4 font-semibold text-[var(--text-primary)] text-center">
+                  <th className="px-4 py-4 text-center font-semibold text-[var(--text-primary)]">
                     {plans.pro.label} ($79/yr)
                   </th>
                 </tr>
@@ -184,23 +184,26 @@ export function PlanComparisonMatrix() {
                     <tr className="bg-[var(--surface-sunken)]/60">
                       <td
                         colSpan={4}
-                        className="py-2.5 pl-6 font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]"
+                        className="py-2.5 pl-6 text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase"
                       >
                         {sec.category}
                       </td>
                     </tr>
                     {sec.items.map((item) => (
-                      <tr key={item.name} className="hover:bg-[var(--surface-page)]/40 transition-colors">
-                        <td className="py-3.5 pl-6 pr-4 font-medium text-[var(--text-primary)]">
+                      <tr
+                        key={item.name}
+                        className="transition-colors hover:bg-[var(--surface-page)]/40"
+                      >
+                        <td className="py-3.5 pr-4 pl-6 font-medium text-[var(--text-primary)]">
                           {item.name}
                         </td>
-                        <td className="py-3.5 px-4 text-center text-xs text-[var(--text-secondary)]">
+                        <td className="px-4 py-3.5 text-center text-xs text-[var(--text-secondary)]">
                           {renderValue(item.free)}
                         </td>
-                        <td className="py-3.5 px-4 text-center text-xs font-semibold text-[var(--text-primary)] bg-[var(--accent-soft)]/10">
+                        <td className="bg-[var(--accent-soft)]/10 px-4 py-3.5 text-center text-xs font-semibold text-[var(--text-primary)]">
                           {renderValue(item.event)}
                         </td>
-                        <td className="py-3.5 px-4 text-center text-xs text-[var(--text-secondary)]">
+                        <td className="px-4 py-3.5 text-center text-xs text-[var(--text-secondary)]">
                           {renderValue(item.pro)}
                         </td>
                       </tr>

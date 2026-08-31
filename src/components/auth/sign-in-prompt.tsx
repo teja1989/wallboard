@@ -202,7 +202,7 @@ export function SignInPrompt({
         {/* Local Emulator 1-Click Fast Sign-In */}
         {appConfig.useEmulators && (
           <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-left">
-            <div className="flex items-center justify-between text-[0.7rem] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-2">
+            <div className="mb-2 flex items-center justify-between text-[0.7rem] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-300">
               <span>⚡ Fast Dev Sign-In (Local)</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -210,7 +210,7 @@ export function SignInPrompt({
                 type="button"
                 disabled={busy !== null}
                 onClick={() => handleDevSignIn('priya@example.com', 'Priya Sharma')}
-                className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)] hover:border-amber-500 transition-all text-left truncate"
+                className="flex items-center gap-1.5 truncate rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-left text-xs font-medium text-[var(--text-primary)] transition-all hover:border-amber-500"
               >
                 <span>👑</span>
                 <span className="truncate">Host: Priya</span>
@@ -219,7 +219,7 @@ export function SignInPrompt({
                 type="button"
                 disabled={busy !== null}
                 onClick={() => handleDevSignIn('you@example.com', 'Admin Owner')}
-                className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)] hover:border-amber-500 transition-all text-left truncate"
+                className="flex items-center gap-1.5 truncate rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-left text-xs font-medium text-[var(--text-primary)] transition-all hover:border-amber-500"
               >
                 <span>🛡️</span>
                 <span className="truncate">Admin Owner</span>
