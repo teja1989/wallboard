@@ -45,7 +45,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   ads: false,
   analytics: false,
   transcoding: false,
-  allowAnonymousPosting: false,
+  allowAnonymousPosting: true,
   presentationMode: true,
 };
 

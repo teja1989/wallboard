@@ -20,6 +20,7 @@ import {
   onIdTokenChanged,
   sendSignInLinkToEmail,
   signInAnonymously,
+  signInWithCustomToken,
   signInWithEmailLink,
   signInWithPopup,
   signInWithRedirect,
@@ -49,6 +50,7 @@ interface AuthContextValue {
   isAnonymous: boolean;
   signInAsGuest: () => Promise<void>;
   upgradeWithGoogle: () => Promise<void>;
+  signInWithDevAccount: (email: string, displayName?: string) => Promise<void>;
   sendEmailLink: (email: string, returnTo?: string) => Promise<void>;
   completeEmailLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -169,6 +171,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    // Safety guard: ensure loading state never hangs indefinitely if emulator or IndexedDB is slow
+    const safetyTimer = setTimeout(() => {
+      setSessionChecked(true);
+      setFirebaseChecked(true);
+    }, 1200);
+    return () => clearTimeout(safetyTimer);
+  }, []);
+
   /**
    * Finish a sign-in that went the redirect way.
    *
@@ -189,6 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (result?.user) await exchangeSession(result.user);
       } catch {
         // Nothing pending, or the visitor changed their mind.
+      } finally {
+        setFirebaseChecked(true);
       }
     })();
   }, [exchangeSession]);
@@ -243,6 +256,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * link if the Google account already exists as its own user, in which case a plain
    * sign-in is the correct fallback — the guest identity is genuinely a different person.
    */
+  const signInWithDevAccount = useCallback(
+    async (email: string, displayName?: string) => {
+      const auth = clientAuth();
+      const res = await api.post<{ customToken: string; uid: string }>('/api/auth/dev-login', {
+        email,
+        displayName: displayName || email.split('@')[0],
+      });
+      const credential = await signInWithCustomToken(auth, res.customToken);
+      await exchangeSession(credential.user);
+    },
+    [exchangeSession],
+  );
+
   const upgradeWithGoogle = useCallback(async () => {
     const auth = clientAuth();
     const provider = new GoogleAuthProvider();
@@ -363,6 +389,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAnonymous: actor?.isAnonymous ?? user?.isAnonymous ?? true,
       signInAsGuest,
       upgradeWithGoogle,
+      signInWithDevAccount,
       sendEmailLink,
       completeEmailLink,
       signOut,
@@ -374,6 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signInAsGuest,
       upgradeWithGoogle,
+      signInWithDevAccount,
       sendEmailLink,
       completeEmailLink,
       signOut,

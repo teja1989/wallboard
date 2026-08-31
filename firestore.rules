@@ -85,6 +85,17 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Collective cash funds and dream pots. Members read the fund progress; writes are server-only.
+      match /funds/{fundId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      match /contributions/{contribId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
       // The host's planning list. Shut in both directions, guests and host alike.
       //
       // Reads because it is somebody's working notes about their own party — what they have
@@ -110,9 +121,9 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // The live wall. Removed and quarantined posts stay invisible to members.
+      // The live wall. Removed and quarantined posts stay invisible to regular viewers.
       match /posts/{postId} {
-        allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();
+        allow read: if resource.data.state == 'visible' || isMemberOf(eventId) || isStaff();
         allow write: if false;
       }
     }

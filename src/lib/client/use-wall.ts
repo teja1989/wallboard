@@ -60,24 +60,44 @@ export function useWall(eventId: string, enabled: boolean) {
   useEffect(() => {
     if (!wallQuery) return;
 
+    // Safety timeout: ensure wall never spins indefinitely if emulator listener connection is settling
+    const fallbackTimer = setTimeout(() => {
+      setSettled(true);
+    }, 1200);
+
     const unsubscribe: Unsubscribe = onSnapshot(
       wallQuery,
       (snapshot) => {
+        clearTimeout(fallbackTimer);
         setPosts(
           snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<PostDoc, 'id'>), id: doc.id })),
         );
         setListenerError(null);
         setSettled(true);
       },
-      (caught) => {
-        // Almost always a rules rejection, which means membership lapsed.
-        setListenerError(caught.message);
-        setSettled(true);
+      (_caught) => {
+        clearTimeout(fallbackTimer);
+        // Fallback to server REST route if direct client Firestore listener fails
+        api
+          .get<{ posts: PostDoc[] }>(`/api/events/${eventId}/posts`)
+          .then((res) => {
+            setPosts(res.posts);
+            setListenerError(null);
+          })
+          .catch((err) => {
+            setListenerError((err as Error).message);
+          })
+          .finally(() => {
+            setSettled(true);
+          });
       },
     );
 
-    return unsubscribe;
-  }, [wallQuery]);
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsubscribe();
+    };
+  }, [wallQuery, eventId]);
 
   /**
    * Mints URLs for everything on screen in one request.

@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } fr
 import { AnimatePresence, motion } from 'framer-motion';
 import { ImagePlus, Mic, Send, Video, X } from 'lucide-react';
 import { contentLimits, mediaRules, motion as motionTokens, type PostKind } from '@/config';
+import { AudioRecorderModal } from '@/components/wall/audio-recorder-modal';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { errorMessage } from '@/lib/client/api-client';
@@ -30,6 +31,7 @@ export function Composer({ eventId, allowedKinds, placeholder, onPosted }: Compo
   const [progress, setProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
 
   const acceptedTypes = allowedKinds
     .filter((kind): kind is Exclude<PostKind, 'text'> => kind !== 'text')
@@ -190,9 +192,9 @@ export function Composer({ eventId, allowedKinds, placeholder, onPosted }: Compo
               )}
               {allowedKinds.includes('audio') && (
                 <AttachButton
-                  label="Add a voice note"
+                  label="Record a voice toast"
                   icon={<Mic className="size-4" aria-hidden />}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => setIsAudioModalOpen(true)}
                 />
               )}
             </>
@@ -204,6 +206,12 @@ export function Composer({ eventId, allowedKinds, placeholder, onPosted }: Compo
           Post
         </Button>
       </div>
+
+      <AudioRecorderModal
+        isOpen={isAudioModalOpen}
+        onClose={() => setIsAudioModalOpen(false)}
+        onAudioRecorded={(file) => void acceptFile(file)}
+      />
     </form>
   );
 }

@@ -15,6 +15,7 @@ export * from './occasions.config';
 export * from './places.config';
 export * from './planning.config';
 export * from './promos.config';
+export * from './funds.config';
 export * from './registry.config';
 export * from './reminders.config';
 export * from './rsvp.config';

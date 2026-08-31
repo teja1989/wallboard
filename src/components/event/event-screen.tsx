@@ -6,6 +6,7 @@ import { Clock, Loader2, Settings2, Sparkles, Tv, Users } from 'lucide-react';
 import { brand, featureFlags, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
+import { Button } from '@/components/ui/button';
 import { GiftList } from '@/components/event/gift-list';
 import { GiftListPanel } from '@/components/event/gift-list-panel';
 import { GuestList } from '@/components/event/guest-list';
@@ -75,6 +76,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [lightboxMedia, setLightboxMedia] = useState<ResolvedMedia | null>(null);
   const [guestRefreshKey, setGuestRefreshKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [guestName, setGuestName] = useState('');
+  const [joinBusy, setJoinBusy] = useState(false);
 
   const loadEvent = useCallback(async () => {
     try {
@@ -264,13 +267,52 @@ export function EventScreen({ eventId }: { eventId: string }) {
               </div>
             )}
 
-            {isLive && !permissions.canPost && isAnonymous && (
-              <div className="mb-6">
-                <SignInPrompt
-                  compact
-                  title="Join in"
-                  body="You are watching as a guest. Sign in to add your own photos, video and messages."
-                />
+            {isLive && !permissions.canPost && (
+              <div className="card mb-6 p-6 text-center space-y-4 shadow-sm border border-[var(--border-subtle)]">
+                <div className="mx-auto size-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
+                  <Sparkles className="size-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Join the Live Wall</h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    Enter your name to immediately start posting photos, video, and voice toasts.
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!guestName.trim()) return;
+                    setJoinBusy(true);
+                    try {
+                      await api.post(`/api/events/${eventId}/join-direct`, { displayName: guestName.trim() });
+                      await loadEvent();
+                    } catch (err) {
+                      console.error('[join-direct]', err);
+                    } finally {
+                      setJoinBusy(false);
+                    }
+                  }}
+                  className="max-w-md mx-auto flex flex-col sm:flex-row gap-2 pt-2"
+                >
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Your name (e.g. Maya)"
+                    className="flex-1 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                    required
+                  />
+                  <Button type="submit" variant="primary" loading={joinBusy}>
+                    <Sparkles className="size-4 mr-1" />
+                    Join & Post
+                  </Button>
+                </form>
+
+                <div className="pt-3 border-t border-[var(--border-subtle)]">
+                  <p className="text-xs text-[var(--text-muted)] mb-3">Or continue with an existing account:</p>
+                  <SignInPrompt compact />
+                </div>
               </div>
             )}
 

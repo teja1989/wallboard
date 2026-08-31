@@ -3,11 +3,16 @@ import { useEffect, useState } from 'react';
 import { Gift, ExternalLink } from 'lucide-react';
 import { registryCopy, registryHostLabel } from '@/config';
 import { api } from '@/lib/client/api-client';
-import type { RegistryLinkDoc } from '@/types/domain';
+import { GiftPotSection } from '@/components/event/gift-pot-section';
+import type { CashFundDoc, RegistryLinkDoc } from '@/types/domain';
 
 interface RegistryResponse {
   links: RegistryLinkDoc[];
   allowed: boolean;
+}
+
+interface FundsResponse {
+  funds: CashFundDoc[];
 }
 
 /** The host's note, or where the link goes — never a repeat of the name above it. */
@@ -17,40 +22,50 @@ function subLine(link: RegistryLinkDoc): string {
   return host === link.label ? '' : host;
 }
 
-/**
- * The gift list, as a guest sees it.
- *
- * Renders nothing at all when the host has not added anything, which is most invitations —
- * an empty "Gifts" heading reads as an ask, and this product should never nag somebody on
- * behalf of a host who did not ask it to.
- *
- * Every row is a plain anchor with a real `href`. That matters more than it looks: the count
- * is a beacon fired on the way out, so a guest with JavaScript off, or one whose tap happens
- * while our own route is down, still reaches the shop. The measurement is ours to lose, not
- * theirs.
- */
 export function GiftList({ eventId }: { eventId: string }) {
   const [links, setLinks] = useState<RegistryLinkDoc[]>([]);
+  const [funds, setFunds] = useState<CashFundDoc[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+
     void (async () => {
       try {
-        const data = await api.get<RegistryResponse>(`/api/events/${eventId}/registry`);
-        if (!cancelled) setLinks(data.allowed ? data.links : []);
+        const [regData, fundData] = await Promise.all([
+          api
+            .get<RegistryResponse>(`/api/events/${eventId}/registry`)
+            .catch(() => ({ links: [], allowed: false })),
+          api.get<FundsResponse>(`/api/events/${eventId}/funds`).catch(() => ({ funds: [] })),
+        ]);
+        if (cancelled) return;
+        setLinks(regData.allowed ? regData.links : []);
+        setFunds(fundData.funds || []);
       } catch {
-        // A gift list that will not load is not worth an error message on somebody's
-        // invitation. The details, the date and the reply are all still there.
+        // Quiet fail
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, refreshKey]);
 
-  if (links.length === 0) return null;
+  if (links.length === 0 && funds.length === 0) return null;
 
   return (
+    <div className="space-y-6">
+      {/* Collective Cash Pots */}
+      {funds.length > 0 && (
+        <GiftPotSection
+          eventId={eventId}
+          funds={funds}
+          onContributionSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {/* External Links */}
+      {links.length > 0 && (
     <section className="card p-5" aria-labelledby="gift-list-heading">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
@@ -92,9 +107,11 @@ export function GiftList({ eventId }: { eventId: string }) {
               <ExternalLink className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
             </a>
           </li>
-        ))}
-      </ul>
-    </section>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
   );
 }
 

@@ -1,30 +1,32 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, Check } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Sparkles } from 'lucide-react';
 import {
   adFreePromiseHolds,
   anyActivePromo,
   brand,
-  formatPrice,
   occasionById,
-  planOrder,
-  plans,
   promoCopy,
 } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
-import { cn } from '@/lib/utils';
+import { PricingCalculator } from '@/components/pricing/pricing-calculator';
+import { PricingCards } from '@/components/pricing/pricing-cards';
+import { CompetitorComparison } from '@/components/pricing/competitor-comparison';
+import { PlanComparisonMatrix } from '@/components/pricing/plan-comparison-matrix';
+import { PricingFaq } from '@/components/pricing/pricing-faq';
 
 export const metadata: Metadata = {
-  title: 'Pricing — Transparent, Simple Plans',
-  description: `${brand.name} is free to start. Simple flat pricing with zero per-guest fees, full RSVP tools, and live photo walls included.`,
+  title: 'Pricing — Flat, Transparent Plans for Every Celebration',
+  description: `${brand.name} has zero per-guest fees, zero banner ads, and flat transparent pricing. Full RSVP tools, all 15 designer templates, and live TV wallboard included.`,
   robots: { index: true, follow: true },
 };
 
 /**
- * Pricing.
+ * Modern Interactive Pricing Studio.
  *
- * Simple, elegant, and transparent.
+ * Combines dynamic headcount matching, side-by-side competitor breakdowns,
+ * deep feature comparison matrices, and clear FAQs.
  */
 export default function PricingPage() {
   const preview = isPreviewPricing();
@@ -34,26 +36,33 @@ export default function PricingPage() {
     <>
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-8">
-        <section className="pt-10 pb-14 text-center sm:pt-16">
-          <h1 className="mx-auto max-w-3xl text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">
-            Simple, transparent pricing.
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
+        {/* Hero Section */}
+        <section className="pt-12 pb-10 text-center sm:pt-18 sm:pb-14">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-semibold text-[var(--accent)] shadow-sm">
+            <Sparkles className="size-3.5" />
+            <span>Zero Per-Guest Fees</span>
+          </div>
+
+          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            Simple, flat pricing for unforgettable gatherings.
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-[var(--text-secondary)]">
-            No per-guest fees, no charge for the live wall, and nothing your guests ever have to pay
-            for or install.
+
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-pretty text-[var(--text-secondary)] sm:text-lg">
+            No per-stamp coins, no charge for the live wallboard, and zero ads on any plan.
+            Whether you are hosting 15 or 250 guests, what you see is what you pay.
           </p>
 
-          {/* Above the table rather than buried in a bullet: for most people the last free
-              invitation they used had a banner on it, and this is the answer to that. */}
-          {adFreePromiseHolds() && (
-            <p className="mx-auto mt-6 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-5 py-2.5 text-sm font-medium">
-              <BadgeCheck className="size-4 text-[var(--accent)]" aria-hidden />
-              {brand.noAds.badge}
-            </p>
-          )}
+          {/* Ad-Free Promise & Promo Callouts */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            {adFreePromiseHolds() && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-raised)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-sm">
+                <BadgeCheck className="size-4 text-[var(--accent)]" aria-hidden />
+                {brand.noAds.badge}
+              </span>
+            )}
+          </div>
 
-          {/* Above the preview note, because a dated window is the more urgent of the two. */}
           {promo && (
             <p className="mx-auto mt-6 max-w-2xl rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed">
               <strong className="font-semibold">{promoCopy.banner(promo)}</strong>{' '}
@@ -64,132 +73,71 @@ export default function PricingPage() {
             </p>
           )}
 
-          {/* The banner is a block, not an inline-flex: as a flex container the bold
-              lead-in becomes its own column and the sentence breaks in half. */}
           {preview && (
-            <p className="mx-auto mt-6 max-w-2xl rounded-2xl bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed text-[var(--text-secondary)]">
+            <p className="mx-auto mt-6 max-w-2xl rounded-2xl bg-[var(--accent-soft)] px-5 py-3.5 text-sm leading-relaxed text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               <strong className="font-semibold text-[var(--text-primary)]">
-                Free while we are in preview.
+                Free during preview:
               </strong>{' '}
-              Every event currently gets everything below, including the paid features. No card,
-              nothing to cancel. This page is what pricing will look like when we turn it on.
+              Every event gets access to all premium themes and live wallboard features. No card required.
             </p>
           )}
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-3">
-          {planOrder.map((planId) => {
-            const plan = plans[planId];
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  'card relative flex flex-col p-7',
-                  plan.featured && 'ring-2 ring-[var(--accent)]',
-                )}
-              >
-                {plan.featured && (
-                  <span className="absolute -top-3 left-7 rounded-[var(--radius-pill)] bg-[var(--accent)] px-3 py-1 text-xs font-medium text-[var(--accent-contrast)]">
-                    Most chosen
-                  </span>
-                )}
+        {/* Section 1: Interactive Guest Scale Calculator */}
+        <div className="mb-16">
+          <PricingCalculator />
+        </div>
 
-                <h2 className="text-lg font-semibold tracking-tight">{plan.label}</h2>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">{plan.audience}</p>
-
-                <p className="mt-6 flex items-baseline gap-1.5">
-                  <span className="text-4xl font-semibold tracking-tight">{formatPrice(plan)}</span>
-                  {plan.cadence === 'per-event' && (
-                    <span className="text-[var(--text-muted)]">per event</span>
-                  )}
-                  {plan.cadence === 'yearly' && (
-                    <span className="text-[var(--text-muted)]">per year</span>
-                  )}
-                </p>
-                <p className="mt-1.5 text-sm text-[var(--text-muted)]">{plan.priceNote}</p>
-
-                <ul className="mt-6 flex-1 space-y-2.5">
-                  {plan.highlights.map((highlight) => (
-                    <li key={highlight} className="flex gap-2.5 text-sm leading-relaxed">
-                      <Check className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" aria-hidden />
-                      <span>{highlight}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href="/create"
-                  className={cn(
-                    'mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-pill)] px-6 text-sm font-medium transition-all duration-200 active:scale-[0.97]',
-                    plan.featured
-                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]'
-                      : 'bg-[var(--surface-sunken)] hover:bg-[var(--accent-soft)]',
-                  )}
-                >
-                  {preview ? 'Start free' : plan.id === 'free' ? 'Start free' : 'Start an event'}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              </div>
-            );
-          })}
-        </section>
-
-        <section className="py-20">
-          <h2 className="text-3xl font-semibold tracking-tight text-balance">
-            The questions people actually ask
-          </h2>
-
-          <dl className="mt-8 grid gap-4 sm:grid-cols-2">
-            <Faq q="Do my guests need an account?">
-              No. They open the link or type the code and they are in. An account is only needed to
-              post to the wall, so that every photo has a name attached to it and you can remove
-              things if you need to.
-            </Faq>
-            <Faq q="What happens to the photos afterwards?">
-              The wall closes on the date you chose, and the files are deleted from storage shortly
-              after. On a paid event you can download the whole archive before it closes.
-            </Faq>
-            {adFreePromiseHolds() && (
-              <Faq q="Is the free plan ad-supported?">
-                No. There are no ads on any plan, and none are coming — an ad beside
-                somebody&rsquo;s invitation earns us pennies and costs you the moment. The free plan
-                is the whole product with smaller limits, not a worse one with something sold in the
-                gaps.
-              </Faq>
-            )}
-            <Faq q="Is it per guest?">
-              Never. The plans differ in how many guests they allow, but you are never charged per
-              head or per invitation sent.
-            </Faq>
-            <Faq q="Can I upgrade after I have sent it?">
-              Yes. Upgrading applies to the event you already made — your guests keep the same link
-              and the same code, and nothing they have already done is lost.
-            </Faq>
-            <Faq q="What if nobody replies?">
-              You will see who has not, and you can nudge them with the same link. The guest list
-              shows both who is coming and who you are still waiting on.
-            </Faq>
-            <Faq q="Can I use it for something sad?">
-              Yes, and it will not put confetti on it. Choosing Memorial changes the wording
-              throughout, and the wall becomes a place for memories rather than party photos.
-            </Faq>
-          </dl>
-        </section>
-
-        <section className="pb-12">
-          <div className="card flex flex-col items-center gap-5 p-10 text-center sm:p-14">
-            <h2 className="max-w-lg text-3xl leading-tight font-semibold tracking-tight text-balance">
-              Start free. Decide later.
+        {/* Section 2: Pricing Plan Cards with Cadence Toggle */}
+        <section className="mb-20">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Choose the plan that fits your rhythm
             </h2>
-            <p className="max-w-md text-pretty text-[var(--text-secondary)]">
-              Make the invitation, see how it looks, send it if you like it. Nothing asks for a
-              card.
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              One-off events or unlimited annual hosting.
+            </p>
+          </div>
+          <PricingCards preview={preview} />
+        </section>
+
+        {/* Section 3: The Marquee Difference (Competitor Comparison) */}
+        <div className="mb-20">
+          <CompetitorComparison />
+        </div>
+
+        {/* Section 4: Expandable Feature Matrix */}
+        <div className="mb-20">
+          <PlanComparisonMatrix />
+        </div>
+
+        {/* Section 5: Interactive FAQ Accordion */}
+        <div className="mb-16">
+          <PricingFaq />
+        </div>
+
+        {/* Section 6: Bottom Conversion Callout */}
+        <section>
+          <div className="card relative overflow-hidden flex flex-col items-center gap-5 p-10 text-center sm:p-16 shadow-[var(--shadow-lift)] border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-indigo-500/10 blur-3xl opacity-60"
+            />
+            <span className="size-12 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center shadow-sm">
+              <Sparkles className="size-6" />
+            </span>
+            <h2 className="max-w-lg text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">
+              Start free. Upgrade anytime.
+            </h2>
+            <p className="max-w-md text-pretty text-sm text-[var(--text-secondary)] sm:text-base">
+              Create your event invitation in 60 seconds, experience the live wallboard, and send
+              it to your guests when ready.
             </p>
             <Link
               href="/create"
-              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-medium text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+              className="inline-flex h-13 items-center gap-2.5 rounded-full bg-[var(--accent)] px-8 text-base font-semibold text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-95"
             >
-              Make an invitation
+              Make an Invitation
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
@@ -198,14 +146,5 @@ export default function PricingPage() {
 
       <SiteFooter />
     </>
-  );
-}
-
-function Faq({ q, children }: { q: string; children: React.ReactNode }) {
-  return (
-    <div className="card p-6">
-      <dt className="font-semibold">{q}</dt>
-      <dd className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{children}</dd>
-    </div>
   );
 }

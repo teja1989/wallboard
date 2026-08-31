@@ -19,7 +19,7 @@ export function CreationStory() {
           How it works
         </p>
         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Three steps. One link. No chasing.
+          Three steps. One link. Effortless hosting.
         </h2>
         <p className="mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
           No mandatory app downloads or account walls for your guests. From blank page to live

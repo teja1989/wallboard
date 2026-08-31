@@ -286,6 +286,20 @@ export async function removePost(eventId: string, post: PostDoc): Promise<void> 
   });
 }
 
+export async function listVisiblePosts(
+  eventId: string,
+  limitCount = contentLimits.wallPageSize,
+): Promise<PostDoc[]> {
+  const snapshot = await eventRef(eventId)
+    .collection(collections.posts)
+    .where('state', '==', 'visible')
+    .orderBy('createdAt', 'desc')
+    .limit(limitCount)
+    .get();
+
+  return snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<PostDoc, 'id'>), id: doc.id }));
+}
+
 export async function getPost(eventId: string, postId: string): Promise<PostDoc | null> {
   const snapshot = await eventRef(eventId).collection(collections.posts).doc(postId).get();
   if (!snapshot.exists) return null;

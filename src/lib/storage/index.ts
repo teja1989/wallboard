@@ -35,5 +35,6 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 };
 
 export function extensionForMime(mimeType: string): string {
-  return EXTENSION_BY_MIME[mimeType] ?? '.bin';
+  const base = (mimeType.split(';')[0] ?? '').trim().toLowerCase();
+  return (base ? EXTENSION_BY_MIME[base] : undefined) ?? EXTENSION_BY_MIME[mimeType] ?? '.bin';
 }

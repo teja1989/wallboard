@@ -258,7 +258,7 @@ export const rateLimits = {
 export type RateLimitName = keyof typeof rateLimits;
 
 export const sessionConfig = {
-  cookieName: '__Host-mq_session',
+  cookieName: process.env.NODE_ENV === 'production' ? '__Host-mq_session' : 'mq_session',
   /** Firebase session cookies max out at 14 days; we stay well under. */
   maxAgeMs: 5 * DAY,
   /**

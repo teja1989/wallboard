@@ -225,6 +225,45 @@ export interface RsvpNoteDoc {
   updatedAt: number;
 }
 
+export type FundCategory =
+  | 'honeymoon'
+  | 'travel'
+  | 'home'
+  | 'baby'
+  | 'celebration'
+  | 'charity'
+  | 'custom';
+
+export interface CashFundDoc {
+  id: string;
+  eventId: string;
+  title: string;
+  description: string;
+  category: FundCategory;
+  targetAmount: number | null;
+  currentAmount: number;
+  contributorCount: number;
+  suggestedPresets: number[];
+  currency: 'USD';
+  status: 'active' | 'completed' | 'paused';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CashContributionDoc {
+  id: string;
+  fundId: string;
+  eventId: string;
+  contributorUid: string;
+  contributorName: string;
+  amount: number;
+  feeAmount: number;
+  message: string;
+  isAnonymous: boolean;
+  postToWall: boolean;
+  createdAt: number;
+}
+
 export interface PostDoc {
   id: string;
   eventId: string;
@@ -237,6 +276,11 @@ export interface PostDoc {
   state: PostState;
   createdAt: number;
   expiresAt: number;
+  /** Optional gift contribution metadata for tribute posts on the wall */
+  giftTribute?: {
+    fundTitle: string;
+    amount: number;
+  };
 }
 
 export interface UserDoc {

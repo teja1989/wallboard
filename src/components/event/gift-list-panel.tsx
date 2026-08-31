@@ -5,11 +5,16 @@ import { registryCopy, registryHostLabel, registryLimits } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
-import type { RegistryLinkDoc } from '@/types/domain';
+import { GiftPotManager } from '@/components/event/gift-pot-manager';
+import type { CashFundDoc, RegistryLinkDoc } from '@/types/domain';
 
 interface RegistryResponse {
   links: RegistryLinkDoc[];
   allowed: boolean;
+}
+
+interface FundsResponse {
+  funds: CashFundDoc[];
 }
 
 /**
@@ -49,22 +54,28 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
   const { notify } = useToast();
 
   const [links, setLinks] = useState<RegistryLinkDoc[]>([]);
+  const [funds, setFunds] = useState<CashFundDoc[]>([]);
   const [allowed, setAllowed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
-        const data = await api.get<RegistryResponse>(`/api/events/${eventId}/registry`);
+        const [regData, fundData] = await Promise.all([
+          api.get<RegistryResponse>(`/api/events/${eventId}/registry`),
+          api.get<FundsResponse>(`/api/events/${eventId}/funds`).catch(() => ({ funds: [] })),
+        ]);
         if (cancelled) return;
-        setLinks(data.links);
-        setAllowed(data.allowed);
+        setLinks(regData.links);
+        setFunds(fundData.funds);
+        setAllowed(regData.allowed);
       } catch (caught) {
         if (!cancelled) notify(errorMessage(caught, 'The gift list would not load.'), 'error');
       } finally {
@@ -75,7 +86,7 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [eventId, notify]);
+  }, [eventId, notify, refreshKey]);
 
   const full = links.length >= registryLimits.maxLinksPerEvent;
 
@@ -121,16 +132,27 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
   if (!allowed) return null;
 
   return (
-    <section className="card p-5" aria-labelledby="gift-panel-heading">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-          <Gift className="size-4" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <h2 id="gift-panel-heading" className="font-semibold">
-            {registryCopy.hostHeading}
-          </h2>
-          <p className="mt-0.5 text-sm text-[var(--text-secondary)]">{registryCopy.hostBody}</p>
+    <section className="card p-5 space-y-6" aria-labelledby="gift-panel-heading">
+      {/* 1. Collective Cash Pots & Dream Gifting Section */}
+      <GiftPotManager
+        eventId={eventId}
+        funds={funds}
+        onFundsChanged={() => setRefreshKey((k) => k + 1)}
+      />
+
+      <div className="border-t border-[var(--border-subtle)] pt-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
+            <Gift className="size-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 id="gift-panel-heading" className="font-semibold">
+              External Store Registries
+            </h2>
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+              Paste external wishlists or registries (Amazon, Target, Zola, etc.).
+            </p>
+          </div>
         </div>
       </div>
 

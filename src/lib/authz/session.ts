@@ -36,9 +36,9 @@ export function sessionCookieOptions(maxAgeSeconds: number) {
   return {
     name: SESSION_COOKIE,
     httpOnly: true,
-    // __Host- prefixed cookies require secure + path=/ + no domain. Browsers make an
-    // exception for http://localhost, so the same name works in development.
-    secure: true,
+    // __Host- prefixed cookies require secure + path=/ + no domain in production.
+    // In local development over plain http://localhost, secure is false so Safari & WebKit accept the cookie.
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
     path: '/',
     maxAge: maxAgeSeconds,

@@ -10,6 +10,8 @@ import type { WallPost } from '@/lib/client/use-wall';
 import { cn, formatDuration, formatRelativeTime } from '@/lib/utils';
 import type { ResolvedMedia } from '@/types/domain';
 
+import { AudioPlayer } from '@/components/wall/audio-player';
+
 interface PostCardProps {
   post: WallPost;
   eventId: string;
@@ -89,6 +91,13 @@ export function PostCard({ post, eventId, canDelete, onOpenImage }: PostCardProp
         )}
       </header>
 
+      {post.giftTribute && (
+        <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-amber-500/15 border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 shadow-sm">
+          <span className="text-base">🎁</span>
+          <span>Gift Contribution: ${post.giftTribute.amount} toward {post.giftTribute.fundTitle}</span>
+        </div>
+      )}
+
       {post.body && (
         <p className="px-4 pt-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
           {post.body}
@@ -104,7 +113,7 @@ export function PostCard({ post, eventId, canDelete, onOpenImage }: PostCardProp
               aria-label="Loading attachment"
             />
           ) : media ? (
-            <MediaBlock media={media} onOpenImage={onOpenImage} />
+            <MediaBlock media={media} authorName={post.authorName} onOpenImage={onOpenImage} />
           ) : null}
         </div>
       )}
@@ -116,9 +125,11 @@ export function PostCard({ post, eventId, canDelete, onOpenImage }: PostCardProp
 
 function MediaBlock({
   media,
+  authorName,
   onOpenImage,
 }: {
   media: ResolvedMedia;
+  authorName: string;
   onOpenImage: (media: ResolvedMedia) => void;
 }) {
   if (media.kind === 'image') {
@@ -129,14 +140,6 @@ function MediaBlock({
         className="block w-full cursor-zoom-in"
         aria-label="View full size"
       >
-        {/*
-          Signed, short-lived URLs on an arbitrary host: next/image cannot optimise these,
-          which is exactly why the resizing happens at upload time instead.
-
-          srcset lets the browser pick between the small copy and the large one by its own
-          slot width and pixel density, so a phone does not pull a 1800px image to fill a
-          390px column — and neither does a retina laptop pull the 6 MB original.
-        */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={media.previewUrl ?? media.displayUrl ?? media.url}
@@ -155,16 +158,7 @@ function MediaBlock({
 
   if (media.kind === 'video') return <VideoBlock media={media} />;
 
-  return (
-    <div className="px-4 pb-1">
-      {/*
-        preload="none": with "metadata", every video on the wall fetches its header the
-        moment the page loads, so a wall of twenty clips costs twenty requests nobody asked
-        for.
-      */}
-      <audio src={media.url} controls preload="none" className="w-full" />
-    </div>
-  );
+  return <AudioPlayer media={media} authorName={authorName} />;
 }
 
 /**

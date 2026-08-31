@@ -1,17 +1,26 @@
 import type { EventDoc } from '@/types/domain';
 
 /**
- * Showcase fixture events.
+ * Showcase fixture events & live presentation wallboard posts.
  *
- * Real, complete EventDoc records used to render live `<Invitation />` components on the
- * marketing and landing pages. Covers all high-frequency consumer occasions: Birthdays,
- * Graduations, Weddings, Baby Showers, Parties, Dinners/Galas, and Memorials.
+ * Real, complete EventDoc records and simulated real-time room photo posts used to
+ * power both the Invitation View and the Live TV Wallboard Mode simulator on the landing page.
  */
+export interface ShowcasePost {
+  id: string;
+  authorName: string;
+  caption: string;
+  kind: 'image' | 'text';
+  accentColor: string;
+  timeAgo: string;
+}
+
 export interface ShowcaseItem {
   id: string;
   label: string;
   tagline: string;
   event: EventDoc;
+  posts: readonly ShowcasePost[];
 }
 
 const NOW = 1788000000000; // Static anchor timestamp for consistent SSR rendering
@@ -21,6 +30,32 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'birthday',
     label: 'Birthday Party',
     tagline: 'Milestone birthdays & celebrations with live guest photo sharing',
+    posts: [
+      {
+        id: 'p_b1',
+        authorName: 'Alex Chen',
+        caption: 'Happy 40th Maya! The skyline rooftop view is unbelievable! 🥂✨',
+        kind: 'image',
+        accentColor: '#f59e0b',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_b2',
+        authorName: 'Marcus & Elena',
+        caption: 'To another incredible decade of adventures! Cheers! 🎂🎉',
+        kind: 'text',
+        accentColor: '#ec4899',
+        timeAgo: '2m ago',
+      },
+      {
+        id: 'p_b3',
+        authorName: 'Sarah K.',
+        caption: 'DJ is playing Earth Wind & Fire! Everyone on the dancefloor! 🎶🕺',
+        kind: 'image',
+        accentColor: '#8b5cf6',
+        timeAgo: '5m ago',
+      },
+    ],
     event: {
       id: 'showcase-birthday',
       title: "Maya's 40th Birthday Celebration",
@@ -75,6 +110,32 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'graduation',
     label: 'Graduation',
     tagline: 'High school & university commencement parties, honors & open houses',
+    posts: [
+      {
+        id: 'p_g1',
+        authorName: 'Uncle David',
+        caption: 'So proud of you, Sam! Columbia University Class of 2026! 🎓💙',
+        kind: 'image',
+        accentColor: '#0284c7',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_g2',
+        authorName: 'Prof. Rostova',
+        caption: 'Congratulations on your distinguished senior honors thesis!',
+        kind: 'text',
+        accentColor: '#10b981',
+        timeAgo: '3m ago',
+      },
+      {
+        id: 'p_g3',
+        authorName: 'Chloe & Maya',
+        caption: 'We graduated! Best 4 years ever, garden party time! 🎓🙌',
+        kind: 'image',
+        accentColor: '#6366f1',
+        timeAgo: '6m ago',
+      },
+    ],
     event: {
       id: 'showcase-graduation',
       title: 'Class of 2026 Commencement & Celebration',
@@ -129,6 +190,32 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'wedding',
     label: 'Wedding',
     tagline: 'Elegant ceremonies, receptions & rehearsal dinners',
+    posts: [
+      {
+        id: 'p_w1',
+        authorName: 'Grandma Rose',
+        caption: 'A magnificent ceremony. Wishing Sophie & Liam a lifetime of happiness. 💍❤️',
+        kind: 'image',
+        accentColor: '#d97706',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_w2',
+        authorName: 'Bridesmaid Jess',
+        caption: 'The most gorgeous bride and happiest couple on earth! 🥂🍾',
+        kind: 'image',
+        accentColor: '#f43f5e',
+        timeAgo: '4m ago',
+      },
+      {
+        id: 'p_w3',
+        authorName: 'Lucas M.',
+        caption: 'The first dance had the entire room in tears. Pure magic! ✨',
+        kind: 'text',
+        accentColor: '#eab308',
+        timeAgo: '8m ago',
+      },
+    ],
     event: {
       id: 'showcase-wedding',
       title: 'Sophie & Liam',
@@ -183,6 +270,24 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'baby',
     label: 'Baby Shower',
     tagline: 'Warm family welcomes & registries with zero ads',
+    posts: [
+      {
+        id: 'p_bb1',
+        authorName: 'Aunt Claire',
+        caption: 'Can’t wait to meet little Charlotte! Wishing you all the love in the world! 🍼💕',
+        kind: 'image',
+        accentColor: '#f472b6',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_bb2',
+        authorName: 'Mama Jessica',
+        caption: 'Thank you everyone for the sweet wishes, gifts, and immense love! 🌸',
+        kind: 'text',
+        accentColor: '#fb7185',
+        timeAgo: '3m ago',
+      },
+    ],
     event: {
       id: 'showcase-baby',
       title: 'A Shower for Baby Charlotte',
@@ -237,6 +342,24 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'party',
     label: 'Party & Night Out',
     tagline: 'High-energy gatherings, rooftop mixers & housewarming parties',
+    posts: [
+      {
+        id: 'p_p1',
+        authorName: 'Leo V.',
+        caption: 'Sunset vibes are unmatched on this terrace! 🌅🎶',
+        kind: 'image',
+        accentColor: '#f97316',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_p2',
+        authorName: 'Nadia & Sam',
+        caption: 'Cocktails are incredible! Who is ready to dance? 💃🍹',
+        kind: 'image',
+        accentColor: '#ec4899',
+        timeAgo: '2m ago',
+      },
+    ],
     event: {
       id: 'showcase-party',
       title: 'Midsummer Sunset & DJ Set',
@@ -291,6 +414,25 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'retirement',
     label: 'Dinner & Gala',
     tagline: 'Distinguished milestones, retirement galas & formal banquets',
+    posts: [
+      {
+        id: 'p_r1',
+        authorName: 'Dr. Vance',
+        caption:
+          '35 years of pioneering surgery and unmatched mentorship. Thank you Dr. Harper! 🩺👏',
+        kind: 'image',
+        accentColor: '#059669',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_r2',
+        authorName: 'Dean Miller',
+        caption: 'A true giant in neurology. Enjoy your well-earned retirement!',
+        kind: 'text',
+        accentColor: '#0284c7',
+        timeAgo: '5m ago',
+      },
+    ],
     event: {
       id: 'showcase-retirement',
       title: 'Dr. Harper’s Retirement Gala',
@@ -345,6 +487,24 @@ export const showcaseItems: readonly ShowcaseItem[] = [
     id: 'memorial',
     label: 'Memorial',
     tagline: 'Dignified, ad-free notices with gentle memory sharing',
+    posts: [
+      {
+        id: 'p_m1',
+        authorName: 'The Wilson Family',
+        caption: 'Arthur’s warmth, humor, and kindness will forever live in our hearts. 🕊️🌿',
+        kind: 'image',
+        accentColor: '#71717a',
+        timeAgo: 'Just now',
+      },
+      {
+        id: 'p_m2',
+        authorName: 'Robert & Ann',
+        caption: 'Always remembering Arthur’s gentle spirit and love for his garden.',
+        kind: 'text',
+        accentColor: '#52525b',
+        timeAgo: '10m ago',
+      },
+    ],
     event: {
       id: 'showcase-memorial',
       title: 'Remembering Arthur Davies',

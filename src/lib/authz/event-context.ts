@@ -18,6 +18,7 @@ export function eventAuthzContext(
     eventRole,
     isOwnResource,
     anonymousPostingAllowed:
-      event.settings.whoCanPost === 'anyone' && isEnabled('allowAnonymousPosting'),
+      (event.settings.whoCanPost === 'anyone' || eventRole !== null) &&
+      isEnabled('allowAnonymousPosting'),
   };
 }

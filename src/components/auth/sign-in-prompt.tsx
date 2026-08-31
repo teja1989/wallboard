@@ -47,14 +47,27 @@ export function SignInPrompt({
   note,
   returnTo,
 }: SignInPromptProps) {
-  const { upgradeWithGoogle, sendEmailLink } = useAuth();
+  const { upgradeWithGoogle, sendEmailLink, signInWithDevAccount } = useAuth();
   const { notify } = useToast();
   const [email, setEmail] = useState('');
   const [showEmail, setShowEmail] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
-  const [busy, setBusy] = useState<AuthProviderId | 'email' | null>(null);
+  const [busy, setBusy] = useState<AuthProviderId | 'email' | 'dev' | null>(null);
 
   const providers = authProviders(appConfig.auth.googleSignIn).filter((p) => p.enabled);
+
+  async function handleDevSignIn(devEmail: string, devName: string) {
+    setBusy('dev');
+    try {
+      await signInWithDevAccount(devEmail, devName);
+      notify(`Signed in as ${devName} (${devEmail})`, 'success');
+      onSignedIn?.();
+    } catch (caught) {
+      notify(errorMessage(caught, 'Could not complete dev sign in.'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function signInWith(id: AuthProviderId) {
     setBusy(id);
@@ -184,6 +197,35 @@ export function SignInPrompt({
             </span>
             <span>Continue with email</span>
           </button>
+        )}
+
+        {/* Local Emulator 1-Click Fast Sign-In */}
+        {appConfig.useEmulators && (
+          <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-left">
+            <div className="flex items-center justify-between text-[0.7rem] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-2">
+              <span>⚡ Fast Dev Sign-In (Local)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => handleDevSignIn('priya@example.com', 'Priya Sharma')}
+                className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)] hover:border-amber-500 transition-all text-left truncate"
+              >
+                <span>👑</span>
+                <span className="truncate">Host: Priya</span>
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => handleDevSignIn('you@example.com', 'Admin Owner')}
+                className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-[var(--surface-raised)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)] hover:border-amber-500 transition-all text-left truncate"
+              >
+                <span>🛡️</span>
+                <span className="truncate">Admin Owner</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {note && <p className="pt-1 text-xs text-[var(--text-muted)]">{note}</p>}

@@ -26,7 +26,12 @@ export function firebaseApp(): FirebaseApp {
 function connectEmulatorsOnce(authInstance: Auth, db: Firestore): void {
   if (emulatorsConnected || !appConfig.useEmulators) return;
   emulatorsConnected = true;
-  const { host, authPort, firestorePort } = appConfig.emulator;
+  // Match the browser's hostname (e.g. localhost vs 127.0.0.1) so Auth Emulator postMessage frame origins match exactly.
+  const host =
+    typeof window !== 'undefined' && window.location.hostname
+      ? window.location.hostname
+      : appConfig.emulator.host;
+  const { authPort, firestorePort } = appConfig.emulator;
   connectAuthEmulator(authInstance, `http://${host}:${authPort}`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, firestorePort);
 }

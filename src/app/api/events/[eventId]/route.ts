@@ -27,7 +27,7 @@ export const GET = route(async (_request, { params }: Params) => {
   // role and then re-reading the same document for its `rsvp` field doubled the cost of
   // the most-requested route in the app.
   const membership = await eventMembershipFor(id, actor.uid);
-  const eventRole = membership?.role ?? null;
+  const eventRole = membership?.role ?? (actor.uid === event.hostUid ? 'host' : null);
 
   if (!can('event:view', eventAuthzContext(actor, event, eventRole))) {
     throw new ApiError('not_found', 'That event does not exist.');

@@ -421,3 +421,149 @@ export function templatesForOccasion(occasionId: string): Template[] {
 export function faceOf(template: Template) {
   return TYPE_FACES[template.face];
 }
+
+export interface TemplateSample {
+  sampleTitle: string;
+  sampleSubtitle: string;
+  sampleDate: string;
+  sampleLocation: string;
+  sampleOccasion: OccasionId;
+  tags: readonly string[];
+}
+
+export const TEMPLATE_SAMPLES: Record<string, TemplateSample> = {
+  sunset: {
+    sampleTitle: "Maya's Rooftop Summer Celebration",
+    sampleSubtitle: 'Drinks from seven, sunset toasts at eight.',
+    sampleDate: 'Saturday, July 18 · 7:00 PM',
+    sampleLocation: 'The Skylight Terrace, SF',
+    sampleOccasion: 'birthday',
+    tags: ['Warm', 'Golden Hour', 'Classic Sans'],
+  },
+  meadow: {
+    sampleTitle: "Chloe & Liam's Garden Engagement",
+    sampleSubtitle: 'Celebrate under the orchard canopy with food & wine.',
+    sampleDate: 'Sunday, June 14 · 2:00 PM',
+    sampleLocation: 'Sycamore Valley Ranch',
+    sampleOccasion: 'wedding',
+    tags: ['Botanical', 'Outdoor', 'Fresh Green'],
+  },
+  lagoon: {
+    sampleTitle: 'Class of 2026 Graduation Brunch',
+    sampleSubtitle: 'Honoring our graduates with champagne & seaside views.',
+    sampleDate: 'Saturday, May 30 · 11:30 AM',
+    sampleLocation: 'Bayside Pavilion',
+    sampleOccasion: 'graduation',
+    tags: ['Cool Blue', 'Minimalist', 'Serene'],
+  },
+  blossom: {
+    sampleTitle: 'Baby Shower for Little Oliver',
+    sampleSubtitle: 'Join us for pastries, sweet tea, and warm wishes.',
+    sampleDate: 'Saturday, August 8 · 1:00 PM',
+    sampleLocation: 'The Rosewood Greenhouse',
+    sampleOccasion: 'baby',
+    tags: ['Soft Pink', 'Fraunces Serif', 'Gentle'],
+  },
+  notepaper: {
+    sampleTitle: 'An Intimate Table for Twelve',
+    sampleSubtitle: 'A five-course seasonal supper celebrating friendship.',
+    sampleDate: 'Friday, September 25 · 7:30 PM',
+    sampleLocation: 'Atelier Kitchen Studio',
+    sampleOccasion: 'dinner',
+    tags: ['Quiet Luxury', 'Linen Texture', 'Type-Led'],
+  },
+  midnight: {
+    sampleTitle: "Sasha's 30th Noir & Neon",
+    sampleSubtitle: 'Late-night cocktails, DJ sets, and celebration till 2 AM.',
+    sampleDate: 'Friday, October 23 · 9:00 PM',
+    sampleLocation: 'The Velvet Underground Lounge',
+    sampleOccasion: 'party',
+    tags: ['Dark Mode', 'Cyberpunk', 'Space Grotesk'],
+  },
+  champagne: {
+    sampleTitle: "Elena & Marcus's Wedding Reception",
+    sampleSubtitle: 'Dinner, dancing, and toasts under the ballroom chandeliers.',
+    sampleDate: 'Saturday, September 19 · 5:30 PM',
+    sampleLocation: 'Fairmont Grand Ballroom',
+    sampleOccasion: 'wedding',
+    tags: ['Black Tie', 'Cormorant Garamond', 'Opulent Gold'],
+  },
+  botanical: {
+    sampleTitle: 'Harvest Vineyard Supper',
+    sampleSubtitle: 'Farm-to-table dinner pairing local vintages.',
+    sampleDate: 'Saturday, October 3 · 6:00 PM',
+    sampleLocation: 'Napa Ridge Vineyards',
+    sampleOccasion: 'dinner',
+    tags: ['Deep Emerald', 'Editorial', 'Organic'],
+  },
+  ember: {
+    sampleTitle: "Leo's Album Release Party",
+    sampleSubtitle: 'First listen live performance and rooftop drinks.',
+    sampleDate: 'Thursday, November 12 · 8:00 PM',
+    sampleLocation: 'The Loft on 5th',
+    sampleOccasion: 'party',
+    tags: ['Fiery Red', 'Bold Poster', 'High Energy'],
+  },
+  linen: {
+    sampleTitle: 'A Life Remembered: Thomas Bennett',
+    sampleSubtitle: 'Gathering to share stories, music, and cherished memories.',
+    sampleDate: 'Sunday, April 19 · 3:00 PM',
+    sampleLocation: 'St. Jude Memorial Chapel',
+    sampleOccasion: 'memorial',
+    tags: ['Tender', 'Woven Linen', 'Solemn & Warm'],
+  },
+  aurora: {
+    sampleTitle: 'Metropolis Tech Summit Afterparty',
+    sampleSubtitle: 'Founders, creators, and investors under neon skies.',
+    sampleDate: 'Wednesday, June 24 · 8:00 PM',
+    sampleLocation: 'Skydeck Horizon Level',
+    sampleOccasion: 'work',
+    tags: ['Holographic', 'Futuristic', 'Aurora Glow'],
+  },
+  letterpress: {
+    sampleTitle: 'The Harvard Alumni Gala',
+    sampleSubtitle: 'An evening of distinction celebrating 25 years.',
+    sampleDate: 'Saturday, November 7 · 6:30 PM',
+    sampleLocation: 'The Metropolitan Club',
+    sampleOccasion: 'reunion',
+    tags: ['Architectural', 'Crisp Editorial', 'Prestigious'],
+  },
+  carnival: {
+    sampleTitle: "Noah's 5th Circus Extravaganza",
+    sampleSubtitle: 'Games, magicians, face painting, and birthday cake!',
+    sampleDate: 'Saturday, May 16 · 2:00 PM',
+    sampleLocation: 'Maple Grove Community Park',
+    sampleOccasion: 'birthday',
+    tags: ['Playful', 'Confetti Drift', 'Vibrant'],
+  },
+  broadsheet: {
+    sampleTitle: 'Annual Design Leaders Colloquium',
+    sampleSubtitle: 'Keynotes, panel discussions, and evening reception.',
+    sampleDate: 'Tuesday, September 15 · 4:00 PM',
+    sampleLocation: 'Museum of Modern Craft',
+    sampleOccasion: 'work',
+    tags: ['Type Announcement', 'Monochrome & Cobalt', 'Bold Sans'],
+  },
+  harvest: {
+    sampleTitle: 'Friendsgiving Long Table Feast',
+    sampleSubtitle: 'Roasted heritage turkey, autumn pies, and mulled cider.',
+    sampleDate: 'Thursday, November 26 · 5:00 PM',
+    sampleLocation: 'Oak Hill Barn Studio',
+    sampleOccasion: 'dinner',
+    tags: ['Warm Amber', 'Supper Club', 'Autumn Glow'],
+  },
+};
+
+export function sampleForTemplate(templateId: string): TemplateSample {
+  return (
+    TEMPLATE_SAMPLES[templateId] ?? {
+      sampleTitle: 'A Special Gathering',
+      sampleSubtitle: 'Join us for drinks, dining, and good times.',
+      sampleDate: 'Saturday Evening · 7:00 PM',
+      sampleLocation: 'The Venue',
+      sampleOccasion: 'party',
+      tags: ['Modern', 'Versatile'],
+    }
+  );
+}
+
