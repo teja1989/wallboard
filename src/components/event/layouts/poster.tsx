@@ -16,6 +16,7 @@ export function PosterLayout({
   occasion,
   details,
   attribution,
+  titleAs: Title = 'h1',
 }: InvitationLayoutProps) {
   const face = faceOf(template);
   const { palette } = template;
@@ -52,7 +53,7 @@ export function PosterLayout({
           From {event.hostedBy}
         </p>
 
-        <h1
+        <Title
           className="mx-auto mt-4 max-w-[14ch] text-5xl leading-[0.98] text-balance sm:text-7xl"
           style={{
             fontFamily: face.stack,
@@ -61,7 +62,7 @@ export function PosterLayout({
           }}
         >
           {event.title}
-        </h1>
+        </Title>
 
         <TemplateMotifMark
           motif={template.motif}

@@ -235,7 +235,7 @@ export function TemplatePreviewModal({ template, onClose }: TemplatePreviewModal
                     : 'max-w-3xl rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-6 shadow-xl',
                 )}
               >
-                <Invitation event={mockEvent} />
+                <Invitation event={mockEvent} titleAs="h2" />
               </div>
             </div>
           ) : (

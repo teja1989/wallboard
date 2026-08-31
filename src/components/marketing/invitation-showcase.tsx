@@ -336,7 +336,12 @@ export function InvitationShowcase() {
               // --- Mode 1 Right: Framed Live Invitation Preview ---
               <div className="relative mx-auto w-full max-w-md lg:max-w-none">
                 <div className="scroll-soft max-h-[520px] overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-page)] shadow-[var(--shadow-lift)] ring-1 ring-[var(--border-subtle)]/50 transition-all duration-300">
-                  <Invitation event={activeItem.event} />
+                  {/*
+                    `h2` because this is a sample on a marketing page, not the page's subject.
+                    Without it the landing page carries two level-1 headings — its own promise
+                    and whatever the demo event happens to be called.
+                  */}
+                  <Invitation event={activeItem.event} titleAs="h2" />
                 </div>
                 <p className="mt-2 text-center text-xs text-[var(--text-muted)]">
                   Scroll inside the card to preview the full invitation & RSVP details

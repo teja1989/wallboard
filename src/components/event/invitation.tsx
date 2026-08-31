@@ -25,7 +25,18 @@ import type { EventDoc } from '@/types/domain';
  * Fields the host left blank simply do not appear. An invitation with three lines should
  * look deliberate, not unfinished.
  */
-export function Invitation({ event }: { event: EventDoc }) {
+export function Invitation({
+  event,
+  titleAs,
+}: {
+  event: EventDoc;
+  /**
+   * `h2` wherever this card is a *sample* rather than the page's subject — the landing-page
+   * showcase, a gallery preview. See `InvitationLayoutProps.titleAs`. Defaults to `h1`, so a
+   * real invitation page needs to say nothing.
+   */
+  titleAs?: 'h1' | 'h2';
+}) {
   const occasion = occasionById(event.occasion);
   const template = templateById(event.templateId);
   const Layout = invitationLayouts[template.layout];
@@ -142,6 +153,7 @@ export function Invitation({ event }: { event: EventDoc }) {
       occasion={occasion}
       details={details}
       attribution={attribution}
+      titleAs={titleAs}
     />
   );
 }

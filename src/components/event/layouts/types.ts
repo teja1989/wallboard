@@ -16,4 +16,16 @@ export interface InvitationLayoutProps {
   details: React.ReactNode;
   /** The "Made with Marquee" line, or null on plans that removed it. */
   attribution: React.ReactNode;
+  /**
+   * The tag for the event's title. `h1` on a real invitation, where the event *is* the page.
+   *
+   * Anywhere the invitation is a sample — the landing page showcase, the create preview — it
+   * has to step down, because a marketing page that renders a real invitation ends up with
+   * two level-1 headings and a screen-reader user hears "Every occasion deserves a marquee"
+   * and "Maya's 40th Birthday Celebration" as equal claims about what the page is.
+   *
+   * Styling does not follow from this: the title keeps the layout's own type scale either
+   * way. Only the outline changes.
+   */
+  titleAs?: 'h1' | 'h2';
 }

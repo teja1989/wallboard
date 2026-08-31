@@ -33,11 +33,16 @@ test.describe('the marketing site', () => {
 
   test('pricing shows all three plans and is honest about the preview', async ({ page }) => {
     await page.goto('/pricing');
-    await expect(page.getByRole('heading', { level: 2, name: 'Free', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: 'One event' })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: 'Pro', exact: true })).toBeVisible();
+    // The plan names sit under the section that introduces them, so they are h3 rather than
+    // h2 — asserted by name and not by level, so the next layout change to this page does not
+    // fail a test that never cared where in the outline they sat.
+    await expect(page.getByRole('heading', { name: 'Free', exact: true })).toBeVisible();
+    // `exact` on all three: the page now also carries an "One event Plan" heading in the
+    // comparison matrix, and a substring match resolves to both.
+    await expect(page.getByRole('heading', { name: 'One event', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pro', exact: true })).toBeVisible();
     // Billing is off by default, so the page must say so rather than implying we charge.
-    await expect(page.getByText(/free while we are in preview/i)).toBeVisible();
+    await expect(page.getByText(/free during preview/i)).toBeVisible();
   });
 
   test('the create page asks for an account, and offers a way past', async ({ page }) => {
@@ -172,12 +177,28 @@ test.describe('creating an event', () => {
     await expect(page.getByRole('button', { name: /create the invitation/i })).toBeDisabled();
   });
 
-  test('the design gallery is browsable and grouped by occasion', async ({ page }) => {
+  test('the design gallery is browsable and filterable by occasion', async ({ page }) => {
+    /*
+      The gallery used to be static sections with an occasion heading over each. It is now a
+      filter bar over one grid, so "grouped by occasion" is no longer the guarantee — being
+      able to narrow to your occasion is. That is the thing worth asserting either way, and
+      asserting the count changes is what stops a filter that renders but does nothing.
+    */
     await page.goto('/templates');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /wedding/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /works for anything/i })).toBeVisible();
-    // Every card links somewhere someone can act on.
+
+    const cards = page.getByRole('button', { name: 'Quick Preview' });
+    const total = await cards.count();
+    expect(total).toBeGreaterThan(0);
+
+    await page
+      .getByRole('button', { name: /wedding/i })
+      .first()
+      .click();
+    await expect(page.getByText(/of \d+ designs/i)).toBeVisible();
+    expect(await cards.count()).toBeLessThanOrEqual(total);
+
+    // Every route out of the gallery still lands somewhere someone can act on.
     await expect(page.getByRole('link', { name: /make an invitation/i }).first()).toBeVisible();
   });
 

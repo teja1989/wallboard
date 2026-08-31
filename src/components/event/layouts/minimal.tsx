@@ -15,6 +15,7 @@ export function MinimalLayout({
   occasion,
   details,
   attribution,
+  titleAs: Title = 'h1',
 }: InvitationLayoutProps) {
   const face = faceOf(template);
   const { palette } = template;
@@ -42,7 +43,7 @@ export function MinimalLayout({
           From {event.hostedBy}
         </p>
 
-        <h1
+        <Title
           className="mx-auto mt-4 max-w-[18ch] text-3xl leading-[1.15] text-balance sm:text-4xl"
           style={{
             fontFamily: face.stack,
@@ -51,7 +52,7 @@ export function MinimalLayout({
           }}
         >
           {event.title}
-        </h1>
+        </Title>
 
         <TemplateMotifMark
           motif={template.motif}

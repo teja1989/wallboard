@@ -15,6 +15,7 @@ export function ClassicLayout({
   occasion,
   details,
   attribution,
+  titleAs: Title = 'h1',
 }: InvitationLayoutProps) {
   const face = faceOf(template);
   const { palette } = template;
@@ -53,7 +54,7 @@ export function ClassicLayout({
           From {event.hostedBy}
         </p>
 
-        <h1
+        <Title
           className="mt-3 text-4xl leading-[1.08] text-balance sm:text-5xl"
           style={{
             fontFamily: face.stack,
@@ -62,7 +63,7 @@ export function ClassicLayout({
           }}
         >
           {event.title}
-        </h1>
+        </Title>
 
         <TemplateMotifMark
           motif={template.motif}

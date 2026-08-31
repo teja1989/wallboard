@@ -53,7 +53,7 @@ export function InvitationPreview({
           away from their half-finished draft.
         */}
         <div inert>
-          <Invitation event={event} />
+          <Invitation event={event} titleAs="h2" />
         </div>
       </section>
     );
@@ -79,7 +79,7 @@ export function InvitationPreview({
 
       {open && (
         <div inert className="mt-4">
-          <Invitation event={event} />
+          <Invitation event={event} titleAs="h2" />
         </div>
       )}
     </section>

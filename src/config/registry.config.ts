@@ -74,6 +74,15 @@ export function registryHostLabel(url: string): string {
 export const registryCopy = {
   /** What the host sees when managing the list. */
   hostHeading: 'Gift list',
+  /**
+   * The sub-heading over the external-link section specifically.
+   *
+   * Separate from `hostHeading` because the panel came to hold two things — cash pots and
+   * outbound links — and naming the whole region after only the second one leaves a screen
+   * reader announcing "External store registries" over a section that also contains the
+   * pots. The region keeps the general name; this names the part.
+   */
+  hostLinksHeading: 'External store registries',
   hostBody:
     'Paste a link to a registry, a wish list, or a charity page. Guests see these under the invitation. Nothing is bought or paid for here — the link takes them straight to wherever you set it up.',
   addLabel: 'Add a link',

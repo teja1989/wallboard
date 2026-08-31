@@ -134,6 +134,18 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
   return (
     <section className="card space-y-6 p-5" aria-labelledby="gift-panel-heading">
       {/*
+        The region's own name, covering everything under it.
+
+        This used to be the "External store registries" heading, which stopped being true the
+        moment cash pots landed above it: the region announced itself as one of the two things
+        it held. The general name stays here and the specific one moved down to the section it
+        actually describes.
+      */}
+      <h2 id="gift-panel-heading" className="sr-only">
+        {registryCopy.hostHeading}
+      </h2>
+
+      {/*
         Collective cash pots. Hidden with the flag rather than left to fail against the API,
         because the manager's empty state invites the host to create a pot and every create
         would come back `not_found` — offering a host a feature and then refusing it is worse
@@ -147,18 +159,14 @@ export function GiftListPanel({ eventId }: { eventId: string }) {
         />
       )}
 
-      <div className="border-t border-[var(--border-subtle)] pt-6">
+      <div className={isEnabled('cashFunds') ? 'border-t border-[var(--border-subtle)] pt-6' : ''}>
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
             <Gift className="size-4" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 id="gift-panel-heading" className="font-semibold">
-              External Store Registries
-            </h2>
-            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-              Paste external wishlists or registries (Amazon, Target, Zola, etc.).
-            </p>
+            <h3 className="font-semibold">{registryCopy.hostLinksHeading}</h3>
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">{registryCopy.hostBody}</p>
           </div>
         </div>
       </div>

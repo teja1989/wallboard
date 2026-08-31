@@ -15,6 +15,7 @@ export function EditorialLayout({
   occasion,
   details,
   attribution,
+  titleAs: Title = 'h1',
 }: InvitationLayoutProps) {
   const face = faceOf(template);
   const { palette } = template;
@@ -48,7 +49,7 @@ export function EditorialLayout({
 
         <hr className="my-5 border-t" style={{ borderColor: palette.accent, opacity: 0.35 }} />
 
-        <h1
+        <Title
           className="max-w-[16ch] text-4xl leading-[1.02] text-balance sm:text-6xl"
           style={{
             fontFamily: face.stack,
@@ -57,7 +58,7 @@ export function EditorialLayout({
           }}
         >
           {event.title}
-        </h1>
+        </Title>
 
         {event.description && (
           <p className="mt-6 max-w-prose text-lg leading-relaxed text-pretty text-[var(--text-secondary)]">
