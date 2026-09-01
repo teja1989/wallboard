@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Check, Sparkles } from 'lucide-react';
-import { formatPrice, isEnabled, plans } from '@/config';
+import { formatPrice, plans } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, errorMessage } from '@/lib/client/api-client';
@@ -21,14 +21,29 @@ export function UpgradeSection({ eventId, plan }: { eventId: string; plan: strin
   const { notify } = useToast();
   const [busy, setBusy] = useState(false);
 
-  if (!isEnabled('billing')) return null;
   if (plan !== 'free') {
     return (
-      <section className="mb-6 rounded-2xl bg-[var(--accent-soft)] px-4 py-3">
+      <section className="mb-6 space-y-2 rounded-2xl bg-[var(--accent-soft)] p-4">
         <p className="flex items-center gap-2 text-sm font-medium">
-          <Check className="size-4" aria-hidden />
+          <Check className="size-4 text-[var(--accent)]" aria-hidden />
           This event is on {plans[plan as keyof typeof plans]?.label ?? 'a paid plan'}.
         </p>
+        <Button
+          type="button"
+          variant="soft"
+          size="sm"
+          className="w-full rounded-xl text-xs"
+          onClick={async () => {
+            try {
+              const res = await api.post<{ url: string }>('/api/billing/portal');
+              if (res.url) window.location.href = res.url;
+            } catch (err) {
+              notify((err as Error).message || 'Could not open billing portal.', 'error');
+            }
+          }}
+        >
+          Manage Subscription & Invoices
+        </Button>
       </section>
     );
   }

@@ -69,7 +69,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   transcoding: false,
   allowAnonymousPosting: true,
   presentationMode: true,
-  cashFunds: false,
+  cashFunds: true,
 };
 
 /**

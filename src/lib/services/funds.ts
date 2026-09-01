@@ -14,6 +14,12 @@ import type { ContributeToFundInput, CreateFundInput } from '@/lib/validation/sc
  * Manages gift pots, contributions, fee calculation, and celebratory wall tributes.
  */
 
+export async function getFund(eventId: string, fundId: string): Promise<CashFundDoc | null> {
+  const snap = await eventRef(eventId).collection(collections.funds).doc(fundId).get();
+  if (!snap.exists) return null;
+  return { ...(snap.data() as Omit<CashFundDoc, 'id'>), id: snap.id };
+}
+
 export async function listFundsForEvent(eventId: string): Promise<CashFundDoc[]> {
   const snapshot = await eventRef(eventId)
     .collection(collections.funds)

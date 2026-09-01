@@ -1,35 +1,32 @@
-import { appConfig, isEnabled } from '@/config';
+import { appConfig } from '@/config';
 import { billingGateway } from '@/lib/billing/gateway';
 import { billingFor } from '@/lib/services/billing';
-import { ApiError, ok, requireIdentifiedActor, route } from '@/lib/server/api';
+import { ApiError, ok, requireActor, route } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * A link to manage or cancel a subscription.
- *
- * Handed off to the provider rather than rebuilt here: card details, invoices and
- * cancellation are theirs to hold, and every one of those we implement ourselves is
- * compliance surface we did not need.
+ * Creates a Stripe Customer Portal link for managing an active Pro subscription.
  */
-export const POST = route(async () => {
-  if (!isEnabled('billing')) {
-    throw new ApiError('forbidden', 'There is nothing to manage while we are in preview.');
-  }
-
-  const actor = await requireIdentifiedActor();
+export const POST = route(async (request) => {
+  const actor = await requireActor();
   const billing = await billingFor(actor.uid);
 
   if (!billing?.customerId) {
-    throw new ApiError('not_found', 'There is no subscription on this account.');
+    throw new ApiError('not_found', 'No active subscription or customer record found.');
   }
 
-  const url = await billingGateway().createPortalUrl(
-    billing.customerId,
-    `${appConfig.siteUrl}/pricing`,
-  );
-  if (!url) throw new ApiError('not_found', 'Subscription management is not available here.');
+  const origin = request.headers.get('origin') || appConfig.siteUrl;
+  const returnUrl = `${origin}/account`;
 
-  return ok({ url });
+  const portalUrl = await billingGateway().createPortalUrl(billing.customerId, returnUrl);
+  if (!portalUrl) {
+    throw new ApiError(
+      'bad_request',
+      'Customer billing portal is not available in mock development mode.',
+    );
+  }
+
+  return ok({ url: portalUrl });
 });

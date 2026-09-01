@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence } from 'framer-motion';
-import { Clock, Loader2, Settings2, Share2, Sparkles, Tv, Users } from 'lucide-react';
+import { ArrowLeft, Clock, Loader2, Settings2, Share2, Sparkles, Tv, Users } from 'lucide-react';
 import { brand, featureFlags, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { Button } from '@/components/ui/button';
+import { CohostCard } from '@/components/event/cohost-card';
 import { GiftList } from '@/components/event/gift-list';
 import { GiftListPanel } from '@/components/event/gift-list-panel';
 import { GuestList } from '@/components/event/guest-list';
@@ -165,9 +166,22 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
       <main className="mx-auto w-full max-w-3xl px-4 pt-6 pb-24 sm:px-6">
         <header className="mb-5 flex items-center justify-between gap-4">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
-            {brand.name}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/account"
+              className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] transition-all hover:bg-[var(--surface-raised)] hover:text-[var(--accent)]"
+              title="Return to My Events"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>My Events</span>
+            </Link>
+            <Link
+              href="/"
+              className="hidden text-xs font-bold tracking-tight text-[var(--text-muted)] hover:text-[var(--text-primary)] sm:inline"
+            >
+              {brand.name}
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <span className="glass inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 text-sm text-[var(--text-secondary)]">
               <Users className="size-3.5" aria-hidden />
@@ -405,6 +419,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   be a faux pas — a work offsite, a memorial.
                 */}
                 <GiftListPanel eventId={eventId} />
+                <CohostCard
+                  eventId={eventId}
+                  hostedBy={event.hostedBy || event.hostName}
+                  onCoHostChanged={loadEvent}
+                />
               </>
             )}
             <GuestList
@@ -453,7 +472,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
  */
 function requestedSection(): Section | null {
   if (typeof window === 'undefined') return null;
-  const tab = new URLSearchParams(window.location.search).get('tab');
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab');
+  if (tab === 'gifts' || tab === 'registry' || params.has('connect') || params.has('gift')) {
+    return 'guests';
+  }
   return SECTIONS.some((section) => section.id === tab) ? (tab as Section) : null;
 }
 

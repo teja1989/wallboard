@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Gift, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Building2, CheckCircle2, Gift, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { FUND_PRESETS, fundsConfig, type FundPreset } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -13,6 +13,12 @@ interface GiftPotManagerProps {
   onFundsChanged: () => void;
 }
 
+interface ConnectStatus {
+  connected: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+}
+
 export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManagerProps) {
   const { notify } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,6 +28,43 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
   const [targetAmount, setTargetAmount] = useState<string>('1500');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [connectLoading, setConnectLoading] = useState(true);
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkConnect() {
+      try {
+        const res = await api.get<ConnectStatus>(`/api/events/${eventId}/funds/connect/status`);
+        if (!cancelled) {
+          setConnectStatus(res);
+          setConnectLoading(false);
+        }
+      } catch {
+        if (!cancelled) setConnectLoading(false);
+      }
+    }
+    void checkConnect();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  async function handleConnectStripe() {
+    setOnboardingBusy(true);
+    try {
+      const res = await api.post<{ url: string }>(`/api/events/${eventId}/funds/connect/onboard`);
+      if (res.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      notify((err as Error).message || 'Could not start bank connection.', 'error');
+    } finally {
+      setOnboardingBusy(false);
+    }
+  }
 
   function handleSelectPreset(preset: FundPreset) {
     setCategory(preset.category);
@@ -83,7 +126,8 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
             Collective Cash Pots & Dream Funds
           </h3>
           <p className="text-xs text-[var(--text-secondary)]">
-            Let guests contribute toward honeymoon travel, nursery funds, or group gifts.
+            Let guests chip in toward honeymoon travel, nursery funds, or group gifts. These appear
+            directly at the bottom of your invitation page for guests.
           </p>
         </div>
 
@@ -107,6 +151,52 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
         )}
       </div>
 
+      {/* Host Payout Account Connection Banner */}
+      {!connectLoading && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex size-10 items-center justify-center rounded-xl ${
+                connectStatus?.payoutsEnabled
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {connectStatus?.payoutsEnabled ? (
+                <CheckCircle2 className="size-5" />
+              ) : (
+                <Building2 className="size-5" />
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[var(--text-primary)]">
+                {connectStatus?.payoutsEnabled
+                  ? 'Bank Payouts Active'
+                  : 'Connect Bank Account for Payouts'}
+              </h4>
+              <p className="text-[0.7rem] text-[var(--text-secondary)]">
+                {connectStatus?.payoutsEnabled
+                  ? 'Guest gift contributions deposit directly to your connected bank account.'
+                  : 'Link your bank or debit card via Stripe Connect Express to receive gift payouts.'}
+              </p>
+            </div>
+          </div>
+
+          {!connectStatus?.payoutsEnabled && (
+            <Button
+              type="button"
+              variant="soft"
+              size="sm"
+              loading={onboardingBusy}
+              onClick={handleConnectStripe}
+              className="shrink-0 rounded-full text-xs"
+            >
+              Connect with Stripe
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Quick 1-Click Preset Starters */}
       {funds.length === 0 && (
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-5">
@@ -120,14 +210,14 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
                 key={preset.category}
                 type="button"
                 onClick={() => handleSelectPreset(preset)}
-                className="flex flex-col items-start gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left transition-all hover:border-[var(--accent)] hover:shadow-sm"
+                className="group flex flex-col items-start rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left shadow-sm transition-all hover:border-[var(--accent)] hover:shadow-md active:scale-95"
               >
-                <span className="text-xl">{preset.glyph}</span>
-                <span className="text-xs leading-tight font-bold text-[var(--text-primary)]">
-                  {preset.title.split(' ')[0]} {preset.title.split(' ')[1]}
+                <span className="mb-1.5 text-2xl">{preset.glyph}</span>
+                <span className="text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)]">
+                  {preset.title.split(' ')[0]} Pot
                 </span>
-                <span className="text-[0.65rem] text-[var(--text-muted)]">
-                  {preset.defaultTarget ? `$${preset.defaultTarget} goal` : 'Open-ended'}
+                <span className="line-clamp-1 text-[0.65rem] text-[var(--text-muted)]">
+                  {preset.description}
                 </span>
               </button>
             ))}
@@ -135,139 +225,160 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
         </div>
       )}
 
-      {/* Existing Funds List */}
+      {/* Existing Active Funds */}
       {funds.length > 0 && (
-        <div className="space-y-3">
-          {funds.map((fund) => (
-            <div
-              key={fund.id}
-              className="flex items-center justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-lg">
-                  {fund.category === 'honeymoon'
-                    ? '✈️'
-                    : fund.category === 'home'
-                      ? '🏡'
-                      : fund.category === 'baby'
-                        ? '🍼'
-                        : fund.category === 'celebration'
-                          ? '🥂'
-                          : '🎁'}
-                </span>
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--text-primary)]">{fund.title}</h4>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    ${fund.currentAmount.toLocaleString()} raised
-                    {fund.targetAmount && ` of $${fund.targetAmount.toLocaleString()} goal`} ·{' '}
-                    {fund.contributorCount} contributors
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={deletingId === fund.id}
-                onClick={() => handleDeleteFund(fund.id)}
-                className="flex size-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
-                title="Remove cash pot"
+        <div className="grid gap-3 sm:grid-cols-2">
+          {funds.map((fund) => {
+            const percent = fund.targetAmount
+              ? Math.min(100, Math.round((fund.currentAmount / fund.targetAmount) * 100))
+              : null;
+            return (
+              <div
+                key={fund.id}
+                className="relative rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 shadow-sm"
               >
-                {deletingId === fund.id ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold tracking-wider text-[var(--accent)] uppercase">
+                      {fund.category}
+                    </span>
+                    <h4 className="text-sm font-bold text-[var(--text-primary)]">{fund.title}</h4>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deletingId === fund.id}
+                    onClick={() => handleDeleteFund(fund.id)}
+                    className="flex size-7 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+                  >
+                    {deletingId === fund.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {fund.description && (
+                  <p className="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">
+                    {fund.description}
+                  </p>
                 )}
-              </button>
-            </div>
-          ))}
+
+                <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3 text-xs">
+                  <div>
+                    <span className="font-bold text-[var(--text-primary)]">
+                      ${fund.currentAmount.toLocaleString()}
+                    </span>
+                    {fund.targetAmount && (
+                      <span className="text-[var(--text-muted)]">
+                        {' '}
+                        / ${fund.targetAmount.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[0.7rem] text-[var(--text-muted)]">
+                    {fund.contributorCount}{' '}
+                    {fund.contributorCount === 1 ? 'gift given' : 'gifts given'}
+                  </span>
+                </div>
+
+                {percent !== null && (
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+                    <div
+                      className="h-full rounded-full bg-[var(--accent)]"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Create / Edit Modal */}
+      {/* Create Modal */}
       {isModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         >
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-6 shadow-2xl sm:p-8">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
+          <div className="relative w-full max-w-md rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
               <div className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-                  <Gift className="size-4" />
-                </span>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  Create Collective Cash Pot
-                </h3>
+                <Gift className="size-5 text-[var(--accent)]" />
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Create Cash Pot</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="flex size-8 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
+                className="flex size-7 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateFund} className="mt-5 space-y-4">
+            <form onSubmit={handleCreateFund} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">Fund Title</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Honeymoon Flight Fund to Amalfi"
-                  className="mt-1 h-10 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">Category</label>
+                <label className="text-xs font-bold text-[var(--text-primary)]">Category</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as FundCategory)}
-                  className="mt-1 h-10 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  className="mt-1 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 text-xs text-[var(--text-primary)]"
                 >
-                  <option value="honeymoon">✈️ Honeymoon & Travel</option>
-                  <option value="home">🏡 New Home & Furniture</option>
-                  <option value="baby">🍼 Baby Nursery & Essentials</option>
-                  <option value="celebration">🥂 Celebration Bar Tab</option>
-                  <option value="travel">🎒 Graduation Adventure</option>
-                  <option value="charity">🕊️ Community Charity</option>
+                  <option value="honeymoon">✈️ Honeymoon Fund</option>
+                  <option value="travel">🎒 Travel & Adventure</option>
+                  <option value="home">🏡 New Home & Living</option>
+                  <option value="baby">🍼 Nursery & Baby Essentials</option>
+                  <option value="celebration">🥂 Celebration & Drinks</option>
+                  <option value="charity">🕊️ Charity & Donation</option>
                   <option value="custom">🎁 Custom Dream Gift</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  Target Goal (USD) · Optional
-                </label>
+                <label className="text-xs font-bold text-[var(--text-primary)]">Pot Name</label>
                 <input
-                  type="number"
-                  min={50}
-                  max={50000}
-                  value={targetAmount}
-                  onChange={(e) => setTargetAmount(e.target.value)}
-                  placeholder="e.g. 2500 (leave blank for open-ended)"
-                  className="mt-1 h-10 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={fundsConfig.titleMaxLength}
+                  placeholder="e.g. Honeymoon in Amalfi Coast"
+                  className="mt-1 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 text-xs text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  Short Description for Guests
+                <label className="text-xs font-bold text-[var(--text-primary)]">
+                  Description / Story (Optional)
                 </label>
                 <textarea
-                  rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Help us celebrate this milestone with an unforgettable trip!"
-                  className="mt-1 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  maxLength={fundsConfig.descriptionMaxLength}
+                  rows={2}
+                  placeholder="Tell guests what you are saving for and why it means so much..."
+                  className="mt-1 w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-xs text-[var(--text-primary)]"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-[var(--border-subtle)] pt-4">
+              <div>
+                <label className="text-xs font-bold text-[var(--text-primary)]">
+                  Target Goal Amount ($USD, Optional)
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max={fundsConfig.maxTargetAmount}
+                  value={targetAmount}
+                  onChange={(e) => setTargetAmount(e.target.value)}
+                  placeholder="e.g. 2500"
+                  className="mt-1 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 text-xs text-[var(--text-primary)]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
                 <Button
                   type="button"
                   variant="soft"
@@ -276,8 +387,8 @@ export function GiftPotManager({ eventId, funds, onFundsChanged }: GiftPotManage
                 >
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary" size="sm" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : 'Save Cash Pot'}
+                <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
+                  Create Pot
                 </Button>
               </div>
             </form>

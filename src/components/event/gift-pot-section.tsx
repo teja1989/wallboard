@@ -39,12 +39,21 @@ export function GiftPotSection({ eventId, funds, onContributionSuccess }: GiftPo
 
     setIsSubmitting(true);
     try {
-      await api.post(`/api/events/${eventId}/funds/${activeFundForModal.id}/contribute`, {
-        amount: finalAmount,
-        contributorName: contributorName.trim(),
-        message: message.trim(),
-        postToWall,
-      });
+      const res = await api.post<{ url: string; contributionId?: string }>(
+        `/api/events/${eventId}/funds/${activeFundForModal.id}/checkout`,
+        {
+          amount: finalAmount,
+          donorName: contributorName.trim() || 'A generous friend',
+          message: message.trim() || undefined,
+          isAnonymous: false,
+          showOnWall: postToWall,
+        },
+      );
+
+      if (res.url && !res.url.includes('gift=success')) {
+        window.location.href = res.url;
+        return;
+      }
 
       notify(`Thank you for your generous $${finalAmount} gift!`, 'success');
       setActiveFundForModal(null);

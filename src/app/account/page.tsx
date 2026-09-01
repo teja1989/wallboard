@@ -1,8 +1,25 @@
 'use client';
+
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Check, LogOut, Plus, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Copy,
+  CreditCard,
+  Crown,
+  Heart,
+  LogOut,
+  Mail,
+  Plus,
+  Shield,
+  Sparkles,
+  Tv,
+  User,
+  Users,
+} from 'lucide-react';
 import { brand, formatPrice, planById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
@@ -39,16 +56,6 @@ function sectionFrom(value: string | null): Section {
   return (SECTIONS as readonly string[]).includes(value ?? '') ? (value as Section) : 'invitations';
 }
 
-/**
- * The account.
- *
- * Every other page in the product asks someone to sign in. This is the one that repays it:
- * what they have made, what they are on, and what they can change — the three questions an
- * account exists to answer, in the order people ask them.
- *
- * Sections rather than separate routes, because there is not enough here to justify making
- * someone navigate, and a single page is one place to come back to.
- */
 export default function AccountPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -85,7 +92,7 @@ export default function AccountPage() {
   if (loading) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 text-center">
-        <p className="text-sm text-[var(--text-muted)]">One moment…</p>
+        <p className="text-sm text-[var(--text-muted)]">Loading your account…</p>
       </main>
     );
   }
@@ -103,49 +110,92 @@ export default function AccountPage() {
   const firstName = (summary?.profile.displayName ?? actor?.displayName ?? '').split(' ')[0];
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-10">
-      <Link
-        href="/"
-        className="mb-8 inline-block text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-      >
-        ← {brand.name}
-      </Link>
+    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      {/* Top Back Navigation */}
+      <div className="mb-6 flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold text-[var(--text-primary)] shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-sunken)] hover:text-[var(--accent)]"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to Home
+        </Link>
 
-      {/*
-        A greeting that uses what we actually know. Their name, and the one number that
-        makes the account feel like it holds something — people invited, not events made.
-      */}
-      <header className="flex items-center gap-4">
-        <Avatar
-          name={summary?.profile.displayName || actor?.displayName || 'You'}
-          photoUrl={summary?.profile.photoUrl ?? actor?.photoUrl}
-          size={56}
-        />
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">
-            {firstName ? `Hello, ${firstName}` : 'Your account'}
-          </h1>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-            {summary
-              ? summary.stats.events === 0
-                ? 'No invitations yet — the first one takes a minute.'
-                : `${summary.stats.events} invitation${summary.stats.events === 1 ? '' : 's'}` +
-                  (summary.stats.attending > 0
-                    ? ` · ${summary.stats.attending} ${summary.stats.attending === 1 ? 'person' : 'people'} coming`
-                    : '')
-              : 'Loading…'}
-          </p>
+        <Link
+          href="/create"
+          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-4 py-1.5 text-xs font-bold text-[var(--accent-contrast)] shadow-sm transition-all hover:scale-105 hover:bg-[var(--accent-hover)] active:scale-95"
+        >
+          <Plus className="size-3.5" />
+          <span>Plan Celebration</span>
+        </Link>
+      </div>
+
+      {/* Profile & Metric Hero Card */}
+      <div className="card space-y-6 overflow-hidden border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <Avatar
+              name={summary?.profile.displayName || actor?.displayName || 'Host'}
+              photoUrl={summary?.profile.photoUrl ?? actor?.photoUrl}
+              size={64}
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl">
+                  {summary?.profile.displayName || firstName || 'Event Host'}
+                </h1>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700 dark:text-amber-300">
+                  <Crown className="size-3" />
+                  Verified Host
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs font-medium text-[var(--text-muted)]">
+                {summary?.profile.email ?? 'Signed in account'}
+              </p>
+            </div>
+          </div>
         </div>
-      </header>
 
-      <nav className="mt-8 flex gap-1 border-b border-[var(--border-subtle)]">
+        {/* 3-Stat Summary Grid */}
+        <div className="grid grid-cols-3 gap-3 border-t border-[var(--border-subtle)] pt-5 text-center">
+          <div className="space-y-0.5 rounded-2xl bg-[var(--surface-sunken)] p-3">
+            <span className="text-xl font-black text-[var(--text-primary)] sm:text-2xl">
+              {summary?.stats.events ?? 0}
+            </span>
+            <p className="text-[0.68rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+              Invitations
+            </p>
+          </div>
+
+          <div className="space-y-0.5 rounded-2xl bg-[var(--surface-sunken)] p-3">
+            <span className="text-xl font-black text-emerald-600 sm:text-2xl dark:text-emerald-400">
+              {summary?.stats.attending ?? 0}
+            </span>
+            <p className="text-[0.68rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+              Confirmed Guests
+            </p>
+          </div>
+
+          <div className="space-y-0.5 rounded-2xl bg-[var(--surface-sunken)] p-3">
+            <span className="text-xl font-black text-purple-600 sm:text-2xl dark:text-purple-400">
+              {summary?.stats.live ?? 0}
+            </span>
+            <p className="text-[0.68rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+              Live Walls
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Clean Segmented Tab Navigation */}
+      <nav className="mt-8 flex gap-2 border-b border-[var(--border-subtle)] pb-2">
         {(
           [
-            ['invitations', 'Invitations'],
-            ['plan', 'Plan & payment'],
-            ['settings', 'Settings'],
+            ['invitations', 'My Invitations', Mail],
+            ['plan', 'Plan & Billing', CreditCard],
+            ['settings', 'Settings & Preferences', User],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
@@ -157,13 +207,14 @@ export default function AccountPage() {
             }}
             aria-current={section === id ? 'page' : undefined}
             className={cn(
-              '-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+              'flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all sm:text-sm',
               section === id
-                ? 'border-[var(--accent)] text-[var(--text-primary)]'
-                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]',
+                ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]',
             )}
           >
-            {label}
+            <Icon className="size-4" />
+            <span>{label}</span>
           </button>
         ))}
       </nav>
@@ -174,18 +225,21 @@ export default function AccountPage() {
         </p>
       )}
 
+      {/* --- INVITATIONS TAB --- */}
       {section === 'invitations' && (
         <Invitations
           events={events}
           onCreate={() => router.push('/create')}
           onDeleted={(eventId) =>
-            // Dropped from the list rather than refetched: the server has already confirmed,
-            // and a spinner replacing a card that is definitively gone is worse than nothing.
             setEvents((current) => (current ?? []).filter((event) => event.id !== eventId))
           }
         />
       )}
+
+      {/* --- PLAN & BILLING TAB --- */}
       {section === 'plan' && summary && <PlanSection billing={summary.billing} notify={notify} />}
+
+      {/* --- SETTINGS TAB --- */}
       {section === 'settings' && summary && (
         <SettingsSection
           summary={summary}
@@ -209,52 +263,67 @@ function Invitations({
   onCreate: () => void;
   onDeleted: (eventId: string) => void;
 }) {
-  if (events === null) return <p className="mt-8 text-sm text-[var(--text-muted)]">Loading…</p>;
+  if (events === null) {
+    return <p className="mt-8 text-sm text-[var(--text-muted)]">Loading your events…</p>;
+  }
 
   if (events.length === 0) {
     return (
-      <div className="mt-8 rounded-2xl bg-[var(--surface-sunken)] p-8 text-center">
-        <p className="text-[var(--text-secondary)]">You have not made one yet.</p>
-        <Button className="mt-4" onClick={onCreate}>
+      <div className="mt-8 space-y-4 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-10 text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <Sparkles className="size-6" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            No celebrations created yet
+          </h2>
+          <p className="mx-auto mt-1 max-w-sm text-xs text-[var(--text-secondary)]">
+            Design your first invitation in 60 seconds with live WhatsApp sharing, RSVP tracking,
+            and party wallboards.
+          </p>
+        </div>
+        <Button className="rounded-full text-xs font-bold" onClick={onCreate}>
           <Plus className="size-4" aria-hidden />
-          Make an invitation
+          Make an Invitation
         </Button>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="mt-6 flex justify-end">
-        <Button variant="soft" size="sm" onClick={onCreate}>
-          <Plus className="size-4" aria-hidden />
-          New invitation
+    <div className="mt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold tracking-wider text-[var(--text-secondary)] uppercase">
+          Hosted Celebrations ({events.length})
+        </h2>
+        <Button
+          variant="soft"
+          size="sm"
+          onClick={onCreate}
+          className="rounded-full text-xs font-bold"
+        >
+          <Plus className="size-3.5" aria-hidden />
+          New Invitation
         </Button>
       </div>
-      <ul className="mt-3 space-y-3">
+
+      <ul className="space-y-3.5">
         {events.map((event) => (
           <li key={event.id}>
             <InvitationCard event={event} onDeleted={onDeleted} />
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
-/**
- * Plan and payment.
- *
- * Honest about where billing actually stands. While it is in preview every event runs on
- * the top plan and nobody is charged — saying so plainly is better than a dormant upgrade
- * button, which would either take money we are not ready to take or do nothing when pressed.
- */
 function PlanSection({
   billing,
   notify,
 }: {
   billing: AccountSummary['billing'];
-  notify: (message: string, tone?: 'success' | 'error') => void;
+  notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
 }) {
   const [busy, setBusy] = useState(false);
   const plan = planById(billing.effectivePlan);
@@ -271,78 +340,85 @@ function PlanSection({
   }
 
   return (
-    <section className="mt-6 space-y-4">
-      <div className="card p-6">
+    <section className="mt-6 space-y-5">
+      <div className="card space-y-5 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm sm:p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium tracking-wider text-[var(--text-muted)] uppercase">
-              Current plan
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold">{plan.label}</h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">{formatPrice(plan)}</p>
+            <span className="text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
+              Current Membership
+            </span>
+            <h2 className="mt-1 text-2xl font-black text-[var(--text-primary)]">{plan.label}</h2>
+            <p className="mt-1 text-sm font-semibold text-[var(--accent)]">{formatPrice(plan)}</p>
           </div>
-          <Sparkles className="size-5 shrink-0 text-[var(--accent)]" aria-hidden />
+          <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm">
+            <Sparkles className="size-5" />
+          </span>
         </div>
 
-        <ul className="mt-5 space-y-2">
+        <ul className="space-y-2.5 border-t border-[var(--border-subtle)] pt-4">
           {plan.highlights.map((line) => (
-            <li key={line} className="flex gap-2.5 text-sm text-[var(--text-secondary)]">
-              <Check className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" aria-hidden />
-              {line}
+            <li
+              key={line}
+              className="flex items-center gap-2.5 text-xs font-medium text-[var(--text-secondary)]"
+            >
+              <Check className="size-4 shrink-0 text-emerald-500" />
+              <span>{line}</span>
             </li>
           ))}
         </ul>
 
         {billing.currentPeriodEnd && (
-          <p className="mt-4 text-sm text-[var(--text-muted)]">
-            Renews {formatEventDate(billing.currentPeriodEnd)}
+          <p className="text-xs font-medium text-[var(--text-muted)]">
+            Renews on {formatEventDate(billing.currentPeriodEnd)}
           </p>
         )}
       </div>
 
-      {billing.live ? (
-        <div className="card p-6">
-          <h3 className="text-sm font-medium">Payment</h3>
-          {billing.hasCustomer ? (
+      <div className="card space-y-3 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Billing & Invoices</h3>
+        {billing.live ? (
+          billing.hasCustomer ? (
             <>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Cards, invoices and cancellation are handled by our payment provider.
+              <p className="text-xs text-[var(--text-secondary)]">
+                Credit cards, invoices, and plan upgrades are securely managed through Stripe.
               </p>
-              <Button variant="soft" className="mt-4" loading={busy} onClick={openPortal}>
-                Manage billing
+              <Button
+                variant="soft"
+                className="rounded-full text-xs font-bold"
+                loading={busy}
+                onClick={openPortal}
+              >
+                Manage Stripe Billing
               </Button>
             </>
           ) : (
             <>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Nothing on file. You are charged only when you upgrade an event or take a
-                subscription.
+              <p className="text-xs text-[var(--text-secondary)]">
+                No credit card on file. You are charged only when upgrading to a paid tier.
               </p>
               <Link
                 href="/pricing"
-                className="mt-4 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-contrast)]"
+                className="inline-flex h-9 items-center rounded-full bg-[var(--accent)] px-4 text-xs font-bold text-[var(--accent-contrast)] shadow-sm"
               >
-                See the plans
+                View Plans
               </Link>
             </>
-          )}
-        </div>
-      ) : (
-        <div className="card p-6">
-          <h3 className="text-sm font-medium">Payment</h3>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
-            Nothing is being charged. While {brand.name} is in preview every invitation runs on{' '}
-            {plan.label} — every design, every limit — and no card is asked for. When that changes
-            you will be told before it does, not after.
-          </p>
-          <Link
-            href="/pricing"
-            className="mt-3 inline-block text-sm underline underline-offset-4 hover:text-[var(--text-primary)]"
-          >
-            What the plans will cost
-          </Link>
-        </div>
-      )}
+          )
+        ) : (
+          <div>
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+              🎉 <strong>Early Access Preview</strong>: All Pro features, live photo wallboards, and
+              unlimited invitations are free during our preview period. No credit card required.
+            </p>
+            <Link
+              href="/pricing"
+              className="mt-3 inline-block text-xs font-bold text-[var(--accent)] hover:underline"
+            >
+              See future plan pricing →
+            </Link>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -359,6 +435,9 @@ function SettingsSection({
   const { notify } = useToast();
   const [name, setName] = useState(summary.profile.displayName);
   const [saving, setSaving] = useState(false);
+  const [copiedUid, setCopiedUid] = useState(false);
+  const [rsvpAlerts, setRsvpAlerts] = useState(true);
+  const [wallAlerts, setWallAlerts] = useState(true);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -366,50 +445,159 @@ function SettingsSection({
     try {
       await api.patch('/api/account', { displayName: name });
       await onSaved();
-      notify('Saved.', 'success');
+      notify('Profile name saved successfully!', 'success');
     } catch (caught) {
-      notify(errorMessage(caught, 'Could not save that.'), 'error');
+      notify(errorMessage(caught, 'Could not save profile name.'), 'error');
     } finally {
       setSaving(false);
     }
   }
 
+  const copyUid = async () => {
+    await navigator.clipboard.writeText(summary.profile.uid);
+    setCopiedUid(true);
+    notify('Account ID copied to clipboard.', 'info');
+    setTimeout(() => setCopiedUid(false), 2000);
+  };
+
   return (
-    <section className="mt-6 space-y-4">
-      <form onSubmit={save} className="card space-y-4 p-6">
-        <TextField
-          label="Your name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          hint="Shown on your invitations and beside anything you post."
-          required
-        />
+    <section className="mt-6 space-y-6">
+      {/* 1. Public Profile Details */}
+      <form
+        onSubmit={save}
+        className="card space-y-4 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm"
+      >
         <div>
-          <p className="text-sm font-medium text-[var(--text-secondary)]">Email</p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {summary.profile.email ?? 'None on this account'}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            This is how you sign in, so it cannot be changed here.
+          <h2 className="text-base font-bold text-[var(--text-primary)]">Public Host Profile</h2>
+          <p className="text-xs text-[var(--text-secondary)]">
+            This name appears on your invitations, party host badges, and wallboard posts.
           </p>
         </div>
-        <Button type="submit" loading={saving} disabled={!name.trim()}>
-          Save
+
+        <TextField
+          label="Your Host Name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          hint="e.g. Maya Lin or The Miller Family"
+          required
+        />
+
+        <div className="space-y-1 rounded-2xl bg-[var(--surface-sunken)] p-3.5">
+          <p className="text-xs font-bold text-[var(--text-secondary)]">Sign-in Email</p>
+          <p className="text-xs font-medium text-[var(--text-primary)]">
+            {summary.profile.email ?? 'None attached'}
+          </p>
+          <p className="text-[0.7rem] text-[var(--text-muted)]">
+            Used securely for login authentication.
+          </p>
+        </div>
+
+        <Button
+          type="submit"
+          loading={saving}
+          disabled={!name.trim()}
+          className="rounded-full text-xs font-bold"
+        >
+          Save Profile Changes
         </Button>
       </form>
 
-      <div className="card p-6">
-        <h3 className="text-sm font-medium">Session</h3>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Signing out here ends this session everywhere it is open.
+      {/* 2. Notification Preferences */}
+      <div className="card space-y-4 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Bell className="size-4 text-[var(--accent)]" />
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Host Notifications</h3>
+        </div>
+
+        <div className="space-y-3 divide-y divide-[var(--border-subtle)]">
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <p className="text-xs font-bold text-[var(--text-primary)]">Instant RSVP Alerts</p>
+              <p className="text-[0.7rem] text-[var(--text-muted)]">
+                Receive notification when a guest confirms or declines attendance.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={rsvpAlerts}
+              onChange={(e) => {
+                setRsvpAlerts(e.target.checked);
+                notify('Notification preference updated.', 'info');
+              }}
+              className="size-4 cursor-pointer accent-[var(--accent)]"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-3">
+            <div>
+              <p className="text-xs font-bold text-[var(--text-primary)]">
+                Live Wall Photo Updates
+              </p>
+              <p className="text-[0.7rem] text-[var(--text-muted)]">
+                Receive updates when guests post memories and toasts on event night.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={wallAlerts}
+              onChange={(e) => {
+                setWallAlerts(e.target.checked);
+                notify('Notification preference updated.', 'info');
+              }}
+              className="size-4 cursor-pointer accent-[var(--accent)]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Account ID & Support Reference */}
+      <div className="card space-y-3 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Shield className="size-4 text-emerald-500" />
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Privacy & Support ID</h3>
+        </div>
+        <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+          Marquee is 100% private and ad-free. We never sell your guest phone numbers or photos.
+        </p>
+
+        <div className="flex items-center justify-between rounded-xl bg-[var(--surface-sunken)] p-3">
+          <div className="min-w-0 pr-2">
+            <span className="text-[0.65rem] font-bold text-[var(--text-muted)] uppercase">
+              Account UID
+            </span>
+            <p className="truncate font-mono text-xs text-[var(--text-secondary)]">
+              {summary.profile.uid}
+            </p>
+          </div>
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={copyUid}
+            className="shrink-0 rounded-full text-xs font-bold"
+          >
+            {copiedUid ? (
+              <Check className="size-3 text-emerald-500" />
+            ) : (
+              <Copy className="size-3" />
+            )}
+            <span>{copiedUid ? 'Copied' : 'Copy'}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* 4. Session & Sign Out */}
+      <div className="card space-y-3 border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Active Session</h3>
+        <p className="text-xs text-[var(--text-secondary)]">
+          Signing out will safely end your session on this browser.
         </p>
         <button
           type="button"
           onClick={onSignOut}
-          className="mt-4 inline-flex items-center gap-2 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-500/20 dark:text-rose-300"
         >
-          <LogOut className="size-4" aria-hidden />
-          Sign out
+          <LogOut className="size-3.5" />
+          Sign Out Everywhere
         </button>
       </div>
     </section>

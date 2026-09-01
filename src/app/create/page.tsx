@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useRouter } from 'next/navigation';
 import { AddressField } from '@/components/create/address-field';
 import Link from 'next/link';
-import { Check, Copy, Lock, PartyPopper, Share2, Users } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Lock, PartyPopper, Share2, Users } from 'lucide-react';
 import {
   POST_KINDS,
   brand,
@@ -144,6 +144,17 @@ export default function CreateEventPage() {
     void (async () => {
       try {
         if (window.sessionStorage.getItem(createGate.browseKey) === 'yes') setBrowsing(true);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlOccasion = urlParams.get('occasion');
+        const urlTemplate = urlParams.get('template');
+        if (urlOccasion && occasions.some((o) => o.id === urlOccasion)) {
+          setOccasionId(urlOccasion);
+        }
+        if (urlTemplate && templates.some((t) => t.id === urlTemplate)) {
+          setTemplateId(urlTemplate);
+          setTemplateTouched(true);
+        }
       } catch {
         // Storage denied. They are asked once more, which is the harmless direction.
       }
@@ -434,9 +445,10 @@ export default function CreateEventPage() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12 text-center">
         <Link
           href="/"
-          className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+          className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold text-[var(--text-primary)] shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-sunken)] hover:text-[var(--accent)]"
         >
-          ← {brand.name}
+          <ArrowLeft className="size-3.5" />
+          Back to Home
         </Link>
         <SignInPrompt
           title="Make an invitation"
@@ -465,9 +477,10 @@ export default function CreateEventPage() {
         <button
           type="button"
           onClick={() => setNeedsAccount(false)}
-          className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+          className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold text-[var(--text-primary)] shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-sunken)] hover:text-[var(--accent)]"
         >
-          ← Back to editing
+          <ArrowLeft className="size-3.5" />
+          Back to editing
         </button>
         <SignInPrompt
           title="Almost there"
@@ -505,9 +518,10 @@ export default function CreateEventPage() {
         <div className="flex min-h-dvh flex-col lg:min-h-0">
           <Link
             href="/"
-            className="mb-8 w-fit text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+            className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold text-[var(--text-primary)] shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-sunken)] hover:text-[var(--accent)]"
           >
-            ← {brand.name}
+            <ArrowLeft className="size-3.5" />
+            Back to Home
           </Link>
 
           <h1 className="text-3xl font-semibold tracking-tight">Make an invitation</h1>

@@ -1,6 +1,24 @@
 'use client';
+
 import { useState } from 'react';
-import { Clock, MapPin, MessageSquare, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  ArrowRight,
+  Cake,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Gift,
+  MapPin,
+  MessageSquare,
+  QrCode,
+  Send,
+  Share2,
+  Sparkles,
+  Tv,
+  Users,
+} from 'lucide-react';
 import { TemplateSurfaceField } from '@/components/event/template-surface';
 import { templateById, type TemplateId } from '@/config';
 import { cn } from '@/lib/utils';
@@ -13,337 +31,413 @@ export function CreationStory() {
   const activeTemplate = templateById(selectedThemeId);
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-16">
-      <div className="text-center sm:text-left">
-        <p className="text-sm font-semibold tracking-wide text-[var(--accent)] uppercase">
-          How it works
-        </p>
-        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Three steps. One link. Effortless hosting.
+    <section id="how-it-works" className="mx-auto w-full max-w-6xl scroll-mt-20 px-6 py-20">
+      {/* Header */}
+      <div className="mx-auto max-w-3xl text-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--accent-soft)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold tracking-wider text-[var(--accent)] uppercase shadow-sm">
+          <Sparkles className="size-3.5" />
+          The 3-Step Experience
+        </span>
+        <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-balance sm:text-4xl lg:text-5xl">
+          From blank page to live party in three easy steps.
         </h2>
-        <p className="mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
-          No mandatory app downloads or account walls for your guests. From blank page to live RSVPs
-          in under two minutes.
+        <p className="mt-4 text-base text-[var(--text-secondary)] sm:text-lg">
+          No mandatory app downloads or account walls for your guests. Everything works seamlessly
+          in any mobile browser.
         </p>
       </div>
 
-      <div className="mt-12 grid gap-8 lg:grid-cols-12 lg:items-start">
-        {/* Step Selector Column */}
+      {/* Step Selector & Visual Stage Grid */}
+      <div className="mt-14 grid gap-8 lg:grid-cols-12 lg:items-center">
+        {/* Left Column: Interactive Step Cards */}
         <div className="space-y-4 lg:col-span-5">
+          {/* Step 1 Button */}
           <button
             type="button"
             onClick={() => setActiveStep(1)}
             className={cn(
-              'card w-full p-5 text-left transition-all duration-200 sm:p-6',
+              'group w-full cursor-pointer rounded-2xl border p-5 text-left transition-all duration-300 sm:p-6',
               activeStep === 1
-                ? 'border-[var(--accent)] bg-[var(--surface-sunken)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--accent)]'
-                : 'hover:bg-[var(--surface-sunken)]',
+                ? 'border-[var(--accent)] bg-[var(--surface-raised)] shadow-xl ring-2 ring-[var(--accent)]/30'
+                : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]/60 hover:border-[var(--border-strong)] hover:bg-[var(--surface-raised)]',
             )}
           >
             <div className="flex items-center gap-3">
               <span
                 className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                  'flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-black transition-colors',
                   activeStep === 1
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                    : 'bg-[var(--surface-elevated)] text-[var(--text-secondary)]',
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm'
+                    : 'border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-muted)]',
                 )}
               >
                 01
               </span>
-              <h3 className="text-lg font-semibold">Type the details</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)] sm:text-lg">
+                Design your invitation in 60s
+              </h3>
             </div>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Enter your event name, date, and venue. Pick from 19 hand-crafted design palettes with
-              rich animated surfaces.
+            <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-secondary)] sm:text-sm">
+              Choose from 15 designer typography themes, set your event details, dress code, and
+              optional gift registry or cash pot.
             </p>
           </button>
 
+          {/* Step 2 Button */}
           <button
             type="button"
             onClick={() => setActiveStep(2)}
             className={cn(
-              'card w-full p-5 text-left transition-all duration-200 sm:p-6',
+              'group w-full cursor-pointer rounded-2xl border p-5 text-left transition-all duration-300 sm:p-6',
               activeStep === 2
-                ? 'border-[var(--accent)] bg-[var(--surface-sunken)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--accent)]'
-                : 'hover:bg-[var(--surface-sunken)]',
+                ? 'border-[var(--accent)] bg-[var(--surface-raised)] shadow-xl ring-2 ring-[var(--accent)]/30'
+                : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]/60 hover:border-[var(--border-strong)] hover:bg-[var(--surface-raised)]',
             )}
           >
             <div className="flex items-center gap-3">
               <span
                 className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                  'flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-black transition-colors',
                   activeStep === 2
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                    : 'bg-[var(--surface-elevated)] text-[var(--text-secondary)]',
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm'
+                    : 'border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-muted)]',
                 )}
               >
                 02
               </span>
-              <h3 className="text-lg font-semibold">Share your way</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)] sm:text-lg">
+                Share via WhatsApp, SMS, or QR
+              </h3>
             </div>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Send via email or tap to text personalized invitation links via iMessage/SMS. Each
-              guest gets a private link that tracks when they view it.
+            <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-secondary)] sm:text-sm">
+              Send personalized 1-click links directly into group chats, print table QR cards, and
+              see real-time delivery status when guests open it.
             </p>
           </button>
 
+          {/* Step 3 Button */}
           <button
             type="button"
             onClick={() => setActiveStep(3)}
             className={cn(
-              'card w-full p-5 text-left transition-all duration-200 sm:p-6',
+              'group w-full cursor-pointer rounded-2xl border p-5 text-left transition-all duration-300 sm:p-6',
               activeStep === 3
-                ? 'border-[var(--accent)] bg-[var(--surface-sunken)] shadow-[var(--shadow-soft)] ring-1 ring-[var(--accent)]'
-                : 'hover:bg-[var(--surface-sunken)]',
+                ? 'border-[var(--accent)] bg-[var(--surface-raised)] shadow-xl ring-2 ring-[var(--accent)]/30'
+                : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]/60 hover:border-[var(--border-strong)] hover:bg-[var(--surface-raised)]',
             )}
           >
             <div className="flex items-center gap-3">
               <span
                 className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                  'flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-black transition-colors',
                   activeStep === 3
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                    : 'bg-[var(--surface-elevated)] text-[var(--text-secondary)]',
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm'
+                    : 'border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-muted)]',
                 )}
               >
                 03
               </span>
-              <h3 className="text-lg font-semibold">Collect replies & photos</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)] sm:text-lg">
+                Track RSVPs & Turn on the TV Wall
+              </h3>
             </div>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Collect guest headcounts, dietary restrictions, and private notes. On event day, the
-              same link becomes a live photo wall for TVs and projectors.
+            <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-secondary)] sm:text-sm">
+              Track adult vs kid headcounts and dietary restrictions. On party night, project the
+              live photo wall with voice toast playback and instant confetti.
             </p>
           </button>
         </div>
 
-        {/* Step Preview Visual Column */}
+        {/* Right Column: Dynamic Interactive Stage */}
         <div className="lg:col-span-7">
-          <div className="card relative overflow-hidden p-5 sm:p-7">
-            {/* Step 1 Visual: Drafting with live theme surface selector */}
-            {activeStep === 1 && (
-              <div className="animate-in fade-in space-y-4 duration-300">
-                <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-                  <span className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase">
-                    Step 1: Event Details & Theme
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                    <Sparkles className="size-3 text-amber-500" />
-                    Auto-saved
-                  </span>
-                </div>
-
-                <div className="space-y-3.5">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)]">
-                      Event Name
-                    </label>
-                    <div className="mt-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3.5 py-2 text-sm font-medium text-[var(--text-primary)]">
-                      Maya&apos;s 40th Birthday Celebration
-                    </div>
+          <div className="relative overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-2xl sm:p-8">
+            <AnimatePresence mode="wait">
+              {/* --- STEP 1 VISUAL: Interactive Designer Canvas --- */}
+              {activeStep === 1 && (
+                <motion.div
+                  key="step-1"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+                    <span className="text-xs font-bold tracking-wider text-[var(--accent)] uppercase">
+                      Step 1: Design & Details
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="size-3.5" />
+                      Auto-saved
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {/* Mock Form Header */}
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)]">
-                        Date & Time
+                      <label className="block text-[0.7rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                        Event Title
                       </label>
-                      <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-xs sm:text-sm">
-                        <Clock className="size-4 shrink-0 text-[var(--text-muted)]" />
-                        <span>Saturday, 7:00 PM</span>
+                      <div className="mt-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3.5 py-2 text-sm font-bold text-[var(--text-primary)]">
+                        Alex & Maya&apos;s Celebration
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[0.7rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                          Date & Time
+                        </label>
+                        <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-xs font-medium">
+                          <Clock className="size-3.5 text-[var(--text-muted)]" />
+                          <span>Sat, Sep 5 · 4:00 PM</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[0.7rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                          Venue
+                        </label>
+                        <div className="mt-1 flex items-center gap-2 truncate rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-xs font-medium">
+                          <MapPin className="size-3.5 text-[var(--text-muted)]" />
+                          <span className="truncate">The Grand Pavilion</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Theme Chooser */}
                     <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)]">
-                        Location
-                      </label>
-                      <div className="mt-1 flex items-center gap-2 truncate rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-xs sm:text-sm">
-                        <MapPin className="size-4 shrink-0 text-[var(--text-muted)]" />
-                        <span className="truncate">The Skylight Loft, NYC</span>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[0.7rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                          Pick a Palette & Animated Surface
+                        </label>
+                        <span className="text-xs font-bold text-[var(--accent)]">
+                          {activeTemplate.label} ({activeTemplate.surface})
+                        </span>
+                      </div>
+
+                      <div className="mt-1.5 grid grid-cols-4 gap-2">
+                        {DEMO_THEMES.map((themeId) => {
+                          const t = templateById(themeId);
+                          const isSelected = selectedThemeId === themeId;
+                          return (
+                            <button
+                              key={themeId}
+                              type="button"
+                              onClick={() => setSelectedThemeId(themeId)}
+                              className={cn(
+                                'flex cursor-pointer flex-col items-center gap-1 rounded-xl p-1.5 transition-all duration-200',
+                                isSelected
+                                  ? 'bg-[var(--surface-sunken)] shadow-sm ring-2 ring-[var(--accent)]'
+                                  : 'hover:bg-[var(--surface-sunken)]/60',
+                              )}
+                            >
+                              <div
+                                className="size-7 rounded-lg shadow-sm"
+                                style={{
+                                  background: `linear-gradient(135deg, ${t.palette.from}, ${t.palette.to})`,
+                                }}
+                              />
+                              <span className="truncate text-[10px] font-semibold text-[var(--text-secondary)]">
+                                {t.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Live Surface Glow Banner */}
+                      <div
+                        className="relative mt-3 h-20 overflow-hidden rounded-2xl p-3.5 shadow-inner transition-all duration-300"
+                        style={{
+                          background: `linear-gradient(135deg, ${activeTemplate.palette.from}, ${activeTemplate.palette.to})`,
+                        }}
+                      >
+                        <TemplateSurfaceField
+                          surface={activeTemplate.surface}
+                          palette={activeTemplate.palette}
+                          className="size-full"
+                        />
+                        <div className="relative z-10 flex h-full flex-col justify-center">
+                          <span
+                            className="font-serif text-base font-bold"
+                            style={{ color: activeTemplate.palette.onGradient }}
+                          >
+                            {activeTemplate.label} Design Theme
+                          </span>
+                          <span
+                            className="text-xs opacity-85"
+                            style={{ color: activeTemplate.palette.onGradient }}
+                          >
+                            Live animated &ldquo;{activeTemplate.surface}&rdquo; surface texture
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                </motion.div>
+              )}
 
-                  {/* Interactive theme surface palette chooser */}
-                  <div>
+              {/* --- STEP 2 VISUAL: Smart Multi-Channel Share Suite --- */}
+              {activeStep === 2 && (
+                <motion.div
+                  key="step-2"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+                    <span className="text-xs font-bold tracking-wider text-[var(--accent)] uppercase">
+                      Step 2: Multi-Channel Share & Delivery
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                      Live Delivery Feed
+                    </span>
+                  </div>
+
+                  {/* 1-Click WhatsApp & SMS Card */}
+                  <div className="space-y-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                     <div className="flex items-center justify-between">
-                      <label className="block text-xs font-medium text-[var(--text-secondary)]">
-                        Theme & Graphical Surface
-                      </label>
-                      <span className="text-xs font-medium text-[var(--accent)]">
-                        {activeTemplate.label} ({activeTemplate.surface})
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                        <Share2 className="size-3.5" />
+                        1-Click WhatsApp & SMS Share
+                      </span>
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[0.7rem] font-bold text-emerald-700 dark:text-emerald-300">
+                        Zero Sign-up for Guests
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-[var(--text-secondary)] italic">
+                      &ldquo;Hey! You&apos;re invited to Alex & Maya&apos;s Celebration on Sep 5.
+                      Tap to RSVP, see directions & schedule: marqueersvp.com/e/PARTY2026&rdquo;
+                    </p>
+                  </div>
+
+                  {/* Real-Time Live Delivery List */}
+                  <div className="divide-y divide-[var(--border-subtle)] overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
+                    <div className="flex items-center justify-between bg-[var(--surface-sunken)]/50 p-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-2 animate-pulse rounded-full bg-emerald-500" />
+                        <span className="text-xs font-bold text-[var(--text-primary)]">
+                          Jessica & Tom
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                        ✓ Confirmed (2 Adults, 1 Kid)
                       </span>
                     </div>
 
-                    {/* Theme Swatch Buttons */}
-                    <div className="mt-1.5 grid grid-cols-4 gap-2">
-                      {DEMO_THEMES.map((themeId) => {
-                        const t = templateById(themeId);
-                        const isSelected = selectedThemeId === themeId;
-                        return (
-                          <button
-                            key={themeId}
-                            type="button"
-                            onClick={() => setSelectedThemeId(themeId)}
-                            className={cn(
-                              'relative flex flex-col items-center gap-1 rounded-xl p-1.5 transition-all duration-200',
-                              isSelected
-                                ? 'bg-[var(--surface-sunken)] shadow-sm ring-2 ring-[var(--accent)]'
-                                : 'hover:bg-[var(--surface-sunken)]/60',
-                            )}
-                          >
-                            <div
-                              className="size-7 rounded-lg shadow-sm sm:size-8"
-                              style={{
-                                background: `linear-gradient(135deg, ${t.palette.from}, ${t.palette.to})`,
-                              }}
-                            />
-                            <span className="truncate text-[10px] font-medium text-[var(--text-secondary)] sm:text-xs">
-                              {t.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Dynamic surface texture banner preview */}
-                    <div
-                      className="relative mt-2.5 h-16 overflow-hidden rounded-xl p-3 shadow-inner transition-all duration-300 sm:h-20"
-                      style={{
-                        background: `linear-gradient(135deg, ${activeTemplate.palette.from}, ${activeTemplate.palette.to})`,
-                      }}
-                    >
-                      <TemplateSurfaceField
-                        surface={activeTemplate.surface}
-                        palette={activeTemplate.palette}
-                        className="size-full"
-                      />
-                      <div className="relative z-10 flex h-full flex-col justify-center">
-                        <span
-                          className="font-serif text-sm font-semibold sm:text-base"
-                          style={{ color: activeTemplate.palette.onGradient }}
-                        >
-                          {activeTemplate.label} Palette
-                        </span>
-                        <span
-                          className="text-[11px] opacity-80"
-                          style={{ color: activeTemplate.palette.onGradient }}
-                        >
-                          Animated &ldquo;{activeTemplate.surface}&rdquo; surface texture
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-2 rounded-full bg-blue-500" />
+                        <span className="text-xs font-bold text-[var(--text-primary)]">
+                          David Rodriguez
                         </span>
                       </div>
+                      <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                        👀 Viewed 3 mins ago
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-2 rounded-full bg-amber-500" />
+                        <span className="text-xs font-bold text-[var(--text-primary)]">
+                          Aunt Sarah
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                        💌 WhatsApp Sent
+                      </span>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
 
-            {/* Step 2 Visual: Smart Distribution */}
-            {activeStep === 2 && (
-              <div className="animate-in fade-in space-y-4 duration-300">
-                <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-                  <span className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase">
-                    Step 2: Guest Relay & Tracking
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500">
-                    Live Tracking
-                  </span>
-                </div>
+              {/* --- STEP 3 VISUAL: Live Wall, RSVPs & Cash Pot --- */}
+              {activeStep === 3 && (
+                <motion.div
+                  key="step-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+                    <span className="text-xs font-bold tracking-wider text-[var(--accent)] uppercase">
+                      Step 3: Headcounts, Cash Pots & Live Wall
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-2.5 py-0.5 text-xs font-bold text-purple-600 dark:text-purple-400">
+                      <Tv className="size-3" />
+                      4K TV Mode Ready
+                    </span>
+                  </div>
 
-                <div className="rounded-2xl bg-[var(--surface-sunken)] p-3.5 sm:p-4">
-                  <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase">
-                    Sample SMS Invitation Link
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-[var(--text-primary)] sm:text-sm">
-                    &ldquo;Maya invited you to Maya&apos;s 40th Birthday! Tap here to RSVP:
-                    https://marqueersvp.com/i/PARTY30?g=alex&rdquo;
-                  </p>
-                </div>
-
-                <ul className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]">
-                  <li className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs font-medium sm:text-sm">Alex Chen</span>
+                  {/* Headcount Split Stats */}
+                  <div className="grid grid-cols-3 gap-2.5 text-center">
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                      <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                        36
+                      </span>
+                      <p className="mt-0.5 text-[10px] font-bold tracking-wider text-emerald-800 uppercase dark:text-emerald-300">
+                        Attending
+                      </p>
                     </div>
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 sm:text-xs">
-                      Seen 2m ago
-                    </span>
-                  </li>
-                  <li className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs font-medium sm:text-sm">Sarah Jenkins</span>
+                    <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3">
+                      <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
+                        28 / 8
+                      </span>
+                      <p className="mt-0.5 text-[10px] font-bold tracking-wider text-blue-800 uppercase dark:text-blue-300">
+                        Adults / Kids
+                      </p>
                     </div>
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 sm:text-xs">
-                      Replied (Attending)
-                    </span>
-                  </li>
-                  <li className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-amber-500" />
-                      <span className="text-xs font-medium sm:text-sm">David Ross</span>
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                        $1,850
+                      </span>
+                      <p className="mt-0.5 text-[10px] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-300">
+                        Cash Pot
+                      </p>
                     </div>
-                    <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-600 sm:text-xs">
-                      Sent
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            )}
+                  </div>
 
-            {/* Step 3 Visual: Replies & Wall */}
-            {activeStep === 3 && (
-              <div className="animate-in fade-in space-y-4 duration-300">
-                <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-                  <span className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase">
-                    Step 3: Headcounts & Live Wall
-                  </span>
-                  <span className="text-xs font-medium text-[var(--text-muted)]">48 Attending</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 text-center sm:gap-3">
-                  <div className="rounded-xl bg-emerald-500/10 p-2.5 sm:p-3">
-                    <span className="text-xl font-bold text-emerald-600 sm:text-2xl">42</span>
-                    <p className="text-[11px] font-medium text-emerald-700 sm:text-xs">Attending</p>
-                  </div>
-                  <div className="rounded-xl bg-zinc-500/10 p-2.5 sm:p-3">
-                    <span className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">
-                      6
-                    </span>
-                    <p className="text-[11px] font-medium text-[var(--text-muted)] sm:text-xs">
-                      Can&apos;t Make It
+                  {/* Live TV Projector Banner */}
+                  <div className="space-y-2 rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex size-2.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex size-2.5 rounded-full bg-purple-500"></span>
+                        </span>
+                        <span className="text-xs font-bold text-purple-900 dark:text-purple-200">
+                          Big-Screen TV Kiosk Active
+                        </span>
+                      </div>
+                      <span className="rounded-md bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                        48 Photos Streamed
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-purple-800/80 dark:text-purple-200/80">
+                      Guests take photos on their phones and they pop onto the big screen with voice
+                      toasts and celebratory confetti!
                     </p>
                   </div>
-                  <div className="rounded-xl bg-amber-500/10 p-2.5 sm:p-3">
-                    <span className="text-xl font-bold text-amber-600 sm:text-2xl">4</span>
-                    <p className="text-[11px] font-medium text-amber-700 sm:text-xs">Maybe</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3.5 sm:p-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)]">
-                    <MessageSquare className="size-3.5 text-[var(--accent)]" />
-                    Guest Notes & Dietary Split
-                  </div>
-                  <div className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                    <p>
-                      • <strong>Alex C.</strong>: &ldquo;Vegetarian · Can&apos;t wait!&rdquo;
-                    </p>
-                    <p>
-                      • <strong>Marcus T.</strong>: &ldquo;Bringing my partner (2 total)&rdquo;
-                    </p>
-                    <p>
-                      • <strong>Elena R.</strong>: &ldquo;Allergic to shellfish&rdquo;
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
+      </div>
+
+      {/* Bottom CTA */}
+      <div className="mt-12 text-center">
+        <Link
+          href="/create"
+          className="inline-flex items-center gap-2 text-sm font-bold text-[var(--accent)] hover:underline"
+        >
+          Try creating your invitation in 60 seconds <ArrowRight className="size-4" />
+        </Link>
       </div>
     </section>
   );

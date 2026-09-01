@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Sparkles } from 'lucide-react';
 import { adFreePromiseHolds, anyActivePromo, brand, occasionById, promoCopy } from '@/config';
 import { isPreviewPricing } from '@/lib/billing/entitlements';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
@@ -31,6 +31,17 @@ export default function PricingPage() {
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
+        {/* Back Button */}
+        <div className="pt-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-bold text-[var(--text-primary)] shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-sunken)] hover:text-[var(--accent)]"
+          >
+            <ArrowLeft className="size-3.5" />
+            Back to Home
+          </Link>
+        </div>
+
         {/* Hero Section */}
         <section className="pt-12 pb-10 text-center sm:pt-18 sm:pb-14">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-1.5 text-xs font-semibold text-[var(--accent)] shadow-sm">

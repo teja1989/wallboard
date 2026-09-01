@@ -1,6 +1,20 @@
 'use client';
+
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Loader2, Mail, MessageSquare, Send, Share2, Trash2 } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  Send,
+  Share2,
+  Sparkles,
+  Trash2,
+  UserCheck,
+} from 'lucide-react';
 import { deliveryCopy, emailConfig, reminderCopy, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -26,10 +40,12 @@ interface InvitePanelProps {
 }
 
 const TONE_CLASS: Record<ReturnType<typeof toneOf>, string> = {
-  neutral: 'text-[var(--text-muted)]',
-  progress: 'bg-[var(--surface-sunken)] text-[var(--text-secondary)]',
-  good: 'bg-[var(--accent-soft)] text-[var(--accent)]',
-  bad: 'bg-[var(--danger-soft)] text-[var(--danger)]',
+  neutral:
+    'border border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--text-muted)]',
+  progress:
+    'border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300 font-semibold',
+  good: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold',
+  bad: 'border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold',
 };
 
 function toneOf(state: DeliveryState) {
@@ -37,17 +53,7 @@ function toneOf(state: DeliveryState) {
 }
 
 /**
- * The guest list, and getting the invitation to it.
- *
- * Two things shape this panel.
- *
- * **People are known by phone at least as often as by email.** So a guest can be added with
- * only a number, and — since the entry form was rebuilt — with a name beside it, which the
- * old paste box could not express for anyone who was not an email address.
- *
- * **Every guest has their own link.** That is what makes "has Priya opened it?" answerable,
- * and it is why the host can send the invitation themselves — from their own phone, in the
- * thread they already talk to that person in — without losing any of the tracking.
+ * The enhanced guest list and multi-channel invitation relay.
  */
 export function InvitePanel({
   eventId,
@@ -85,8 +91,8 @@ export function InvitePanel({
 
   const all = invitees ?? [];
   const emailable = all.filter((i) => i.email);
-  const unsent = emailable.filter((i) => i.status === 'pending' || i.status === 'failed');
-  const sent = emailable.filter((i) => i.status !== 'pending' && i.status !== 'unsubscribed');
+  const unsent = all.filter((i) => i.status === 'pending' || i.status === 'failed');
+  const sent = all.filter((i) => i.status !== 'pending' && i.status !== 'unsubscribed');
 
   function linkFor(invitee: InviteeDoc): string {
     if (!code) return '';
@@ -97,20 +103,23 @@ export function InvitePanel({
   async function copyLink(invitee: InviteeDoc) {
     await navigator.clipboard.writeText(relayCopy.message(hostedBy, eventTitle, linkFor(invitee)));
     setCopied(invitee.id);
+    notify(`Copied invitation message for ${invitee.name || 'guest'}!`, 'success');
     window.setTimeout(() => setCopied(null), 1600);
   }
 
-  async function shareLink(invitee: InviteeDoc) {
-    const text = relayCopy.message(hostedBy, eventTitle, linkFor(invitee));
-    if (!navigator.share) {
-      await copyLink(invitee);
-      return;
-    }
-    // A cancelled share sheet rejects, and that is not an error worth showing anyone.
-    await navigator.share({ text }).catch(() => undefined);
+  function sendWhatsApp(invitee: InviteeDoc) {
+    if (!code) return;
+    const link = linkFor(invitee);
+    const text = relayCopy.message(hostedBy, eventTitle, link);
+    const cleanPhone = invitee.phone ? invitee.phone.replace(/[^0-9]/g, '') : '';
+    const url = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   function sendSms(invitee: InviteeDoc) {
+    if (!code) return;
     const text = relayCopy.message(hostedBy, eventTitle, linkFor(invitee));
     const phone = invitee.phone ? invitee.phone.replace(/[^0-9+]/g, '') : '';
     const url = `sms:${phone}?&body=${encodeURIComponent(text)}`;
@@ -135,282 +144,255 @@ export function InvitePanel({
       }>(`/api/events/${eventId}/invites`, { invitees: guests });
       await load();
 
-      // Account for all of them, not just the ones that worked — a count that does not move
-      // without explanation is the most common "is it broken?" moment here.
       const parts = [`${result.added} added`];
-      if (result.duplicates) parts.push(`${result.duplicates} already on the list`);
-      if (result.blocked) parts.push(`${result.blocked} previously opted out`);
-      if (result.invalid) parts.push(`${result.invalid} unusable`);
-      notify(parts.join(', '), 'success');
-      return true;
+      if (result.duplicates > 0) parts.push(`${result.duplicates} already on the list`);
+      if (result.invalid > 0) parts.push(`${result.invalid} invalid`);
+      if (result.blocked > 0) parts.push(`${result.blocked} opted out`);
+
+      notify(parts.join(' · '), result.added > 0 ? 'success' : 'info');
+      return result.added > 0;
     } catch (caught) {
-      // Left in the form rather than cleared, so a failed add is a retry instead of
-      // fifteen names to type again.
-      notify(errorMessage(caught, 'Could not add those.'), 'error');
+      notify(errorMessage(caught, 'Could not add guests.'), 'error');
       return false;
     } finally {
       setBusy(null);
     }
   }
 
-  async function send(kind: 'invitation' | 'reminder') {
-    const count = kind === 'invitation' ? unsent.length : sent.length;
-    const what =
-      kind === 'invitation'
-        ? `Email the invitation to ${count} ${count === 1 ? 'person' : 'people'}?`
-        : 'Nudge everyone who has not replied yet?';
-    if (!window.confirm(what)) return;
-
-    setBusy(kind === 'invitation' ? 'send' : 'remind');
+  async function remove(inviteeId: string) {
     try {
-      const result = await api.post<{ sent: number; failed: number; skipped: number }>(
-        `/api/events/${eventId}/invites/send`,
-        { kind },
-      );
-      await load();
-      onEventChanged();
-      notify(
-        result.sent > 0
-          ? `${result.sent} sent${result.failed ? `, ${result.failed} failed` : ''}`
-          : 'Nobody was due one — everyone has either had it or replied.',
-        result.failed > 0 ? 'error' : 'success',
-      );
+      await api.delete(`/api/events/${eventId}/invites/${inviteeId}`);
+      setInvitees((current) => (current ? current.filter((i) => i.id !== inviteeId) : null));
+      notify('Removed from the list.', 'info');
     } catch (caught) {
-      notify(errorMessage(caught, 'Could not send.'), 'error');
-    } finally {
-      setBusy(null);
+      notify(errorMessage(caught, 'Could not remove that person.'), 'error');
     }
   }
 
-  /**
-   * Sends to exactly one person.
-   *
-   * No confirm dialog: the row names them, the button sits on that row, and one email to one
-   * named person is not the irreversible-feeling act that "email 40 people" is. The bulk
-   * button keeps its confirm for that reason.
-   *
-   * The server still decides whether they are eligible — this only narrows who is considered,
-   * so a summary can legitimately come back `sent: 0` if their state changed underneath.
-   */
   async function sendOne(invitee: InviteeDoc) {
+    if (!invitee.email) return;
     setSendingOne(invitee.id);
     try {
-      const result = await api.post<{ sent: number; failed: number; skipped: number }>(
-        `/api/events/${eventId}/invites/send`,
-        { kind: 'invitation', inviteeIds: [invitee.id] },
-      );
+      await api.post(`/api/events/${eventId}/invites/${invitee.id}/send`, {
+        purpose: invitee.status === 'failed' ? 'retry' : 'invitation',
+      });
+      notify(`Sent to ${invitee.name || invitee.email}.`, 'success');
       await load();
       onEventChanged();
-      const who = invitee.name || invitee.email;
-      notify(
-        result.sent > 0 ? `Sent to ${who}.` : `Nothing sent — ${who} has already had theirs.`,
-        result.failed > 0 ? 'error' : 'success',
-      );
     } catch (caught) {
-      notify(errorMessage(caught, 'Could not send that one.'), 'error');
+      notify(errorMessage(caught, 'Could not send.'), 'error');
     } finally {
       setSendingOne(null);
     }
   }
 
-  async function remove(inviteeId: string) {
+  async function send(purpose: 'invitation' | 'reminder') {
+    setBusy(purpose === 'invitation' ? 'send' : 'remind');
     try {
-      await api.delete(`/api/events/${eventId}/invites/${inviteeId}`);
+      const result = await api.post<{ sent: number; skipped: number; failed: number }>(
+        `/api/events/${eventId}/invites/send`,
+        { purpose },
+      );
       await load();
+      onEventChanged();
+      notify(`Emails sent to ${result.sent} guests!`, 'success');
     } catch (caught) {
-      notify(errorMessage(caught, 'Could not remove that.'), 'error');
+      notify(errorMessage(caught, 'Could not send the emails.'), 'error');
+    } finally {
+      setBusy(null);
     }
   }
 
   return (
-    <section className="space-y-5">
-      <GuestEntry busy={busy === 'add'} onAdd={add} />
-
-      {invitees === null ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-[var(--text-muted)]" aria-label="Loading" />
+    <section className="space-y-6" aria-labelledby="invite-panel-heading">
+      <div className="card space-y-4 border border-[var(--border-subtle)] p-5 shadow-sm sm:p-6">
+        <div>
+          <h2 id="invite-panel-heading" className="text-base font-bold text-[var(--text-primary)]">
+            Add Guests to Your Invitation
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            Add guests by name, phone number, or email. Each guest gets a personalized private link
+            so you know who has opened it.
+          </p>
         </div>
-      ) : invitees.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[var(--text-muted)]">
-          Nobody on the list yet. You can always share the code instead.
-        </p>
-      ) : (
+
+        <GuestEntry onAdd={add} busy={busy === 'add'} />
+      </div>
+
+      {invitees && invitees.length > 0 && (
         <>
-          {/*
-            Above the relay panel and the list, because "how is this going" is the question a
-            host opens this tab to answer. Derived from the list already in hand, so it costs
-            nothing to draw.
-          */}
           <InviteProgress invitees={invitees} tally={tally} />
 
           <AutoRemindToggle eventId={eventId} enabled={autoRemind} onChanged={onEventChanged} />
 
-          <div className="card space-y-3 p-5">
-            <div>
-              <h3 className="flex items-center gap-2 font-semibold">
-                <Share2 className="size-4" aria-hidden />
-                {relayCopy.panelTitle}
-              </h3>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">{relayCopy.panelBody}</p>
+          {/* Next Action Instruction Box */}
+          <div className="space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-sm">
+                  <Share2 className="size-3.5" />
+                </span>
+                <h3 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+                  Ready to Deliver ({all.length} Contacts Added)
+                </h3>
+              </div>
+              <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[0.7rem] font-bold text-emerald-900 dark:text-emerald-200">
+                {unsent.length} Unsent
+              </span>
             </div>
-            <Button variant="soft" size="sm" onClick={copyAll} disabled={!code}>
-              <Copy className="size-4" aria-hidden />
-              Copy every message
-            </Button>
+
+            <p className="text-xs leading-relaxed text-emerald-900/80 dark:text-emerald-200/80">
+              Tap the <strong>WhatsApp</strong> or <strong>SMS</strong> button on each contact below
+              to deliver their unique invitation link. They can RSVP in 5 seconds without
+              downloading any app.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={copyAll}
+                disabled={!code}
+                className="rounded-full border border-emerald-500/30 bg-white text-xs font-bold text-emerald-900 dark:bg-black/40 dark:text-emerald-200"
+              >
+                <Copy className="size-3.5" />
+                <span>Copy All Formatted Messages</span>
+              </Button>
+
+              {emailable.length > 0 && unsent.filter((i) => i.email).length > 0 && (
+                <Button
+                  size="sm"
+                  loading={busy === 'send'}
+                  onClick={() => send('invitation')}
+                  className="rounded-full text-xs font-bold"
+                >
+                  <Mail className="size-3.5" />
+                  <span>Email All Unsent ({unsent.filter((i) => i.email).length})</span>
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/*
-            Each control appears only when it has something to do, rather than sitting there
-            greyed out. "Email 0 unsent" was a send button offered before there was anybody to
-            send to — it read as the primary action of the panel while being permanently
-            disabled, which puts the tool's suggested order (send, then decide who) backwards
-            from the real one.
-          */}
-          {(unsent.length > 0 || sent.length > 0) && (
-            <div className="flex flex-wrap items-center gap-2">
-              {unsent.length > 0 && (
-                <Button size="sm" loading={busy === 'send'} onClick={() => send('invitation')}>
-                  <Mail className="size-4" aria-hidden />
-                  {/* "all" earns its place now that each row can be sent on its own. */}
-                  Email all {unsent.length}
-                </Button>
-              )}
-              {sent.length > 0 && (
-                <Button
-                  variant="soft"
-                  size="sm"
-                  loading={busy === 'remind'}
-                  onClick={() => send('reminder')}
+          {/* Guest Roster with Clear Action Buttons */}
+          <div className="space-y-3">
+            <h3 className="px-1 text-xs font-bold tracking-wider text-[var(--text-secondary)] uppercase">
+              Your Guest Roster ({all.length})
+            </h3>
+
+            <ul className="space-y-2.5">
+              {invitees.map((invitee) => (
+                <li
+                  key={invitee.id}
+                  className="flex flex-col justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 shadow-sm transition-all hover:border-[var(--border-strong)] sm:flex-row sm:items-center"
                 >
-                  <Send className="size-4" aria-hidden />
-                  Nudge non-repliers
-                </Button>
-              )}
-              <EmailPreview eventId={eventId} />
-            </div>
-          )}
+                  {/* Left: Contact Info & Status */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-bold text-[var(--text-primary)]">
+                        {invitee.name || invitee.email || invitee.phone}
+                      </p>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[0.65rem] font-bold tracking-wider uppercase',
+                          TONE_CLASS[toneOf(invitee.status)],
+                        )}
+                      >
+                        {deliveryCopy[invitee.status].label}
+                      </span>
+                    </div>
 
-          {unsent.length > 0 && (
-            <p className="-mt-2 text-xs text-[var(--text-muted)]">
-              Or send to one person at a time with the ✉ beside their name.
-            </p>
-          )}
+                    <p className="truncate text-xs text-[var(--text-muted)]">
+                      {[invitee.email, invitee.phone].filter(Boolean).join(' · ') ||
+                        relayCopy.noContact}
+                    </p>
 
-          <ul className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
-            {invitees.map((invitee) => (
-              <li key={invitee.id} className="flex items-center gap-2 px-4 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {invitee.name || invitee.email || invitee.phone}
-                  </p>
-                  <p className="truncate text-xs text-[var(--text-muted)]">
-                    {[invitee.email, invitee.phone].filter(Boolean).join(' · ') ||
-                      relayCopy.noContact}
-                  </p>
-                  {invitee.lastError && (
-                    <p className="truncate text-xs text-[var(--danger)]">{invitee.lastError}</p>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end gap-0.5">
-                  <span
-                    className={cn(
-                      'rounded-[var(--radius-pill)] px-2.5 py-1 text-xs',
-                      TONE_CLASS[toneOf(invitee.status)],
+                    {invitee.statusAt > 0 && invitee.status !== 'pending' && (
+                      <p className="text-[0.7rem] text-[var(--text-muted)]">
+                        {formatRelativeTime(invitee.statusAt)}
+                        {invitee.viewCount > 1 && ` · seen ${invitee.viewCount}×`}
+                      </p>
                     )}
-                  >
-                    {deliveryCopy[invitee.status].label}
-                  </span>
-                  {invitee.statusAt > 0 && invitee.status !== 'pending' && (
-                    <span className="text-[0.68rem] text-[var(--text-muted)] tabular-nums">
-                      {formatRelativeTime(invitee.statusAt)}
-                      {invitee.viewCount > 1 && ` · seen ${invitee.viewCount}×`}
-                    </span>
-                  )}
-                </div>
+                  </div>
 
-                {/*
-                  Send to this one person.
+                  {/* Right: Action Buttons Row */}
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5 self-start sm:self-auto">
+                    {/* WhatsApp Button */}
+                    <button
+                      type="button"
+                      onClick={() => sendWhatsApp(invitee)}
+                      disabled={!code}
+                      title="Send WhatsApp invitation message"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105 hover:bg-emerald-700 active:scale-95 disabled:opacity-40"
+                    >
+                      <MessageCircle className="size-3.5" />
+                      <span>WhatsApp</span>
+                    </button>
 
-                  "Email everyone unsent" was the only send there was, which is the wrong
-                  granularity for how a guest list is actually built: people arrive in ones and
-                  twos over a week, and a host who has just added their sister should not have
-                  to either wait or re-run the whole list. A failed address needs one retry,
-                  not a batch.
+                    {/* SMS Button */}
+                    <button
+                      type="button"
+                      onClick={() => sendSms(invitee)}
+                      disabled={!code}
+                      title="Send SMS text message"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-700 shadow-sm transition-all hover:scale-105 hover:bg-blue-500/20 active:scale-95 disabled:opacity-40 dark:text-blue-300"
+                    >
+                      <MessageSquare className="size-3.5" />
+                      <span>SMS</span>
+                    </button>
 
-                  Shown only where it would do something — an address on file, and a state the
-                  server would act on. The same `pending | failed` test the bulk button uses,
-                  so the two cannot disagree about who is owed one.
-                */}
-                {invitee.email && (invitee.status === 'pending' || invitee.status === 'failed') && (
-                  <button
-                    type="button"
-                    onClick={() => void sendOne(invitee)}
-                    disabled={sendingOne !== null}
-                    aria-label={`Email the invitation to ${invitee.name || invitee.email}`}
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] disabled:opacity-40"
-                  >
-                    {sendingOne === invitee.id ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <Mail className="size-4" aria-hidden />
-                    )}
-                  </button>
-                )}
+                    {/* Email Button (if email is attached and pending) */}
+                    {invitee.email &&
+                      (invitee.status === 'pending' || invitee.status === 'failed') && (
+                        <button
+                          type="button"
+                          onClick={() => void sendOne(invitee)}
+                          disabled={sendingOne !== null}
+                          title={`Email invitation to ${invitee.email}`}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition-all hover:bg-[var(--surface-raised)] disabled:opacity-40"
+                        >
+                          {sendingOne === invitee.id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Mail className="size-3.5" />
+                          )}
+                          <span>Email</span>
+                        </button>
+                      )}
 
-                {invitee.phone && (
-                  <button
-                    type="button"
-                    onClick={() => sendSms(invitee)}
-                    disabled={!code}
-                    aria-label={`Send SMS to ${invitee.name || invitee.phone}`}
-                    title={`Send text message to ${invitee.phone}`}
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-40"
-                  >
-                    <MessageSquare className="size-4" aria-hidden />
-                  </button>
-                )}
+                    {/* Copy Link Button */}
+                    <button
+                      type="button"
+                      onClick={() => copyLink(invitee)}
+                      disabled={!code}
+                      title="Copy guest personalized link"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                    >
+                      {copied === invitee.id ? (
+                        <Check className="size-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
+                      <span>Copy</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => copyLink(invitee)}
-                  disabled={!code}
-                  aria-label={`Copy the invitation for ${invitee.name || invitee.email || invitee.phone}`}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] disabled:opacity-40"
-                >
-                  {copied === invitee.id ? (
-                    <Check className="size-4 text-[var(--accent)]" aria-hidden />
-                  ) : (
-                    <Copy className="size-4" aria-hidden />
-                  )}
-                </button>
+                    {/* Remove Contact */}
+                    <button
+                      type="button"
+                      onClick={() => remove(invitee.id)}
+                      title={`Remove ${invitee.name || 'guest'}`}
+                      className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => shareLink(invitee)}
-                  disabled={!code}
-                  aria-label={`Send the invitation to ${invitee.name || invitee.email || invitee.phone}`}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] disabled:opacity-40 sm:hidden"
-                >
-                  <Share2 className="size-4" aria-hidden />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => remove(invitee.id)}
-                  aria-label={`Remove ${invitee.name || invitee.email || invitee.phone}`}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-            &ldquo;Seen&rdquo; means they opened their invitation — not that an inbox previewed it.
-            Every email carries a one-click unsubscribe, and someone who opts out stays opted out
-            even if you add them again. Up to {emailConfig.maxInviteesPerEvent} guests per event.
+          <p className="px-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            &ldquo;Seen&rdquo; means the guest opened their personal invitation in their browser.
+            Every invite has tracking so you always know who is planning to come.
           </p>
         </>
       )}
@@ -418,16 +400,6 @@ export function InvitePanel({
   );
 }
 
-/**
- * Whether we chase the people who have not replied.
- *
- * Sits on the guest list rather than in the host drawer, beside the manual nudge it replaces:
- * this is the same job, done for you, and a host deciding whether to chase somebody is
- * already looking at who has not answered.
- *
- * Optimistic, and deliberately so — a checkbox that waits on a round trip before moving reads
- * as broken. The failure path puts it back and says why.
- */
 function AutoRemindToggle({
   eventId,
   enabled,

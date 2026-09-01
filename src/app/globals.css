@@ -310,3 +310,12 @@
     animation: mq-surface-fall 11s linear infinite;
   }
 }
+
+@keyframes slideProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}

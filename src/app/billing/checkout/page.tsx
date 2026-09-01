@@ -2,7 +2,7 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CreditCard, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, CreditCard, TriangleAlert } from 'lucide-react';
 import { brand, formatPrice, planById } from '@/config';
 import { Button } from '@/components/ui/button';
 import { api, errorMessage } from '@/lib/client/api-client';
@@ -95,8 +95,9 @@ function MockCheckoutInner() {
 
         <Link
           href={cancelUrl}
-          className="mt-4 inline-block text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-xs font-bold text-[var(--text-secondary)] transition-all hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]"
         >
+          <ArrowLeft className="size-3.5" />
           Cancel and go back
         </Link>
       </div>
