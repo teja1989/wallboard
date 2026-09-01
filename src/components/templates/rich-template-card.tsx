@@ -170,7 +170,7 @@ export function RichTemplateCard({
               className="inline-flex h-9 w-full max-w-[150px] cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/90 text-xs font-semibold text-[var(--text-primary)] shadow-md transition-transform hover:scale-105 active:scale-95 dark:bg-zinc-900/90"
             >
               <Eye className="size-3.5" />
-              <span>Full Preview</span>
+              <span>Quick Preview</span>
             </button>
           </div>
         </div>

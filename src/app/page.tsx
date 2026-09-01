@@ -66,7 +66,7 @@ export default function LandingPage() {
               href="/create"
               className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-bold text-[var(--accent-contrast)] shadow-[var(--shadow-lift)] transition-all duration-200 hover:scale-105 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
             >
-              Plan Your Party Now
+              Make an Invitation
               <ArrowRight className="size-4" aria-hidden />
             </Link>
             <Link

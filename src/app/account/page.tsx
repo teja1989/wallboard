@@ -139,7 +139,7 @@ export default function AccountPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="truncate text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl">
-                  {summary?.profile.displayName || firstName || 'Event Host'}
+                  Hello, {summary?.profile.displayName || firstName || 'Host'}
                 </h1>
                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700 dark:text-amber-300">
                   <Crown className="size-3" />
@@ -160,7 +160,7 @@ export default function AccountPage() {
               {summary?.stats.events ?? 0}
             </span>
             <p className="text-[0.68rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
-              Invitations
+              {summary?.stats.events === 1 ? '1 invitation' : 'Invitations'}
             </p>
           </div>
 
