@@ -182,12 +182,12 @@ export function SiteFooter() {
                   href="/privacy"
                   className="transition-colors hover:text-[var(--text-primary)]"
                 >
-                  Privacy Policy
+                  Privacy
                 </Link>
               </li>
               <li>
                 <Link href="/terms" className="transition-colors hover:text-[var(--text-primary)]">
-                  Terms of Service
+                  Terms
                 </Link>
               </li>
               <li>
