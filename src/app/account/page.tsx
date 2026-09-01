@@ -10,17 +10,14 @@ import {
   Copy,
   CreditCard,
   Crown,
-  Heart,
   LogOut,
   Mail,
   Plus,
   Shield,
   Sparkles,
-  Tv,
   User,
-  Users,
 } from 'lucide-react';
-import { brand, formatPrice, planById } from '@/config';
+import { formatPrice, planById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
 import { Avatar } from '@/components/ui/avatar';

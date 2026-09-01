@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Lock, ShieldCheck, Smartphone, Sparkles } from 'lucide-react';
-import { adFreePromiseHolds, brand } from '@/config';
+import { brand } from '@/config';
 import { CreationStory } from '@/components/marketing/creation-story';
 import { HeroCarousel } from '@/components/marketing/hero-carousel';
 import { InteractiveFeatureDemo } from '@/components/marketing/interactive-feature-demo';

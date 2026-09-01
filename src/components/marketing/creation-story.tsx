@@ -3,22 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  ArrowRight,
-  Cake,
-  CheckCircle2,
-  Clock,
-  Eye,
-  Gift,
-  MapPin,
-  MessageSquare,
-  QrCode,
-  Send,
-  Share2,
-  Sparkles,
-  Tv,
-  Users,
-} from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, MapPin, Share2, Sparkles, Tv } from 'lucide-react';
 import { TemplateSurfaceField } from '@/components/event/template-surface';
 import { templateById, type TemplateId } from '@/config';
 import { cn } from '@/lib/utils';

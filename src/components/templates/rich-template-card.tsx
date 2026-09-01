@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Eye, Heart, Sparkles, Users } from 'lucide-react';
+import { ArrowRight, Eye, Sparkles } from 'lucide-react';
 import { TemplateSurfaceField } from '@/components/event/template-surface';
 import { faceOf, sampleForTemplate, type Template } from '@/config';
 import { cn } from '@/lib/utils';

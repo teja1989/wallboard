@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Check, Copy, Crown, Plus, Shield, Trash2, UserPlus, Users } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, Shield, Trash2, UserPlus } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -29,7 +29,7 @@ export function CohostCard({ eventId, joinCode, hostedBy, onCoHostChanged }: Coh
   const [copied, setCopied] = useState(false);
   const [removingUid, setRemovingUid] = useState<string | null>(null);
 
-  const loadCohosts = async () => {
+  const loadCohosts = useCallback(async () => {
     try {
       const [guestsRes, invitesRes] = await Promise.all([
         api
@@ -46,11 +46,13 @@ export function CohostCard({ eventId, joinCode, hostedBy, onCoHostChanged }: Coh
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
-    void loadCohosts();
-  }, [eventId]);
+    void (async () => {
+      await loadCohosts();
+    })();
+  }, [loadCohosts]);
 
   const copyCohostLink = async () => {
     const activeCode = code || joinCode;

@@ -2,17 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowUpRight,
-  CalendarDays,
-  Download,
-  Eye,
-  MessageSquare,
-  Sparkles,
-  Trash2,
-  Tv,
-  Users,
-} from 'lucide-react';
+import { Download, Eye, MessageSquare, Trash2, Tv, Users } from 'lucide-react';
 import { occasionById } from '@/config';
 import { DeleteEventForm } from '@/components/event/delete-event-form';
 import { entitlementsFor } from '@/lib/billing/entitlements';

@@ -4,21 +4,16 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Check,
   Copy,
-  ExternalLink,
   Loader2,
   Mail,
   MessageCircle,
   MessageSquare,
-  Send,
   Share2,
-  Sparkles,
   Trash2,
-  UserCheck,
 } from 'lucide-react';
-import { deliveryCopy, emailConfig, reminderCopy, relayCopy } from '@/config';
+import { deliveryCopy, reminderCopy, relayCopy } from '@/config';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
-import { EmailPreview } from '@/components/event/email-preview';
 import { InviteProgress } from '@/components/event/invite-progress';
 import { GuestEntry } from '@/components/event/guest-entry';
 import { api, errorMessage } from '@/lib/client/api-client';
@@ -92,7 +87,6 @@ export function InvitePanel({
   const all = invitees ?? [];
   const emailable = all.filter((i) => i.email);
   const unsent = all.filter((i) => i.status === 'pending' || i.status === 'failed');
-  const sent = all.filter((i) => i.status !== 'pending' && i.status !== 'unsubscribed');
 
   function linkFor(invitee: InviteeDoc): string {
     if (!code) return '';

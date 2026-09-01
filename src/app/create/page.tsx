@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ArrowLeft, Check, Copy, Lock, PartyPopper, Share2, Users } from 'lucide-react';
 import {
   POST_KINDS,
-  brand,
   contentLimits,
   defaultExpiryPresetId,
   defaultOccasionId,
