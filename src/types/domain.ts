@@ -144,6 +144,14 @@ export interface RsvpTally {
   attending: number;
 }
 
+export interface AgendaItem {
+  id: string;
+  time: string;
+  title: string;
+  description?: string;
+  emoji?: string;
+}
+
 export interface EventDoc {
   id: string;
   title: string;
@@ -171,6 +179,8 @@ export interface EventDoc {
   rsvp: RsvpSettings;
   rsvpTally: RsvpTally;
   settings: EventSettings;
+  /** Optional party timeline schedule */
+  agenda?: AgendaItem[];
   /** The plan this event runs on. Resolved through effectivePlanId() before use. */
   plan: PlanId;
   createdAt: number;
@@ -197,6 +207,7 @@ export type EventPreview = Pick<
 > & {
   hostedBy: string;
   memberCount: number;
+  agenda?: AgendaItem[];
 };
 
 export interface MemberDoc {

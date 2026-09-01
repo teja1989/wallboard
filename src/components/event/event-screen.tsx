@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence } from 'framer-motion';
-import { Clock, Loader2, Settings2, Sparkles, Tv, Users } from 'lucide-react';
+import { Clock, Loader2, Settings2, Share2, Sparkles, Tv, Users } from 'lucide-react';
 import { brand, featureFlags, occasionById, templateById } from '@/config';
 import { useAuth } from '@/components/auth/auth-provider';
 import { SignInPrompt } from '@/components/auth/sign-in-prompt';
@@ -13,6 +13,8 @@ import { GuestList } from '@/components/event/guest-list';
 import { HostPanel } from '@/components/event/host-panel';
 import { InvitePanel } from '@/components/event/invite-panel';
 import { Invitation } from '@/components/event/invitation';
+import { PartyAgenda } from '@/components/event/party-agenda';
+import { ShareInvitationModal } from '@/components/event/share-invitation-modal';
 import { PlanPanel } from '@/components/event/plan-panel';
 import { RsvpCard } from '@/components/event/rsvp-card';
 import { Composer } from '@/components/wall/composer';
@@ -78,6 +80,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [now, setNow] = useState(() => Date.now());
   const [guestName, setGuestName] = useState('');
   const [joinBusy, setJoinBusy] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const loadEvent = useCallback(async () => {
     try {
@@ -170,6 +173,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <Users className="size-3.5" aria-hidden />
               {event.rsvpTally.attending}
             </span>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              aria-label="Share invitation"
+              title="Share on WhatsApp, SMS, or print table signs"
+              className="glass inline-flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--accent)] transition-transform hover:scale-105"
+            >
+              <Share2 className="size-4" aria-hidden />
+            </button>
             {permissions.canManage && (
               <button
                 type="button"
@@ -208,6 +220,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
         {active === 'invite' && (
           <div className="space-y-5">
             <Invitation event={event} />
+            {event.agenda && event.agenda.length > 0 && <PartyAgenda agenda={event.agenda} />}
             <RsvpCard
               event={event}
               status={rsvp.status}
@@ -419,6 +432,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
         onClose={() => setHostPanelOpen(false)}
         onChanged={loadEvent}
       />
+      {showShareModal && (
+        <ShareInvitationModal event={event} onClose={() => setShowShareModal(false)} />
+      )}
     </>
   );
 }

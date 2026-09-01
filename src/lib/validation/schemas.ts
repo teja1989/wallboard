@@ -165,6 +165,14 @@ export const eventIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,40}$/);
 export const postIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,40}$/);
 export const uidSchema = z.string().min(1).max(128);
 
+export const agendaItemSchema = z.object({
+  id: z.string(),
+  time: cleanText(30),
+  title: cleanText(60),
+  description: cleanText(200).optional(),
+  emoji: cleanText(10).optional(),
+});
+
 export const createEventSchema = z
   .object({
     title: cleanText(contentLimits.eventTitleMaxLength).pipe(z.string().min(1, 'Give it a name.')),
@@ -178,6 +186,7 @@ export const createEventSchema = z
     timeZone: timeZoneSchema,
     dressCode: cleanText(contentLimits.dressCodeMaxLength).default(''),
     rsvp: rsvpSettingsSchema.prefault({}),
+    agenda: z.array(agendaItemSchema).max(20).optional(),
     expiryPresetId: z.enum(presetIds),
     whoCanPost: z.enum(['members', 'anyone']).default('members'),
     allowedKinds: z
@@ -203,6 +212,7 @@ export const updateEventSchema = z
     timeZone: timeZone.optional(),
     dressCode: cleanText(contentLimits.dressCodeMaxLength).optional(),
     rsvp: rsvpPatchSchema.optional(),
+    agenda: z.array(agendaItemSchema).max(20).optional(),
     whoCanPost: z.enum(['members', 'anyone']).optional(),
     allowedKinds: z.array(z.enum(POST_KINDS)).min(1).optional(),
   })

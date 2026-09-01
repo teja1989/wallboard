@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import { adFreePromiseHolds, brand, templates } from '@/config';
 import { CreationStory } from '@/components/marketing/creation-story';
+import { FeatureEcosystem } from '@/components/marketing/feature-ecosystem';
+import { InteractiveFeatureDemo } from '@/components/marketing/interactive-feature-demo';
 import { InvitationShowcase } from '@/components/marketing/invitation-showcase';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 
@@ -21,22 +23,32 @@ export const metadata: Metadata = {
  * The landing page.
  *
  * Designed with top-tier consumer tech standards: pristine hierarchy,
- * full-width occasion discovery, live interactive product rendering, and clear trust guarantees.
+ * interactive feature sandbox, 6-pillar ecosystem grid, and clear trust guarantees.
  */
 export default function LandingPage() {
   return (
     <>
       <SiteHeader />
 
-      <main>
+      <main className="relative overflow-hidden">
+        {/* Ambient Gradient Glow Backdrop */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[600px] w-full max-w-7xl -translate-x-1/2 opacity-30 blur-3xl dark:opacity-20"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, var(--accent) 0%, #ec4899 35%, #8b5cf6 70%, transparent 100%)',
+          }}
+        />
+
         {/* --- Hero Section -------------------------------------------- */}
-        <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-16 text-center sm:pt-20 sm:pb-20">
-          <p className="mb-5 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--accent-soft)] px-4 py-1.5 text-xs font-semibold tracking-wide text-[var(--accent)] uppercase sm:text-sm">
+        <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-14 text-center sm:pt-20 sm:pb-16">
+          <p className="mb-5 inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--accent-soft)] bg-[var(--surface-raised)]/80 px-4 py-1.5 text-xs font-bold tracking-wide text-[var(--accent)] uppercase shadow-sm backdrop-blur-md sm:text-sm">
             <Sparkles className="size-3.5 text-[var(--accent)]" aria-hidden />
-            Modern Invitations, RSVPs & Live Wall — One Link
+            Modern Invitations, RSVPs & Live TV Wall — One Link
           </p>
 
-          <h1 className="mx-auto max-w-4xl text-4xl leading-[1.08] font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+          <h1 className="mx-auto max-w-4xl text-4xl leading-[1.08] font-black tracking-tight text-balance sm:text-5xl lg:text-6xl">
             {brand.tagline}
           </h1>
 
@@ -47,16 +59,44 @@ export default function LandingPage() {
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3.5">
             <Link
               href="/create"
-              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-medium text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-bold text-[var(--accent-contrast)] shadow-[var(--shadow-lift)] transition-all duration-200 hover:scale-105 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
             >
               Make an invitation
               <ArrowRight className="size-4" aria-hidden />
             </Link>
             <Link
               href="/join"
-              className="inline-flex h-13 items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-sunken)] px-8 text-base font-medium transition-colors hover:bg-[var(--accent-soft)]"
+              className="inline-flex h-13 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-8 text-base font-medium transition-colors hover:bg-[var(--accent-soft)]"
             >
               I have a code
+            </Link>
+          </div>
+
+          {/* Quick Occasion Shortcuts */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/create?occasion=birthday"
+              className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-700 transition-all hover:scale-105 hover:bg-amber-500/20 dark:text-amber-300"
+            >
+              🎂 Kid & Adult Birthdays
+            </Link>
+            <Link
+              href="/create?occasion=graduation"
+              className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3.5 py-1 text-xs font-bold text-blue-700 transition-all hover:scale-105 hover:bg-blue-500/20 dark:text-blue-300"
+            >
+              🎓 Graduations
+            </Link>
+            <Link
+              href="/create?occasion=wedding"
+              className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1 text-xs font-bold text-rose-700 transition-all hover:scale-105 hover:bg-rose-500/20 dark:text-rose-300"
+            >
+              💍 Weddings
+            </Link>
+            <Link
+              href="/create?occasion=baby"
+              className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1 text-xs font-bold text-purple-700 transition-all hover:scale-105 hover:bg-purple-500/20 dark:text-purple-300"
+            >
+              🍼 Baby Showers
             </Link>
           </div>
 
@@ -67,8 +107,21 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* --- Interactive Feature Playground Simulator ----------------- */}
+        <section className="mx-auto w-full max-w-5xl px-6 py-6">
+          <div className="mb-6 text-center">
+            <p className="text-xs font-bold tracking-wider text-[var(--accent)] uppercase">
+              Interactive Live Preview
+            </p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+              Test-drive what your guests experience on event night.
+            </h2>
+          </div>
+          <InteractiveFeatureDemo />
+        </section>
+
         {/* --- Occasion Showcase Section ------------------------------- */}
-        <section className="mx-auto w-full max-w-6xl px-6 py-12">
+        <section className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="mb-8 text-center">
             <p className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase sm:text-sm">
               Tailored For Every Event
@@ -84,6 +137,9 @@ export default function LandingPage() {
 
           <InvitationShowcase />
         </section>
+
+        {/* --- Complete 6-Pillar Ecosystem Grid ------------------------- */}
+        <FeatureEcosystem />
 
         {/* --- 3-Step Ease Story --------------------------------------- */}
         <CreationStory />
@@ -203,7 +259,7 @@ export default function LandingPage() {
 
         {/* --- Final Conversion Banner --------------------------------- */}
         <section className="mx-auto w-full max-w-6xl px-6 pt-6 pb-20">
-          <div className="card flex flex-col items-center gap-5 p-10 text-center sm:p-14">
+          <div className="card flex flex-col items-center gap-5 border border-[var(--border-subtle)] p-10 text-center shadow-2xl sm:p-14">
             <h2 className="max-w-xl text-3xl font-bold tracking-tight text-balance sm:text-4xl">
               Start free. Decide later.
             </h2>
@@ -212,7 +268,7 @@ export default function LandingPage() {
             </p>
             <Link
               href="/create"
-              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-medium text-[var(--accent-contrast)] shadow-[var(--shadow-soft)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+              className="inline-flex h-13 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--accent)] px-8 text-base font-bold text-[var(--accent-contrast)] shadow-[var(--shadow-lift)] transition-all duration-200 hover:scale-105 hover:bg-[var(--accent-hover)] active:scale-[0.97]"
             >
               Make an invitation
               <ArrowRight className="size-4" aria-hidden />

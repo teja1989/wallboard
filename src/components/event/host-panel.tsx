@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Copy, Eye, RefreshCw, Shield, Timer, X } from 'lucide-react';
+import { Check, Copy, Download, Eye, RefreshCw, Shield, Timer, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { DangerSection } from '@/components/event/danger-section';
 import { UpgradeSection } from '@/components/event/upgrade-section';
@@ -372,6 +372,25 @@ export function HostPanel({
             </section>
 
             <UpgradeSection eventId={eventId} plan={plan} />
+
+            <section className="mb-6">
+              <h3 className="mb-2 text-sm font-medium text-[var(--text-secondary)]">
+                Memory Keepsake Album
+              </h3>
+              <p className="mb-3 text-xs text-[var(--text-muted)]">
+                Download a complete ZIP bundle with all full-resolution photos, audio voice notes,
+                guest list, and an offline interactive photo viewer.
+              </p>
+              <Button
+                variant="soft"
+                size="sm"
+                className="w-full"
+                onClick={() => window.open(`/api/events/${eventId}/archive`, '_blank')}
+              >
+                <Download className="size-4" aria-hidden />
+                Download Keepsake Archive (ZIP)
+              </Button>
+            </section>
 
             <section className="mb-6">
               <h3 className="mb-2 text-sm font-medium text-[var(--text-secondary)]">

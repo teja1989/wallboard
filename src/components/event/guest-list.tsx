@@ -122,13 +122,34 @@ export function GuestList({
   const replied = guests.filter((guest) => guest.status !== 'pending');
   const awaiting = guests.filter((guest) => guest.status === 'pending');
 
+  const totalAdults = replied
+    .filter((g) => g.status === 'yes')
+    .reduce((sum, g) => sum + (g.adults || 0), 0);
+  const totalKids = replied
+    .filter((g) => g.status === 'yes')
+    .reduce((sum, g) => sum + (g.children || 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="card p-5">
-        <p className="text-3xl font-semibold tracking-tight">{tally.attending}</p>
-        <p className="text-sm text-[var(--text-secondary)]">
-          {tally.attending === 1 ? 'person coming' : 'people coming'}
-        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <p className="text-3xl font-semibold tracking-tight">{tally.attending}</p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {tally.attending === 1 ? 'person coming' : 'people coming'}
+            </p>
+          </div>
+          {tally.attending > 0 && (
+            <div className="flex gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent)]">
+                🧑 {totalAdults} Adults
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                🧒 {totalKids} Kids
+              </span>
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2 text-sm">
           <Tally label={rsvpLabels.yes} value={tally.yes} />
