@@ -29,6 +29,7 @@ export interface EventDraft {
   locationName: string;
   locationAddress: string;
   dressCode: string;
+  question: string;
   templateId: string;
   templateTouched: boolean;
   expiryPresetId: string;
@@ -63,6 +64,7 @@ function parse(raw: string): EventDraft | null {
     locationName: isString(d.locationName) ? d.locationName : '',
     locationAddress: isString(d.locationAddress) ? d.locationAddress : '',
     dressCode: isString(d.dressCode) ? d.dressCode : '',
+    question: isString(d.question) ? d.question : '',
     templateId: d.templateId,
     templateTouched: d.templateTouched === true,
     expiryPresetId: isString(d.expiryPresetId) ? d.expiryPresetId : '',

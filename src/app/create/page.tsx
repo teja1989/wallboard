@@ -10,6 +10,7 @@ import {
   contentLimits,
   defaultExpiryPresetId,
   defaultOccasionId,
+  DRESS_CODE_PRESETS,
   templates,
   expiryPresets,
   occasionById,
@@ -106,6 +107,7 @@ export default function CreateEventPage() {
    */
   const [venueZone, setVenueZone] = useState<string | null>(null);
   const [dressCode, setDressCode] = useState('');
+  const [question, setQuestion] = useState('');
   const [templateId, setTemplateId] = useState<string>(
     occasionById(defaultOccasionId).defaultTemplateId,
   );
@@ -251,6 +253,7 @@ export default function CreateEventPage() {
       locationName,
       locationAddress,
       dressCode,
+      question,
       templateId,
       templateTouched,
       expiryPresetId,
@@ -266,6 +269,7 @@ export default function CreateEventPage() {
       locationName,
       locationAddress,
       dressCode,
+      question,
       templateId,
       templateTouched,
       expiryPresetId,
@@ -313,7 +317,7 @@ export default function CreateEventPage() {
               allowPlusOnes: fields.maxPartySize > 1,
               maxPartySize: fields.maxPartySize,
               askNote: false,
-              question: null,
+              question: fields.question.trim() ? fields.question.trim() : null,
             },
             expiryPresetId: fields.expiryPresetId,
             allowedKinds: fields.allowedKinds,
@@ -385,6 +389,7 @@ export default function CreateEventPage() {
       setLocationName(draft.locationName);
       setLocationAddress(draft.locationAddress);
       setDressCode(draft.dressCode);
+      if (draft.question) setQuestion(draft.question);
       setTemplateId(draft.templateId);
       setTemplateTouched(draft.templateTouched);
       setExpiryPresetId(draft.expiryPresetId);
@@ -406,6 +411,7 @@ export default function CreateEventPage() {
           locationName: draft.locationName,
           locationAddress: draft.locationAddress,
           dressCode: draft.dressCode,
+          question: draft.question || '',
           templateId: draft.templateId,
           templateTouched: draft.templateTouched,
           expiryPresetId: draft.expiryPresetId,
@@ -679,16 +685,57 @@ export default function CreateEventPage() {
               />
             </div>
 
-            {occasion.asksDressCode && (
+            <fieldset className="space-y-3">
+              <div>
+                <legend className="block text-sm font-medium text-[var(--text-secondary)]">
+                  Dress code <span className="text-xs text-[var(--text-muted)]">(Optional)</span>
+                </legend>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Help guests dress to match the atmosphere of your celebration.
+                </p>
+              </div>
+
+              {/* Quick Visual Preset Chips */}
+              <div className="flex flex-wrap gap-2">
+                {DRESS_CODE_PRESETS.map((preset) => {
+                  const isSelected = dressCode === preset.label;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setDressCode(isSelected ? '' : preset.label)}
+                      className={cn(
+                        'inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-xs transition-all',
+                        isSelected
+                          ? 'scale-105 bg-[var(--accent)] text-[var(--accent-contrast)]'
+                          : 'border border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--surface-page)]',
+                      )}
+                    >
+                      <span>{preset.emoji}</span>
+                      <span>{preset.label}</span>
+                      <div className="ml-1 flex items-center gap-0.5">
+                        {preset.palette.map((c) => (
+                          <span
+                            key={c}
+                            className="size-2 rounded-full border border-black/10 shadow-xs"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
               <TextField
-                label="Dress code"
-                hint="Optional."
+                label="Custom dress code or styling instructions"
+                hint="Select a preset above or type your own instructions."
                 value={dressCode}
                 onChange={(e) => setDressCode(e.target.value)}
-                placeholder="Whatever makes you happy"
+                placeholder="e.g. Cocktail attire, black tie optional, or summer linen"
                 maxLength={contentLimits.dressCodeMaxLength}
               />
-            )}
+            </fieldset>
 
             <fieldset>
               <legend className="mb-3 block text-sm font-medium text-[var(--text-secondary)]">
@@ -741,6 +788,69 @@ export default function CreateEventPage() {
                 Guests say how many adults and children are coming, so you get a headcount you can
                 actually cater for.
               </p>
+            </fieldset>
+
+            {/* Custom Host RSVP Question / Poll Builder */}
+            <fieldset className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/60 p-4 sm:p-5">
+              <div>
+                <legend className="text-sm font-bold text-[var(--text-primary)]">
+                  Ask Guests a Custom Question / Poll{' '}
+                  <span className="text-xs font-normal text-[var(--text-muted)]">(Optional)</span>
+                </legend>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Collect song requests, dietary needs, or shuttle ride requests during RSVP.
+                </p>
+              </div>
+
+              {/* Preset Question Suggestions */}
+              <div className="space-y-1.5">
+                <p className="text-[0.68rem] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                  Popular Prompts
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    {
+                      label: '🎵 Song Requests',
+                      text: 'What song will get you on the dance floor?',
+                    },
+                    {
+                      label: '🍕 Dietary / Allergies',
+                      text: 'Any dietary requirements or food allergies?',
+                    },
+                    {
+                      label: '🚗 Ride / Shuttle',
+                      text: 'Do you need a spot on the group shuttle bus?',
+                    },
+                    {
+                      label: '🥂 Drink Preference',
+                      text: 'What is your signature drink preference?',
+                    },
+                  ].map((prompt) => (
+                    <button
+                      key={prompt.label}
+                      type="button"
+                      onClick={() => setQuestion(question === prompt.text ? '' : prompt.text)}
+                      className={cn(
+                        'cursor-pointer rounded-full px-3 py-1 text-xs font-semibold shadow-xs transition-all',
+                        question === prompt.text
+                          ? 'scale-105 bg-[var(--accent)] text-[var(--accent-contrast)]'
+                          : 'border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
+                      )}
+                    >
+                      {prompt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <TextField
+                label="Question text on RSVP"
+                hint="Leave blank if you do not want to ask an extra question."
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="e.g. Song request for the DJ, or dietary preferences..."
+                maxLength={contentLimits.rsvpQuestionMaxLength}
+              />
             </fieldset>
 
             <fieldset>

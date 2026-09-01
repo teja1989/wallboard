@@ -282,7 +282,10 @@ function GuestGroup({
                 </p>
               )}
               {canSeeNotes && guest.answer && (
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">{guest.answer}</p>
+                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)]">
+                  <span>💬</span>
+                  <span>{guest.answer}</span>
+                </div>
               )}
             </div>
 

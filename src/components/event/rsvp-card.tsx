@@ -223,23 +223,40 @@ export function RsvpCard({
                 </div>
               )}
 
-              {event.rsvp.question && (
-                <div>
-                  <label
-                    htmlFor="rsvp-answer"
-                    className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]"
-                  >
-                    {event.rsvp.question}
-                  </label>
-                  <input
-                    id="rsvp-answer"
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    maxLength={contentLimits.rsvpAnswerMaxLength}
-                    className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-3 transition-colors focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] focus:outline-none"
-                  />
-                </div>
-              )}
+              {event.rsvp.question &&
+                (() => {
+                  const isSong = /song|music|dj|track/i.test(event.rsvp.question);
+                  const isDietary = /diet|food|allerg|eat|vegan|vegetarian/i.test(
+                    event.rsvp.question,
+                  );
+                  const isRide = /shuttle|ride|carpool|transport/i.test(event.rsvp.question);
+
+                  return (
+                    <div className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/60 p-3.5">
+                      <label
+                        htmlFor="rsvp-answer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]"
+                      >
+                        <span>{isSong ? '🎵' : isDietary ? '🍕' : isRide ? '🚗' : '✨'}</span>
+                        <span>{event.rsvp.question}</span>
+                      </label>
+                      <input
+                        id="rsvp-answer"
+                        value={answer}
+                        onChange={(e) => setAnswer(e.target.value)}
+                        maxLength={contentLimits.rsvpAnswerMaxLength}
+                        placeholder={
+                          isSong
+                            ? 'e.g. September - Earth Wind & Fire'
+                            : isDietary
+                              ? 'e.g. Vegetarian, nut allergy'
+                              : 'Type your answer...'
+                        }
+                        className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3.5 py-2.5 text-xs transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] focus:outline-none sm:text-sm"
+                      />
+                    </div>
+                  );
+                })()}
 
               {event.rsvp.askNote && (
                 <div>

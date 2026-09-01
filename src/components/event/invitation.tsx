@@ -4,6 +4,7 @@ import {
   appConfig,
   brand,
   directionsUrl,
+  findDressCodePreset,
   occasionById,
   placesConfig,
   templateById,
@@ -112,11 +113,37 @@ export function Invitation({
         </Detail>
       )}
 
-      {event.dressCode && (
-        <Detail icon={<Shirt className="size-4" aria-hidden />} label="Dress code">
-          {event.dressCode}
-        </Detail>
-      )}
+      {event.dressCode &&
+        (() => {
+          const preset = findDressCodePreset(event.dressCode);
+          return (
+            <Detail icon={<Shirt className="size-4" aria-hidden />} label="Dress code">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  {preset && <span>{preset.emoji}</span>}
+                  <span className="font-semibold">{event.dressCode}</span>
+                  {preset && (
+                    <div className="ml-1 flex items-center gap-1">
+                      {preset.palette.map((color) => (
+                        <span
+                          key={color}
+                          className="size-2.5 rounded-full border border-black/15 shadow-xs"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {preset && (
+                  <p className="text-xs text-[var(--text-secondary)] opacity-85">
+                    {preset.shortHint}
+                  </p>
+                )}
+              </div>
+            </Detail>
+          );
+        })()}
 
       {event.startsAt === null && (
         <Detail icon={<Clock className="size-4" aria-hidden />} label="When">
