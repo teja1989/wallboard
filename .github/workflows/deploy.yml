@@ -4,7 +4,7 @@ name: Deploy
 # CI runs everywhere, deploys go to one place.
 on:
   push:
-    branches: [main, claude/group-event-wallboard-gcp-aqi0q3]
+    branches: [main, claude/group-event-wallboard-gcp-aqi0q3, group-event-wallboard-gcp-aqi0q3]
     paths-ignore: ['docs/**', '**/*.md', '.claude/**']
   workflow_dispatch:
     inputs:
