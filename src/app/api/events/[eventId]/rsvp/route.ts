@@ -1,0 +1,103 @@
+import { can } from '@/lib/authz/policy';
+import { eventAuthzContext } from '@/lib/authz/event-context';
+import { eventRoleFor } from '@/lib/authz/session';
+import { recordAudit } from '@/lib/audit';
+import { recordFunnelAll } from '@/lib/services/funnel';
+import { requireEvent } from '@/lib/services/events';
+import { sendRsvpConfirmation } from '@/lib/services/invites';
+import { markReplied } from '@/lib/services/delivery';
+import { submitRsvp } from '@/lib/services/rsvp';
+import { ApiError, limitByUser, ok, parseBody, requireActor, route } from '@/lib/server/api';
+import { requestContext } from '@/lib/server/request';
+import { eventIdSchema, rsvpSchema } from '@/lib/validation/schemas';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+type Params = { params: Promise<{ eventId: string }> };
+
+/**
+ * Answers the invitation.
+ *
+ * Anonymous guests are allowed here on purpose: someone handed the code was invited, and
+ * requiring an account before they can say "yes, I'll be there" loses replies for no
+ * security benefit. Posting to the wall still needs an account — that is where attribution
+ * starts to matter.
+ *
+ * Ended and expired events still accept replies, because an RSVP deadline is the host's to
+ * set and has nothing to do with when the wall stops taking photos.
+ */
+export const POST = route(async (request, { params }: Params) => {
+  const { eventId } = await params;
+  const id = eventIdSchema.parse(eventId);
+
+  const actor = await requireActor();
+  const event = await requireEvent(id);
+  const eventRole = await eventRoleFor(id, actor.uid);
+
+  if (!can('rsvp:respond', eventAuthzContext(actor, event, eventRole))) {
+    throw new ApiError('not_found', 'That event does not exist.');
+  }
+  await limitByUser('rsvpPerUser', actor.uid);
+
+  const input = await parseBody(request, rsvpSchema);
+  const outcome = await submitRsvp(actor, event, input);
+
+  // The host's list should say "replied" the moment they do, whichever link they came in
+  // on. Matched on address rather than on the guest token, because a forwarded link or a
+  // second device is still that person answering. Best-effort, like the confirmation below.
+  await markReplied(id, actor.email).catch((error: unknown) =>
+    console.error('[rsvp] could not mark the invitee replied', error),
+  );
+
+  // A confirmation is a courtesy, so it must never be able to fail the reply that earned
+  // it. Only for a yes, and only when we have an address to send it to.
+  if (outcome.status === 'yes' && actor.email) {
+    await sendRsvpConfirmation(event, actor.email, input.displayName || actor.displayName).catch(
+      (error: unknown) => console.error('[rsvp] confirmation email failed', error),
+    );
+  }
+
+  /*
+    Only a *first* reply is counted, and that is the whole distinction between these two
+    numbers and the tally beside them.
+
+    This used to fire on every reply, changes included, so a guest who said maybe and later
+    yes incremented `rsvpAnswered` twice. That makes it a count of reply *actions*, which is
+    not a thing anybody wants to divide by opens: the "what fraction of guests reply" ratio
+    would creep above the truth in proportion to how much people fiddled with their answer,
+    and nothing about the number would look wrong.
+
+    So the split is: **the funnel counts conversions, the tally counts current state.**
+    `rsvpAnswered` and `rsvpYes` mean "on their first reply, this many people answered, and
+    this many of those said yes" — monotonic, never double-counted, safe as a denominator.
+    Who is actually coming right now is `event.rsvpTally`, which is transactional and
+    authoritative, and is what any headcount must read instead of this.
+
+    `rsvpYes` is therefore first-reply-yes rather than ever-said-yes. Ever-said-yes cannot be
+    counted correctly without a record of whether this guest has said it before — the member
+    document holds only their current answer — and a naive check would double-count anyone
+    who went yes, no, yes. Undercounting a later change of heart is the cheaper error, and
+    the tally already reports the truth about attendance.
+  */
+  if (!outcome.changed) {
+    await recordFunnelAll(
+      event.id,
+      outcome.status === 'yes' ? ['rsvpAnswered', 'rsvpYes'] : ['rsvpAnswered'],
+    );
+  }
+
+  await recordAudit(
+    actor,
+    {
+      action: outcome.changed ? 'rsvp.change' : 'rsvp.respond',
+      targetType: 'member',
+      targetId: actor.uid,
+      eventId: id,
+      metadata: { status: outcome.status, partySize: outcome.partySize },
+    },
+    requestContext(request),
+  );
+
+  return ok({ rsvp: outcome });
+});

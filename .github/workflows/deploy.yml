@@ -1,0 +1,323 @@
+name: Deploy
+
+# Manual, or on a push to the deploy branch. Deliberately not every branch:
+# CI runs everywhere, deploys go to one place.
+on:
+  push:
+    branches: [main, claude/group-event-wallboard-gcp-aqi0q3, group-event-wallboard-gcp-aqi0q3]
+    paths-ignore: ['docs/**', '**/*.md', '.claude/**']
+  workflow_dispatch:
+    inputs:
+      plan_only:
+        description: 'Show the infrastructure plan and stop, without deploying'
+        type: boolean
+        default: false
+
+# Two deploys racing each other would fight over Terraform state.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for Workload Identity Federation: this is what lets the job mint an
+  # OIDC token GCP will trust. No service-account key exists anywhere.
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  SERVICE_NAME: marquee
+
+jobs:
+  # The full suite runs in ci.yml on every branch. This is the subset that is
+  # fast enough to gate a deploy on, so a commit that does not compile can never
+  # reach production even if someone pushes straight to the deploy branch.
+  verify:
+    name: Types, lint, unit tests
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_USE_EMULATORS: 'true'
+      NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: marquee-dev.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: marquee-dev
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: marquee-dev.appspot.com
+      NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000'
+      JOIN_CODE_PEPPER: ci-pepper-value-not-a-real-secret-0123456789
+      OWNER_EMAILS: owner@example.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  deploy:
+    name: Terraform and Cloud Run
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the deploy is configured
+        run: |
+          missing=()
+          for v in GCP_PROJECT_ID GCP_REGION GCP_WORKLOAD_IDENTITY_PROVIDER \
+                   GCP_DEPLOY_SERVICE_ACCOUNT TF_STATE_BUCKET OWNER_EMAILS; do
+            [ -z "${!v}" ] && missing+=("$v")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository variables: ${missing[*]}"
+            echo "Run infra/bootstrap.sh — it prints every value and the gh commands to set them."
+            exit 1
+          fi
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          OWNER_EMAILS: ${{ vars.OWNER_EMAILS }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      # Before the generated tfvars exists, so `fmt -check` only judges files
+      # that are actually in the repository.
+      - name: Terraform format and validate
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform validate
+
+      # Every apply passes the same variables. Assembling them once keeps the
+      # two applies from quietly drifting apart.
+      - name: Assemble Terraform variables
+        run: |
+          {
+            echo "project_id = \"${{ vars.GCP_PROJECT_ID }}\""
+            echo "region = \"${{ vars.GCP_REGION }}\""
+            echo "service_name = \"${SERVICE_NAME}\""
+            echo "owner_emails = \"${{ vars.OWNER_EMAILS }}\""
+            echo "site_url = \"${{ vars.SITE_URL }}\""
+            echo "google_sign_in = ${{ vars.GOOGLE_SIGN_IN || 'false' }}"
+            echo "google_oauth_client_id = \"${{ vars.GOOGLE_OAUTH_CLIENT_ID }}\""
+            # A secret, so it comes from secrets rather than vars and never appears in the
+            # printed tfvars below.
+            echo "google_oauth_client_secret = \"${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}\""
+            # Cold starts are the whole cost of scale-to-zero. Set MIN_INSTANCES=1 to keep
+            # one warm: sign-in is the worst-hit path, because it makes several round
+            # trips and every one can land on a container that is still booting.
+            # Serves the sign-in handler from our own site rather than firebaseapp.com,
+            # which is what stops browsers treating the popup as third-party. Needs
+            # Firebase Hosting set up first — docs/SETUP.md.
+            echo "auth_domain = \"${{ vars.AUTH_DOMAIN }}\""
+            echo "min_instances = ${{ vars.MIN_INSTANCES || '0' }}"
+            echo "billing_account = \"${{ vars.GCP_BILLING_ACCOUNT }}\""
+            echo "budget_alert_emails = \"${{ vars.BUDGET_ALERT_EMAILS }}\""
+            # Mail. Defaults keep it in the outbox, so a deploy that has not been given a
+            # key writes invitations to Firestore rather than failing to start.
+            echo "email_driver = \"${{ vars.EMAIL_DRIVER || 'outbox' }}\""
+            echo "email_from_address = \"${{ vars.EMAIL_FROM_ADDRESS || 'invitations@marqueersvp.com' }}\""
+            # Address lookup. Server-side key; `places_enabled` decides whether the secret
+            # exists at all, because presence must not be derived from a sensitive value.
+            echo "places_enabled = ${{ vars.PLACES_ENABLED || 'false' }}"
+            echo "google_maps_api_key = \"${{ secrets.GOOGLE_MAPS_API_KEY }}\""
+            echo "resend_api_key = \"${{ secrets.RESEND_API_KEY }}\""
+          } > infra/terraform/ci.auto.tfvars
+          # Everything except the secrets, which this step writes but must not print.
+          grep -vE 'client_secret|api_key' infra/terraform/ci.auto.tfvars
+
+      - name: Terraform plan
+        if: ${{ inputs.plan_only }}
+        working-directory: infra/terraform
+        run: |
+          terraform plan -input=false -var="image=" | tee /tmp/plan.txt
+          {
+            echo '### Plan only — nothing was deployed'
+            echo '```'
+            tail -60 /tmp/plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Deploying is two applies, and the ordering is forced rather than chosen.
+      # The image has to be built with the Firebase web config and the site URL
+      # baked in — Next inlines NEXT_PUBLIC_* at build time — and none of those
+      # values exists until Terraform has created the web app and the service.
+      # So: apply the infrastructure, read what it produced, build against it,
+      # then apply again to move the service onto the new image.
+      - name: Current image
+        id: current
+        if: ${{ !inputs.plan_only }}
+        run: |
+          IMAGE="$(gcloud run services describe "${SERVICE_NAME}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || true)"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "Service is currently running: ${IMAGE:-<nothing yet — first deploy>}"
+
+      - name: Terraform apply — infrastructure
+        if: ${{ !inputs.plan_only }}
+        working-directory: infra/terraform
+        # Passing the image the service is already on makes this apply a no-op
+        # for the service itself: it creates and updates everything around it
+        # without rolling a revision that would only be replaced minutes later.
+        run: terraform apply -auto-approve -input=false -var="image=${{ steps.current.outputs.image }}"
+
+      # The origin is derived from the project number and region rather than read
+      # off the service, because the service's own config depends on it. If the
+      # derivation is ever wrong, this catches it in the same run: the real URL
+      # is written back into the variables, and the release apply corrects the
+      # service environment and the bucket CORS along with the image.
+      - name: Reconcile the site URL
+        if: ${{ !inputs.plan_only }}
+        working-directory: infra/terraform
+        run: |
+          REAL="$(terraform output -raw service_url)"
+          USED="$(terraform output -raw site_url)"
+          if [ -n "${{ vars.SITE_URL }}" ]; then
+            echo "Custom domain configured (${{ vars.SITE_URL }}); leaving it alone."
+          elif [ "$REAL" != "$USED" ]; then
+            echo "::warning::Derived origin $USED does not match the assigned $REAL — correcting."
+            sed -i "s|^site_url = .*|site_url = \"$REAL\"|" ci.auto.tfvars
+            terraform apply -auto-approve -input=false -var="image=${{ steps.current.outputs.image }}"
+          else
+            echo "Origin matches: $REAL"
+          fi
+
+      - name: Read Terraform outputs
+        id: tf
+        if: ${{ !inputs.plan_only }}
+        working-directory: infra/terraform
+        run: |
+          terraform output -json > /tmp/tf.json
+          jq -r '
+            "site_url=" + .site_url.value,
+            "service_url=" + .service_url.value,
+            "registry=" + .artifact_repository.value,
+            "api_key=" + .firebase_web_config.value.api_key,
+            "auth_domain=" + .firebase_web_config.value.auth_domain,
+            "storage_bucket=" + .firebase_web_config.value.storage_bucket,
+            "app_id=" + .firebase_web_config.value.app_id,
+            "google_sign_in=" + (.firebase_web_config.value.google_sign_in | tostring)
+          ' /tmp/tf.json >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: build
+        if: ${{ !inputs.plan_only }}
+        run: |
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+          IMAGE="${{ steps.tf.outputs.registry }}/${SERVICE_NAME}:${GITHUB_SHA}"
+          docker build \
+            --build-arg NEXT_PUBLIC_SITE_URL="${{ steps.tf.outputs.site_url }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ steps.tf.outputs.api_key }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ steps.tf.outputs.auth_domain }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="${{ vars.GCP_PROJECT_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ steps.tf.outputs.storage_bucket }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ steps.tf.outputs.app_id }}" \
+            --build-arg NEXT_PUBLIC_GOOGLE_SIGN_IN="${{ steps.tf.outputs.google_sign_in }}" \
+            -t "$IMAGE" .
+          docker push "$IMAGE"
+
+          # Pin the digest, not the tag. A tag can be moved; a digest is the
+          # image this run actually built and nothing else.
+          DIGEST="$(gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)')"
+          echo "image=${{ steps.tf.outputs.registry }}/${SERVICE_NAME}@${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform apply — release
+        if: ${{ !inputs.plan_only }}
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -input=false -var="image=${{ steps.build.outputs.image }}"
+
+      # A deploy that answers 200 with our own headers is a deploy that works.
+      # A green Terraform apply on its own is not.
+      # Verified against the service's own URL, which always resolves. A custom domain has
+      # its own timeline — DNS at a registrar, then a certificate — and failing the deploy
+      # because that is not finished yet would mark every run red for days and hide a real
+      # failure among them. The revision either serves or it does not; that is this step's
+      # question.
+      - name: Smoke the deployment
+        if: ${{ !inputs.plan_only }}
+        run: |
+          URL="${{ steps.tf.outputs.service_url }}"
+          # An unset output would otherwise curl an empty string six times and report it as
+          # the service being down, which is a long way from what actually happened.
+          [ -n "$URL" ] || { echo "::error::service_url output is empty — nothing to check"; exit 1; }
+          CODE=000
+          for attempt in 1 2 3 4 5 6; do
+            CODE="$(curl -s -o /tmp/body -w '%{http_code}' --max-time 30 "$URL/" || echo 000)"
+            [ "$CODE" = "200" ] && break
+            echo "attempt $attempt: HTTP $CODE — waiting for the revision to serve"
+            sleep 10
+          done
+          [ "$CODE" = "200" ] || { echo "::error::Landing page returned $CODE"; head -40 /tmp/body; exit 1; }
+
+          # The CSP nonce is set in proxy.ts. No CSP means something other than
+          # our app answered, and a 200 from it would prove nothing.
+          curl -sI "$URL/" | grep -qi 'content-security-policy' \
+            || { echo "::error::No CSP header — this is not our app answering"; exit 1; }
+
+          {
+            echo '### Deployed'
+            echo ''
+            echo "- **Serving**: $URL"
+            echo "- **Image**: \`${{ steps.build.outputs.image }}\`"
+            echo "- **Commit**: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reported, never fatal: this is a DNS question, not a deploy question.
+      - name: Custom domain
+        if: ${{ !inputs.plan_only && vars.SITE_URL != '' }}
+        working-directory: infra/terraform
+        run: |
+          SITE="${{ steps.tf.outputs.site_url }}"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$SITE/" || echo 000)"
+
+          {
+            echo ''
+            echo "### Custom domain — $SITE"
+            echo ''
+            if [ "$CODE" = "200" ]; then
+              echo "Live and answering."
+            else
+              echo "Not answering yet (HTTP $CODE). Add these records at your registrar,"
+              echo "with proxying **off**, then allow ~15 minutes for the certificate:"
+              echo ''
+              echo '```'
+              terraform output -json domain_dns_records | jq -r '.[]' || echo '(none — mapping not created)'
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          [ "$CODE" = "200" ] || echo "::warning::$SITE is not serving yet — DNS or certificate still pending."
+
+      - name: Revision history on failure
+        if: ${{ failure() && !inputs.plan_only }}
+        run: |
+          echo "::warning::Deploy did not verify. Cloud Run keeps the previous revision serving unless the new one became ready."
+          gcloud run revisions list \
+            --service "${SERVICE_NAME}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --format='table(name, active, creationTimestamp)' || true

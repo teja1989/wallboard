@@ -1,0 +1,175 @@
+rules_version = '2';
+
+// Deny-by-default. Clients may READ what they are entitled to see; clients may never
+// WRITE. Every mutation goes through a Next.js route handler using the Admin SDK, which
+// validates, authorises, rate-limits and audit-logs. The Admin SDK bypasses these rules,
+// so they exist purely to bound what a browser holding an ID token can reach.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function platformRole() {
+      return signedIn() && request.auth.token.role is string ? request.auth.token.role : 'user';
+    }
+
+    function isStaff() {
+      return platformRole() in ['support', 'admin', 'owner'];
+    }
+
+    function isMemberOf(eventId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/events/$(eventId)/members/$(uid()));
+    }
+
+    // ---- users -------------------------------------------------------------
+    // A user reads only their own profile. Staff read any profile.
+    match /users/{userId} {
+      allow read: if signedIn() && (userId == uid() || isStaff());
+      allow write: if false;
+    }
+
+    // ---- events ------------------------------------------------------------
+    match /events/{eventId} {
+      // Members see the event. Staff see any event. Non-members get nothing here —
+      // the pre-join preview is served by the API, not by a direct read.
+      allow read: if isMemberOf(eventId) || isStaff();
+      allow write: if false;
+
+      // Join codes are server-only. Even the host reads theirs through the API so the
+      // read is rate-limited and audit-logged.
+      match /private/{docId} {
+        allow read, write: if false;
+      }
+
+      // The guest list. Every member sees who is coming — that is what a guest list is
+      // for — so the RSVP answer and headcount live here.
+      match /members/{memberId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      // The private half of a reply: the note to the host and the answer to their custom
+      // question. A separate subcollection because Firestore cannot restrict a single
+      // field, and a note addressed to the host is not for the rest of the guest list.
+      // Even the host reads these through the API, so the read is authorised and logged.
+      match /rsvpNotes/{guestId} {
+        allow read, write: if false;
+      }
+
+      // Who the host is inviting. Server-only, and now doubly so: alongside the addresses
+      // and phone numbers, each document carries the link token that identifies that guest.
+      // A readable token would let anyone holding the code mark other people as having seen
+      // the invitation, and the list itself is exactly what must not be visible to everyone
+      // who has the code. The host reads it through an authorised API call.
+      //
+      // The recursive wildcard covers the deliveries subcollection: a per-guest record of
+      // what was sent and when it was read is no more public than the guest list it hangs
+      // off, and a rule written only for the parent would leave the children open.
+      match /invitees/{inviteeId}/{document=**} {
+        allow read, write: if false;
+      }
+
+      // The gift list. Members read it — it is shown on the invitation, and a guest deciding
+      // what to bring is the whole audience for it. Writes go through the host-only API like
+      // everything else, and the click count on each row is incremented there rather than by
+      // whoever happened to tap it.
+      match /registry/{linkId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      // Collective cash funds and dream pots. Members read the fund progress; writes are server-only.
+      match /funds/{fundId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      match /contributions/{contribId} {
+        allow read: if isMemberOf(eventId) || isStaff();
+        allow write: if false;
+      }
+
+      // The host's planning list. Shut in both directions, guests and host alike.
+      //
+      // Reads because it is somebody's working notes about their own party — what they have
+      // not done yet, and what they are spending — and a guest reading the budget for the
+      // party they are attending is exactly the surprise this product should never produce.
+      // Writes because ticking a row is gated on a paid entitlement, and a rule cannot check
+      // one; the host reaches it through an authorised API call like every other write here.
+      match /milestones/{milestoneId} {
+        allow read, write: if false;
+      }
+
+      // Aggregate funnel counters, one document per day. Server-only in both directions.
+      //
+      // Writes, obviously: a client that could increment its own counters could tell the host
+      // whatever story it liked, and every one of these is fired from a route handler so none
+      // of them needs to come from a browser.
+      //
+      // Reads too, which is less obvious — they are only sums. But "how many people opened
+      // this and did not reply" is the host's business and nobody else's, and a guest able to
+      // read it learns how the guest list is behaving. Anyone entitled to it goes through an
+      // authorised API call, as with every other host-facing read here.
+      match /funnel/{dayKey} {
+        allow read, write: if false;
+      }
+
+      // The live wall. Removed and quarantined posts stay invisible to members.
+      //
+      // Both halves of this condition are load-bearing and were each briefly lost:
+      //
+      // `isMemberOf` — without it, `state == 'visible'` alone makes every wall on the
+      // platform world-readable to anyone holding an event id. A wedding's guest photos are
+      // not public because they are un-moderated.
+      //
+      // `state == 'visible'` — without it, membership alone reveals removed and quarantined
+      // posts to the whole guest list, which is exactly the audience a host removes a post
+      // *from*. Moderation that the moderated-against can still read is not moderation.
+      //
+      // They are an AND for that reason. `isStaff` is the separate, audited escape hatch.
+      match /posts/{postId} {
+        allow read: if (isMemberOf(eventId) && resource.data.state == 'visible') || isStaff();
+        allow write: if false;
+      }
+    }
+
+    // ---- server-only collections ------------------------------------------
+    // Code lookup table: readable only by the server, or the hash space becomes a
+    // brute-forceable index of every live event.
+    match /joinCodes/{codeHash} {
+      allow read, write: if false;
+    }
+
+    match /rateLimits/{bucket} {
+      allow read, write: if false;
+    }
+
+    // Audit logs are read through the admin API so every read is itself accountable.
+    match /auditLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    // Development outbox. Server-only in every environment — it holds rendered messages
+    // addressed to real people.
+    match /mailOutbox/{messageId} {
+      allow read, write: if false;
+    }
+
+    match /config/{docId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // Anything not matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,380 @@
+import 'server-only';
+import { invitationPath } from '@/lib/codes-format';
+import {
+  appConfig,
+  brand,
+  calendarCopy,
+  emailSubjects,
+  faceOf,
+  occasionById,
+  templateById,
+} from '@/config';
+import { formatEventDate } from '@/lib/utils';
+import type { EmailKind } from '@/config';
+import type { EventDoc } from '@/types/domain';
+
+/**
+ * Email rendering.
+ *
+ * Hand-written tables and inline styles, because email clients are still living in 2005:
+ * Outlook has no flexbox, Gmail strips `<style>` blocks, and nothing supports CSS custom
+ * properties. So none of the app's design tokens can be used here — the invitation's
+ * palette and display face are read from the template and inlined per message instead,
+ * which is what makes the email look like the invitation rather than like a receipt.
+ *
+ * A text part is always produced. It is what stops the message being scored as spam, and
+ * it is what someone on a watch actually reads.
+ */
+
+export interface RenderedEmail {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+/** Escapes for HTML text nodes and attribute values alike. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function eventUrl(eventId: string): string {
+  return `${appConfig.siteUrl}/e/${eventId}`;
+}
+
+/**
+ * Where an invitation actually has to point.
+ *
+ * `/e/{id}` is the event, and the event turns away anyone who is not already a member —
+ * which is every single recipient of an invitation. Sending them there made the button in
+ * the message a dead end and the line beneath it ("no account, no app") a lie.
+ *
+ * The code is the credential, as it is everywhere else in the product; the email is a
+ * private channel to one named address. Redeeming through the invitation route reuses the
+ * rate limits, the anonymous bootstrap and the audit trail rather than inventing a second
+ * way in — and it is the one URL that renders a preview when someone forwards it on.
+ */
+export function joinUrl(joinCode: string, guestToken?: string): string {
+  return `${appConfig.siteUrl}${invitationPath(joinCode, guestToken)}`;
+}
+
+/**
+ * The `.ics` for an emailed invitation.
+ *
+ * A link rather than an attachment. Attaching the file is the more familiar pattern and it
+ * is the wrong one here: an attachment on a bulk send is the strongest spam signal a message
+ * can carry, Gmail hides `text/calendar` parts behind its own RSVP widget which then mails a
+ * reply to an organizer address we do not run, and the file would be frozen at the moment it
+ * was sent — so a venue change would leave every guest holding the old address. A link is
+ * fetched when it is tapped, which is when it is correct.
+ */
+export function calendarUrl(joinCode: string): string {
+  return `${appConfig.siteUrl}${invitationPath(joinCode)}/calendar`;
+}
+
+interface Shell {
+  event: EventDoc;
+  /** Preheader — the grey line clients show after the subject. Worth writing properly. */
+  preview: string;
+  bodyHtml: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  unsubscribeUrl?: string;
+}
+
+/**
+ * The message chrome: coloured header in the template's palette, white card, footer.
+ *
+ * Everything is a table. Everything is inline. `!important` is absent because Gmail strips
+ * it. Widths are fixed at 600px because that is the last width every client agrees on.
+ */
+function shell({ event, preview, bodyHtml, ctaLabel, ctaUrl, unsubscribeUrl }: Shell): string {
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  const { palette } = template;
+
+  // Email clients that do not understand oklch() would render nothing, so the header
+  // carries a hex fallback underneath the gradient.
+  const headerFallback = '#f0ded4';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(event.title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f2ef;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preview)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6f2ef;padding:24px 12px;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 1px 3px rgba(60,40,30,0.08);">
+
+      <tr><td style="height:96px;background:${headerFallback};background-image:linear-gradient(135deg,${palette.from},${palette.to});">&nbsp;</td></tr>
+
+      <tr><td style="padding:28px 32px 32px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#2b2320;">
+        ${bodyHtml}
+
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0 0;">
+          <tr><td style="border-radius:999px;background:#c65f47;">
+            <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:999px;">${escapeHtml(ctaLabel)}</a>
+          </td></tr>
+        </table>
+
+        <p style="margin:20px 0 0 0;font-size:13px;line-height:1.5;color:#8a7a72;">
+          Or open this link:<br>
+          <a href="${escapeHtml(ctaUrl)}" style="color:#8a7a72;">${escapeHtml(ctaUrl)}</a>
+        </p>
+      </td></tr>
+
+      <tr><td style="padding:20px 32px 28px 32px;border-top:1px solid #eee6e1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#a1938c;">
+        <!--
+          The name links out. This footer is the highest-volume surface the product has —
+          it lands in every invited inbox — and as plain text it asked each reader to
+          remember a name and search for it later, which nobody does.
+        -->
+        Sent with <a href="${escapeHtml(appConfig.siteUrl)}" style="color:#a1938c;">${escapeHtml(brand.name)}</a> on behalf of ${escapeHtml(event.hostedBy)}.
+        ${unsubscribeUrl ? `<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:#a1938c;">Stop receiving emails about this event</a>.` : ''}
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`.replace('__FACE__', face.stack);
+}
+
+/** The event's facts, as a block both the invitation and the reminder reuse. */
+function detailsHtml(event: EventDoc, joinCode?: string): string {
+  const rows: string[] = [];
+
+  if (event.startsAt !== null) {
+    // Right under the date, because deciding you can make it and saving it are the same
+    // moment — and if it is not saved then, it is not saved at all.
+    const add = joinCode
+      ? `<br><a href="${escapeHtml(calendarUrl(joinCode))}" style="color:#c65f47;font-size:13px;">${escapeHtml(calendarCopy.emailLabel)}</a>`
+      : '';
+    rows.push(
+      row('When', `${escapeHtml(formatEventDate(event.startsAt, event.timeZone, 'always'))}${add}`),
+    );
+  }
+  if (event.location?.name || event.location?.address) {
+    const place = [event.location.name, event.location.address].filter(Boolean).join(', ');
+    const value = event.location.url
+      ? `<a href="${escapeHtml(event.location.url)}" style="color:#c65f47;">${escapeHtml(place)}</a>`
+      : escapeHtml(place);
+    rows.push(row('Where', value));
+  }
+  if (event.dressCode) rows.push(row('Dress code', escapeHtml(event.dressCode)));
+
+  if (rows.length === 0) return '';
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0 0;width:100%;">${rows.join('')}</table>`;
+}
+
+function row(label: string, value: string): string {
+  return `<tr>
+    <td style="padding:6px 0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#a1938c;width:110px;vertical-align:top;">${escapeHtml(label)}</td>
+    <td style="padding:6px 0;font-size:15px;line-height:1.5;color:#2b2320;">${value}</td>
+  </tr>`;
+}
+
+function detailsText(event: EventDoc, joinCode?: string): string {
+  const lines: string[] = [];
+  if (event.startsAt !== null) {
+    lines.push(`When:  ${formatEventDate(event.startsAt, event.timeZone, 'always')}`);
+    if (joinCode) lines.push(`       ${calendarCopy.emailLabel}: ${calendarUrl(joinCode)}`);
+  }
+  if (event.location?.name || event.location?.address) {
+    lines.push(
+      `Where: ${[event.location.name, event.location.address].filter(Boolean).join(', ')}`,
+    );
+    if (event.location.url) lines.push(`       ${event.location.url}`);
+  }
+  if (event.dressCode) lines.push(`Dress: ${event.dressCode}`);
+  return lines.length ? `\n${lines.join('\n')}\n` : '';
+}
+
+export interface RenderContext {
+  event: EventDoc;
+  /** Present on invitations and reminders; absent on a confirmation to the replier. */
+  unsubscribeUrl?: string;
+  /** The guest's name, when we know it. */
+  guestName?: string;
+  /**
+   * The event's join code. Present on invitations and reminders, whose recipients are not
+   * members yet; absent on a confirmation, whose recipient already is one.
+   */
+  joinCode?: string;
+  /** This guest's link token, so the view it produces has a name attached. */
+  guestToken?: string;
+}
+
+export function renderEmail(kind: EmailKind, context: RenderContext): RenderedEmail {
+  switch (kind) {
+    case 'invitation':
+      return renderInvitation(context);
+    case 'reminder':
+      return renderReminder(context);
+    case 'rsvpConfirmation':
+      return renderConfirmation(context);
+    case 'welcomeHost':
+      return renderWelcomeHost(context);
+  }
+}
+
+function renderInvitation({
+  event,
+  unsubscribeUrl,
+  joinCode,
+  guestToken,
+}: RenderContext): RenderedEmail {
+  const occasion = occasionById(event.occasion);
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  const url = joinCode ? joinUrl(joinCode, guestToken) : eventUrl(event.id);
+
+  const bodyHtml = `
+    <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">From ${escapeHtml(event.hostedBy)}</p>
+    <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:30px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
+    ${event.description ? `<p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${escapeHtml(event.description)}</p>` : ''}
+    ${detailsHtml(event, joinCode)}
+    <p style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#5c4f49;">${escapeHtml(occasion.rsvpPrompt)} It takes one tap — no account, no app.</p>`;
+
+  const text = `${event.hostedBy} invited you to ${event.title}
+${event.description ? `\n${event.description}\n` : ''}${detailsText(event, joinCode)}
+${occasion.rsvpPrompt} Reply here:
+${url}
+${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}` : ''}`;
+
+  return {
+    subject: emailSubjects.invitation(event.title, event.hostedBy),
+    html: shell({
+      event,
+      preview:
+        `${occasion.rsvpPrompt} ${event.startsAt ? formatEventDate(event.startsAt, event.timeZone, 'always') : ''}`.trim(),
+      bodyHtml,
+      ctaLabel: 'Open the invitation',
+      ctaUrl: url,
+      unsubscribeUrl,
+    }),
+    text: text.trim(),
+  };
+}
+
+function renderReminder({
+  event,
+  unsubscribeUrl,
+  guestName,
+  joinCode,
+  guestToken,
+}: RenderContext): RenderedEmail {
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  // A reminder goes to someone who has still not replied, so they are still not a member.
+  const url = joinCode ? joinUrl(joinCode, guestToken) : eventUrl(event.id);
+  const greeting = guestName ? `${escapeHtml(guestName)}, we` : 'We';
+
+  const bodyHtml = `
+    <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">A gentle nudge</p>
+    <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
+    <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${greeting} have not heard from you yet, and ${escapeHtml(event.hostedBy)} is working out numbers. Even a no is genuinely useful.</p>
+    ${detailsHtml(event, joinCode)}`;
+
+  const text = `${event.title} — a gentle nudge
+
+${guestName ? `${guestName}, we` : 'We'} have not heard from you yet, and ${event.hostedBy} is working out numbers. Even a no is genuinely useful.
+${detailsText(event, joinCode)}
+Reply here:
+${url}
+${unsubscribeUrl ? `\nStop receiving emails about this event: ${unsubscribeUrl}` : ''}`;
+
+  return {
+    subject: emailSubjects.reminder(event.title),
+    html: shell({
+      event,
+      preview: 'Even a no is genuinely useful.',
+      bodyHtml,
+      ctaLabel: 'Reply now',
+      ctaUrl: url,
+      unsubscribeUrl,
+    }),
+    text: text.trim(),
+  };
+}
+
+function renderConfirmation({ event, guestName, joinCode }: RenderContext): RenderedEmail {
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  const url = eventUrl(event.id);
+
+  const bodyHtml = `
+    <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">You're on the list</p>
+    <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
+    <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">${guestName ? `Thanks, ${escapeHtml(guestName)}. ` : 'Thanks. '}${escapeHtml(event.hostedBy)} knows you are coming. Here are the details again, so they are in your inbox when you need them.</p>
+    ${detailsHtml(event, joinCode)}
+    <p style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#5c4f49;">On the day, the same link becomes the wall where everyone posts their photos.</p>`;
+
+  const text = `You're on the list for ${event.title}
+
+${guestName ? `Thanks, ${guestName}. ` : 'Thanks. '}${event.hostedBy} knows you are coming.
+${detailsText(event, joinCode)}
+On the day, the same link becomes the wall where everyone posts their photos:
+${url}`;
+
+  return {
+    subject: emailSubjects.rsvpConfirmation(event.title),
+    html: shell({
+      event,
+      preview: 'The details, so they are in your inbox when you need them.',
+      bodyHtml,
+      ctaLabel: 'See the invitation',
+      ctaUrl: url,
+    }),
+    text: text.trim(),
+  };
+}
+
+function renderWelcomeHost({ event, joinCode }: RenderContext): RenderedEmail {
+  const template = templateById(event.templateId);
+  const face = faceOf(template);
+  const url = eventUrl(event.id);
+  const inviteUrl = joinCode ? joinUrl(joinCode) : url;
+
+  const bodyHtml = `
+    <p style="margin:0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#a1938c;">Your Event is Ready</p>
+    <h1 style="margin:10px 0 0 0;font-family:${face.stack};font-size:28px;line-height:1.15;font-weight:${face.weight};color:#2b2320;">${escapeHtml(event.title)}</h1>
+    <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#5c4f49;">Your invitation is ready to share with guests. You can open your host controls to invite friends, add co-hosts, or customize settings at any time.</p>
+    ${detailsHtml(event, joinCode)}
+    <div style="margin:24px 0 0 0;padding:16px;background:#f8f5f2;border-radius:12px;">
+      <p style="margin:0;font-size:13px;font-weight:600;color:#5c4f49;text-transform:uppercase;letter-spacing:0.08em;">Share with guests</p>
+      <p style="margin:6px 0 0 0;font-size:15px;color:#2b2320;word-break:break-all;"><a href="${inviteUrl}" style="color:#2b2320;text-decoration:underline;">${inviteUrl}</a></p>
+    </div>`;
+
+  const text = `Your event is ready: ${event.title}
+
+Manage your event, invite guests, and track RSVPs:
+${url}
+
+Share this invitation link with your guests:
+${inviteUrl}
+
+${detailsText(event, joinCode)}`;
+
+  return {
+    subject: emailSubjects.welcomeHost(event.title),
+    html: shell({
+      event,
+      preview: 'Your invitation is live and ready to share with guests.',
+      bodyHtml,
+      ctaLabel: 'Open Host Controls',
+      ctaUrl: url,
+    }),
+    text: text.trim(),
+  };
+}

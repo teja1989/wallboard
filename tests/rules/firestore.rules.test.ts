@@ -1,0 +1,633 @@
+import { readFileSync } from 'node:fs';
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+  type RulesTestEnvironment,
+} from '@firebase/rules-unit-testing';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+
+/**
+ * Firestore rules are the last line of defence: they bound what a browser holding a valid
+ * ID token can reach if it bypasses the app entirely. Every one of these assertions
+ * describes an attack someone could mount with nothing but the Firebase SDK and a session.
+ *
+ * Run via `npm run test:rules`, which starts the emulator around the suite.
+ */
+
+const PROJECT_ID = 'marquee-rules-test';
+const EVENT_ID = 'event-alpha';
+const OTHER_EVENT_ID = 'event-beta';
+
+let testEnv: RulesTestEnvironment;
+
+beforeAll(async () => {
+  testEnv = await initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    firestore: {
+      rules: readFileSync('firestore.rules', 'utf8'),
+      host: '127.0.0.1',
+      port: 8080,
+    },
+  });
+});
+
+afterAll(async () => {
+  await testEnv?.cleanup();
+});
+
+beforeEach(async () => {
+  await testEnv.clearFirestore();
+
+  // Seeded with rules disabled, exactly as the Admin SDK would write it in production.
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+
+    await setDoc(doc(db, 'events', EVENT_ID), {
+      title: 'Alpha party',
+      hostUid: 'host-uid',
+      status: 'live',
+      expiresAt: Date.now() + 3_600_000,
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'private', 'joinCode'), {
+      code: 'ABCD2345',
+      codeHash: 'deadbeef',
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'member-uid'), {
+      role: 'member',
+      rsvp: { status: 'yes', partySize: 2, respondedAt: Date.now() },
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'members', 'host-uid'), {
+      role: 'host',
+      rsvp: { status: 'yes', partySize: 1, respondedAt: Date.now() },
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'rsvpNotes', 'member-uid'), {
+      note: 'Allergic to shellfish',
+      answer: '',
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'invitees', 'abc123'), {
+      email: 'guest@example.com',
+      name: 'Guest',
+      status: 'sent',
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'registry', 'giftlink0001'), {
+      label: 'Our registry',
+      url: 'https://example.com/registry',
+      clickCount: 3,
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'milestones', 'milestone0001'), {
+      title: 'Book the caterer',
+      done: false,
+      budget: 4200,
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'funnel', '2026-08-28'), {
+      day: '2026-08-28',
+      inviteSent: 40,
+      invitationOpened: 31,
+      rsvpAnswered: 22,
+    });
+    await setDoc(doc(db, 'mailOutbox', 'msg-1'), {
+      to: 'guest@example.com',
+      subject: 'You are invited',
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'posts', 'post-visible'), {
+      state: 'visible',
+      body: 'hello',
+      authorUid: 'member-uid',
+      createdAt: Date.now(),
+    });
+    await setDoc(doc(db, 'events', EVENT_ID, 'posts', 'post-removed'), {
+      state: 'removed',
+      body: '',
+      authorUid: 'member-uid',
+      createdAt: Date.now(),
+    });
+
+    await setDoc(doc(db, 'events', OTHER_EVENT_ID), { title: 'Beta party', status: 'live' });
+    await setDoc(doc(db, 'events', OTHER_EVENT_ID, 'posts', 'secret'), {
+      state: 'visible',
+      body: 'not for you',
+      createdAt: Date.now(),
+    });
+
+    await setDoc(doc(db, 'joinCodes', 'deadbeef'), { eventId: EVENT_ID });
+    await setDoc(doc(db, 'users', 'member-uid'), { displayName: 'Member' });
+    await setDoc(doc(db, 'users', 'other-uid'), { displayName: 'Other' });
+    await setDoc(doc(db, 'auditLogs', 'log-1'), { action: 'event.create', actorUid: 'host-uid' });
+    await setDoc(doc(db, 'rateLimits', 'bucket-1'), { count: 3 });
+  });
+});
+
+/** A signed-in member of EVENT_ID. */
+function member() {
+  return testEnv.authenticatedContext('member-uid').firestore();
+}
+
+/** Signed in, but a member of nothing. */
+function outsider() {
+  return testEnv.authenticatedContext('outsider-uid').firestore();
+}
+
+function anonymous() {
+  return testEnv.unauthenticatedContext().firestore();
+}
+
+function staff(role: 'support' | 'admin' | 'owner') {
+  return testEnv.authenticatedContext(`${role}-uid`, { role }).firestore();
+}
+
+describe('events', () => {
+  it('lets a member read the event', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID)));
+  });
+
+  it('refuses a signed-in non-member', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID)));
+  });
+
+  it('refuses a signed-out visitor', async () => {
+    await assertFails(getDoc(doc(anonymous(), 'events', EVENT_ID)));
+  });
+
+  it('lets staff read any event', async () => {
+    await assertSucceeds(getDoc(doc(staff('support'), 'events', EVENT_ID)));
+  });
+
+  it('refuses writes from every client, including the host', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(setDoc(doc(host, 'events', EVENT_ID), { title: 'Renamed' }));
+    await assertFails(deleteDoc(doc(host, 'events', EVENT_ID)));
+  });
+
+  it('refuses writes from an owner', async () => {
+    // Even the app owner mutates through the audited API, never directly.
+    await assertFails(setDoc(doc(staff('owner'), 'events', EVENT_ID), { title: 'Renamed' }));
+  });
+
+  it('refuses a self-granted plan upgrade on the event', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(setDoc(doc(host, 'events', EVENT_ID), { plan: 'pro' }, { merge: true }));
+  });
+});
+
+describe('join codes', () => {
+  it('are unreadable by the host', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'private', 'joinCode')));
+  });
+
+  it('are unreadable by staff', async () => {
+    await assertFails(getDoc(doc(staff('owner'), 'events', EVENT_ID, 'private', 'joinCode')));
+  });
+
+  it('cannot be looked up through the hash table', async () => {
+    // Otherwise the collection would be an enumerable index of every live event.
+    await assertFails(getDoc(doc(member(), 'joinCodes', 'deadbeef')));
+    await assertFails(getDocs(collection(outsider(), 'joinCodes')));
+  });
+});
+
+describe('posts', () => {
+  it('are readable by members', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID, 'posts', 'post-visible')));
+  });
+
+  it('hide removed posts from members', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'posts', 'post-removed')));
+  });
+
+  it('are unreadable across events', async () => {
+    // Membership in one event must not leak into another.
+    await assertFails(getDoc(doc(member(), 'events', OTHER_EVENT_ID, 'posts', 'secret')));
+  });
+
+  it('are unreadable by non-members', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'posts', 'post-visible')));
+  });
+
+  it('support the wall query for members', async () => {
+    await assertSucceeds(
+      getDocs(
+        query(collection(member(), 'events', EVENT_ID, 'posts'), where('state', '==', 'visible')),
+      ),
+    );
+  });
+
+  it('reject a wall query that would include removed posts', async () => {
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'posts')));
+  });
+
+  it('cannot be written by their own author', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'posts', 'forged'), {
+        state: 'visible',
+        body: 'straight to the database',
+        authorUid: 'member-uid',
+      }),
+    );
+  });
+
+  it('cannot be edited to impersonate someone else', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'posts', 'post-visible'), {
+        authorUid: 'host-uid',
+      }),
+    );
+  });
+});
+
+describe('members', () => {
+  it('are visible to fellow members', async () => {
+    await assertSucceeds(getDocs(collection(member(), 'events', EVENT_ID, 'members')));
+  });
+
+  it('are invisible to outsiders', async () => {
+    await assertFails(getDocs(collection(outsider(), 'events', EVENT_ID, 'members')));
+  });
+
+  it('cannot be self-created, which would be a way to join without a code', async () => {
+    await assertFails(
+      setDoc(doc(outsider(), 'events', EVENT_ID, 'members', 'outsider-uid'), { role: 'member' }),
+    );
+  });
+
+  it('cannot self-promote to host', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'members', 'member-uid'), { role: 'host' }),
+    );
+  });
+});
+
+describe('RSVP notes', () => {
+  it('are unreadable by other guests', async () => {
+    // A note addressed to the host is not for the rest of the guest list.
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable even by the person who wrote them', async () => {
+    // They read it back through the API, so the read is authorised and logged.
+    const author = testEnv.authenticatedContext('member-uid').firestore();
+    await assertFails(getDoc(doc(author, 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable by the host', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('are unreadable by staff', async () => {
+    await assertFails(getDoc(doc(staff('owner'), 'events', EVENT_ID, 'rsvpNotes', 'member-uid')));
+  });
+
+  it('cannot be enumerated', async () => {
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'rsvpNotes')));
+  });
+
+  it('cannot be written by anyone', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'rsvpNotes', 'member-uid'), { note: 'edited' }),
+    );
+  });
+});
+
+describe('RSVP answers on the guest list', () => {
+  it('are visible to fellow guests, because that is what a guest list is', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID, 'members', 'host-uid')));
+  });
+
+  it('cannot be forged by answering on someone else’s behalf', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'members', 'host-uid'), {
+        rsvp: { status: 'no', partySize: 1 },
+      }),
+    );
+  });
+
+  it('cannot be self-written, even for yourself', async () => {
+    // Otherwise a guest could inflate their party size past the host's limit and skip the
+    // tally update the server maintains.
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'members', 'member-uid'), {
+        rsvp: { status: 'yes', partySize: 99 },
+      }),
+    );
+  });
+
+  it('stay invisible to non-members', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'members', 'member-uid')));
+  });
+});
+
+/**
+ * Funnel counters.
+ *
+ * They hold nothing but integers — no visitor id, no session, nothing that could name a
+ * person. They are still shut, in both directions.
+ *
+ * Writes because every one of them is fired from a route handler, so a browser that could
+ * increment them could only be lying. Reads because "thirty-one people opened this and
+ * twenty-two replied" is the host's business: a guest able to read it learns how the rest of
+ * the guest list is behaving, and the host reads it through an authorised API call like every
+ * other host-facing number here.
+ */
+describe('the funnel counters', () => {
+  it('cannot be read by a member', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'funnel', '2026-08-28')));
+  });
+
+  it('cannot be read by the host they describe', async () => {
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'funnel', '2026-08-28')));
+  });
+
+  it('cannot be read by an outsider or enumerated', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'funnel', '2026-08-28')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'funnel')));
+  });
+
+  it('cannot be inflated by anyone', async () => {
+    // A host who could write their own numbers would be measuring their own opinion.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(doc(host, 'events', EVENT_ID, 'funnel', '2026-08-28'), { invitationOpened: 9999 }),
+    );
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'funnel', '2026-08-29'), { rsvpYes: 1 }),
+    );
+  });
+});
+
+/**
+ * The gift list is the one host-managed subcollection guests are *meant* to read: it renders
+ * on the invitation, and a guest deciding what to bring is the entire audience for it. So the
+ * interesting assertions here are the other two — that a stranger cannot, and that the click
+ * count on each row cannot be written by whoever tapped it.
+ */
+describe('the gift list', () => {
+  it('is readable by a member, because it is shown on their invitation', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0001')));
+  });
+
+  it('is not readable by an outsider', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'registry', 'giftlink0001')));
+  });
+
+  it('cannot be written, by the host or by a guest', async () => {
+    // The host adds links through the API so the destination is validated and audited; a
+    // guest must not be able to put a link of their own in front of the whole guest list.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(doc(host, 'events', EVENT_ID, 'registry', 'giftlink0002'), {
+        url: 'https://example.com/x',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0003'), {
+        url: 'https://evil.example/x',
+      }),
+    );
+  });
+
+  it('has a click count nobody can inflate from a browser', async () => {
+    await assertFails(
+      setDoc(
+        doc(member(), 'events', EVENT_ID, 'registry', 'giftlink0001'),
+        { clickCount: 9999 },
+        { merge: true },
+      ),
+    );
+  });
+});
+
+/**
+ * The planning list is shut in both directions, and unusually the *host* is locked out too.
+ *
+ * Reads because it is somebody's working notes about their own party — including what they are
+ * spending on it — and a guest reading the catering budget for the party they are attending is
+ * exactly the surprise this product must never produce. Writes because ticking a row is gated
+ * on a paid entitlement, and a Firestore rule cannot check one.
+ */
+describe('the planning list', () => {
+  it('is unreadable by a guest, budget and all', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'milestones', 'milestone0001')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'milestones')));
+  });
+
+  it('is unreadable by an outsider', async () => {
+    await assertFails(getDoc(doc(outsider(), 'events', EVENT_ID, 'milestones', 'milestone0001')));
+  });
+
+  it('is not even readable by the host, who reaches it through the API', async () => {
+    // Not an oversight. The entitlement gate lives in the route handler, and a client that
+    // could read the collection directly would be one step from a client that writes it.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'milestones', 'milestone0001')));
+  });
+
+  it('cannot be ticked off from a browser', async () => {
+    // Which is what stops a free-tier host working a list they are only entitled to read.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(
+      setDoc(
+        doc(host, 'events', EVENT_ID, 'milestones', 'milestone0001'),
+        { done: true },
+        { merge: true },
+      ),
+    );
+  });
+});
+
+describe('the invitee list', () => {
+  it('is unreadable by guests', async () => {
+    // A list of everyone's email addresses is exactly what must not be readable by
+    // everyone holding the code.
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('is unreadable by the host who built it', async () => {
+    // They read it through an authorised API call, so the read is logged.
+    const host = testEnv.authenticatedContext('host-uid').firestore();
+    await assertFails(getDoc(doc(host, 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('is unreadable by staff', async () => {
+    await assertFails(getDoc(doc(staff('owner'), 'events', EVENT_ID, 'invitees', 'abc123')));
+  });
+
+  it('cannot be enumerated', async () => {
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'invitees')));
+  });
+
+  it('cannot be written by anyone', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'forged'), {
+        email: 'someone@example.com',
+      }),
+    );
+  });
+
+  /**
+   * The link token identifies one guest, and it is the credential their personal
+   * invitation link carries. Readable tokens would let anyone holding the code mark other
+   * people as having seen the invitation — and would turn the guest list into something
+   * that could be enumerated a person at a time.
+   */
+  it('never exposes a guest link token', async () => {
+    await assertFails(getDoc(doc(member(), 'events', EVENT_ID, 'invitees', 'abc123')));
+    await assertFails(getDocs(collection(member(), 'events', EVENT_ID, 'invitees')));
+  });
+
+  /**
+   * The delivery history hangs off each guest. A rule written only for the parent document
+   * would leave these children wide open, which is why the rule uses a recursive wildcard.
+   */
+  it('keeps the delivery history shut too', async () => {
+    const path = ['events', EVENT_ID, 'invitees', 'abc123', 'deliveries', 'd1'] as const;
+
+    await assertFails(getDoc(doc(member(), ...path)));
+    await assertFails(getDoc(doc(staff('owner'), ...path)));
+    await assertFails(
+      getDocs(collection(member(), 'events', EVENT_ID, 'invitees', 'abc123', 'deliveries')),
+    );
+    await assertFails(setDoc(doc(member(), ...path), { state: 'seen' }));
+  });
+});
+
+describe('the mail outbox', () => {
+  it('is unreadable by every client', async () => {
+    // It holds rendered messages addressed to real people, in every environment.
+    await assertFails(getDoc(doc(member(), 'mailOutbox', 'msg-1')));
+    await assertFails(getDoc(doc(staff('owner'), 'mailOutbox', 'msg-1')));
+    await assertFails(getDocs(collection(staff('admin'), 'mailOutbox')));
+  });
+
+  it('cannot be written to', async () => {
+    await assertFails(setDoc(doc(member(), 'mailOutbox', 'forged'), { to: 'a@b.com' }));
+  });
+});
+
+describe('users', () => {
+  it('let a person read their own profile', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'users', 'member-uid')));
+  });
+
+  it('refuse reads of someone else’s profile', async () => {
+    await assertFails(getDoc(doc(member(), 'users', 'other-uid')));
+  });
+
+  it('let staff read any profile', async () => {
+    await assertSucceeds(getDoc(doc(staff('admin'), 'users', 'member-uid')));
+  });
+
+  it('refuse self-service writes, so a role claim cannot be forged', async () => {
+    await assertFails(setDoc(doc(member(), 'users', 'member-uid'), { role: 'owner' }));
+  });
+
+  it('refuse a self-granted paid plan', async () => {
+    // Billing state lives on the user document, so this is the write that would hand
+    // someone a Pro subscription for free.
+    await assertFails(
+      setDoc(
+        doc(member(), 'users', 'member-uid'),
+        { billing: { plan: 'pro', currentPeriodEnd: Date.now() + 1e10 } },
+        { merge: true },
+      ),
+    );
+  });
+});
+
+describe('server-only collections', () => {
+  it('keep audit logs unreadable, even by an owner', async () => {
+    await assertFails(getDoc(doc(member(), 'auditLogs', 'log-1')));
+    await assertFails(getDoc(doc(staff('owner'), 'auditLogs', 'log-1')));
+  });
+
+  it('keep audit logs unwritable, so the trail cannot be tampered with', async () => {
+    await assertFails(setDoc(doc(staff('owner'), 'auditLogs', 'forged'), { action: 'nope' }));
+  });
+
+  it('keep rate-limit buckets out of reach', async () => {
+    // Readable buckets would tell an attacker exactly how much budget they have left.
+    await assertFails(getDoc(doc(member(), 'rateLimits', 'bucket-1')));
+    await assertFails(setDoc(doc(member(), 'rateLimits', 'bucket-1'), { count: 0 }));
+  });
+
+  it('keep an audit query unrunnable, not merely a single document unreadable', async () => {
+    /*
+      The console filters the log by actor. The rule denies the whole collection, but a
+      collection query is a separate evaluation from a document get, and "you cannot read
+      log-1" would not by itself stop somebody listing every action a named host has taken.
+    */
+    await assertFails(
+      getDocs(query(collection(member(), 'auditLogs'), where('actorUid', '==', 'host-uid'))),
+    );
+    await assertFails(
+      getDocs(query(collection(staff('owner'), 'auditLogs'), where('eventId', '==', EVENT_ID))),
+    );
+  });
+});
+
+describe('suspension', () => {
+  /*
+    Suspension is enforced in the API, and the API is the only thing that can write. These
+    assert the flank: a suspended account still holds a valid Firebase token, so the question
+    is what that token can do to Firestore directly while the app is refusing it.
+  */
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'member-uid'), {
+        uid: 'member-uid',
+        role: 'user',
+        suspendedAt: Date.now(),
+        suspendedReason: 'reported for abuse',
+      });
+    });
+  });
+
+  it('cannot be lifted by the account it was applied to', async () => {
+    // The whole mechanism would be decorative if the suspended party could clear the field
+    // from a browser console.
+    await assertFails(
+      setDoc(
+        doc(member(), 'users', 'member-uid'),
+        { suspendedAt: null, suspendedReason: null },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('cannot be applied to somebody else by an ordinary account', async () => {
+    await assertFails(
+      setDoc(doc(member(), 'users', 'outsider-uid'), { suspendedAt: Date.now() }, { merge: true }),
+    );
+  });
+
+  it('cannot be applied by staff directly either — it goes through the audited route', async () => {
+    // Staff read any profile. Nobody writes one: a suspension with no audit entry behind it
+    // is a suspension nobody can explain later, so the rules refuse the shortcut.
+    await assertFails(
+      setDoc(doc(staff('owner'), 'users', 'member-uid'), { suspendedAt: null }, { merge: true }),
+    );
+  });
+
+  it('leaves the account still able to read its own profile, which is the design', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'users', 'member-uid')));
+  });
+});
+
+describe('unknown paths', () => {
+  it('are denied by default', async () => {
+    await assertFails(getDoc(doc(member(), 'somethingNew', 'doc-1')));
+    await assertFails(setDoc(doc(staff('owner'), 'somethingNew', 'doc-1'), { a: 1 }));
+  });
+});

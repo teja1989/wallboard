@@ -1,0 +1,31 @@
+# Marquee.
+#
+# Default to closed. The marketing pages are the only ones that should ever appear
+# in a search result; an event page is a private invitation whose URL was shared
+# with named people, and the app already sends `noindex` on every one of them.
+# This is the same decision made a second time, at the crawl rather than the page.
+
+User-agent: *
+
+# The public surfaces. `/$` matches the landing page exactly, not everything
+# beneath it.
+Allow: /$
+Allow: /pricing
+Allow: /templates
+
+# The legal pages have to be fetchable. Google's OAuth review reads the privacy
+# policy before it will let the app serve anyone outside the test-user list, and a
+# policy behind a Disallow is a policy that fails review — while looking fine to us.
+Allow: /privacy
+Allow: /terms
+
+# Everything else, stated explicitly so the intent survives someone editing the
+# catch-all below.
+Disallow: /e/
+Disallow: /join
+Disallow: /auth/
+Disallow: /api/
+Disallow: /billing/
+Disallow: /unsubscribe
+
+Disallow: /

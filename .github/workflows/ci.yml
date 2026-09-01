@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Emulator placeholders. No real credentials are involved anywhere in CI.
+  # Deliberately not the origin the tests browse to.
+  #
+  # These are two different things — the canonical public address, and where the browser
+  # actually is — and they diverge in real life the moment a custom domain is configured
+  # before its DNS is live. Pointing them at the same host let a bug through where the
+  # emailed sign-in link was built from the configured URL, so every link led to a domain
+  # that did not resolve. Keeping them different is what keeps that honest.
+  NEXT_PUBLIC_SITE_URL: https://marquee.example.com
+  NEXT_PUBLIC_USE_EMULATORS: 'true'
+  NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: marquee-dev.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: marquee-dev
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: marquee-dev.appspot.com
+  NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000'
+  NEXT_PUBLIC_EMULATOR_HOST: 127.0.0.1
+  STORAGE_DRIVER: emulator
+  JOIN_CODE_PEPPER: ci-pepper-value-not-a-real-secret-0123456789
+  CLEANUP_TASK_SECRET: ci-cleanup-secret-not-a-real-secret-0123456789
+  OWNER_EMAILS: owner@example.com
+  EMAIL_DRIVER: outbox
+  BILLING_DRIVER: mock
+
+jobs:
+  static:
+    name: Types, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      # Dependency hygiene, calibrated by what this gate actually caused.
+      #
+      # This step used to be `npm audit --audit-level=moderate` across dev dependencies too.
+      # It went red on advisories with no honest fix, and the pressure to make it green
+      # produced an `overrides` block that forced `gaxios` to v7 — a major the entire Cloud
+      # Storage auth chain does not support. The result was that no credential could be
+      # obtained from the metadata server, so photo upload, the wall's signed image URLs, the
+      # archive and event deletion were all broken in production for the life of the project,
+      # while this very check reported success. A gate that pushes people into corrupting the
+      # dependency tree is worse than no gate.
+      #
+      # So: block on anything high or critical in what actually ships, and report the rest
+      # without failing. `--omit=dev` because firebase-tools and the emulators never reach a
+      # container. `tests/unit/dependencies.test.ts` covers the failure mode this created —
+      # it fails on any package resolving a dependency outside its declared range, which is
+      # exactly what an override added to quiet this step tends to do.
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Report lower-severity advisories (not blocking)
+        run: npm audit --omit=dev || true
+
+  rules:
+    name: Firestore rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The Firestore emulator is a Java process.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:rules
+
+  # The deploy workflow builds this image only after Terraform has already applied,
+  # so a broken Dockerfile used to cost a whole deploy cycle to discover — which is
+  # exactly how a COPY of a `public/` directory that never existed reached production
+  # infrastructure. The runners have Docker; building here costs three minutes and
+  # catches it on the push instead.
+  image:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # Placeholders: these are inlined into the browser bundle, so the real
+          # values come from Terraform at deploy time. Nothing here needs to be true,
+          # only present, since the build fails without them.
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://example.com
+            NEXT_PUBLIC_FIREBASE_API_KEY=ci-placeholder
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=ci.firebaseapp.com
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID=ci-placeholder
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=ci-placeholder
+            NEXT_PUBLIC_FIREBASE_APP_ID=1:0:web:0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+
+      - name: Start emulators
+        run: |
+          npx firebase emulators:start --project marquee-dev \
+            --only auth,firestore,storage > /tmp/emulators.log 2>&1 &
+          npx wait-on -t 120000 http-get://127.0.0.1:8080 http-get://127.0.0.1:9099
+
+      - name: Start the app
+        run: |
+          npm start > /tmp/app.log 2>&1 &
+          npx wait-on -t 120000 http-get://127.0.0.1:3000
+
+      # Two passes over the same running stack: the API contract, then the real UI.
+      - run: npm run smoke
+      - run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Server logs on failure
+        if: failure()
+        run: |
+          echo '--- app ---'; tail -100 /tmp/app.log
+          echo '--- emulators ---'; tail -100 /tmp/emulators.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
